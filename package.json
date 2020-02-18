@@ -1,0 +1,23 @@
+{
+  "private": true,
+  "name": "purescript-screamer",
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "spago build",
+    "build:examples": "cd examples",
+    "postinstall": "spago install"
+  },
+  "dependencies": {
+    "sinuous": "0.24.0"
+  },
+  "devDependencies": {
+    "handlebars": "4.7.3",
+    "parcel-bundler": "^1.12.4",
+    "purescript": "^0.13.6",,
+    "purty": "4.6.0",
+    "spago": "^0.14.0",
+    "ts-node": "8.6.2",
+    "typescript": "^3.7.5"
+  }
+}

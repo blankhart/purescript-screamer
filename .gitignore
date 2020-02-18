@@ -1,0 +1,14 @@
+**/.cache/
+**/.code-workspace
+**/dist
+**/generated-docs/
+**/output/
+**/node_modules/
+**/.psa*
+**/.psc-package/
+**/.psc*
+**/.pulp-cache/
+**/.purs*
+**/.spago
+**/.vscode
+**/yarn-error.log
