@@ -9,6 +9,7 @@
     , "effect"
     , "foreign"
     , "generics-rep"
+    , "newtype"
     , "nullable"
     , "prelude"
     , "random"

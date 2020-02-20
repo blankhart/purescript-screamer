@@ -10,5 +10,6 @@
 **/.pulp-cache/
 **/.purs*
 **/.spago
+src/**/*.js
 **/.vscode
 **/yarn-error.log

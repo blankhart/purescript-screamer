@@ -1,6 +1,6 @@
--- Possibly keep out of the core via extensible subscriptions
+module Screamer.Subscriptions.Router where
 
-module Screamer.Router where
+{-
 
 foreign import onClick :: Event -> Effect Unit
 
@@ -52,3 +52,5 @@ subscription = { initialize, update, destroy }
 
 subscribe :: forall action. Mode -> (Url -> action) -> H.Subscription action
 subscribe mode handler = H.subscribe subscription { mode, handler }
+
+-}
