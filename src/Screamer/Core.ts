@@ -1,6 +1,18 @@
 import { h } from 'sinuous';
 import { computed, observable, Observable } from 'sinuous/observable';
 
+// NOTE: Unclear how to integrate 'cleanup'
+// import S from 's-js';
+// import { context } from 'sinuous';
+/*
+const h = context({
+  subscribe: S,
+  cleanup: S.cleanup,
+  root: S.root,
+  sample: S.sample,
+});
+*/
+
 export const documentImpl: Document = document;
 
 export const querySelectorImpl = (document: Document) => {
@@ -28,6 +40,7 @@ export const attribute = (key: string) => {
 };
 
 // intended to work for HTML only
+// more efficient not to construct objects each time
 export const element = (tag: string) => {
   return (attributes: Attribute[]) => {
     return (children: HTMLElement[]) => {
@@ -41,21 +54,30 @@ export const element = (tag: string) => {
   };
 };
 
-export function on(name: string) {
-  return function (handler: (e: Event) => (() => void)) {
-    return { key: "on" + name, value: (e: Event) => handler(e)() };
+export function handler(name: string) {
+  return function (onEvent: (e: Event) => (() => void)) {
+    return { key: "on" + name, value: (e: Event) => onEvent(e)() };
   };
 };
+
+export const mount = (selector: string) => (component: () => Element) => () => {
+  const element = document.querySelector(selector);
+  if (element) {
+    element.appendChild(component());
+  } else {
+    console.error(
+      `unable to mount at selector "${selector}" because the document has no matching element`
+    );
+  }
+}
+
+// FAKERY
 
 export function tick(counter: Observable<number>) {
   return function () {
     setInterval(() => counter(counter() + 1), 100);
   };
 };
-
-export const mount = (render: () => Element) => {
-  return () => document.body.append(render());
-}
 
 export const tutorial = () => {
   const counter = observable(0);

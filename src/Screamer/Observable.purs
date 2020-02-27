@@ -1,42 +1,60 @@
-module Screamer.Observable where 
+module Screamer.Observable where
 
-import Effect (Effect)
 import Prelude
 
-foreign import data Observable :: Type -> Type
+import Effect (Effect)
+import Unsafe.Coerce (unsafeCoerce)
 
-foreign import new_ :: forall a . a -> Effect (Observable a)
+foreign import data Channel :: Type -> Type
 
-new :: forall a . a -> Effect (Observable a)
-new = new_
+foreign import data Signal :: Type -> Type
 
-foreign import get :: forall a . Observable a -> Effect a
+-- Emit
 
-gets :: forall a b . (a -> b) -> Observable a -> Effect b
-gets f o = f <$> get o
+--------------------------------------------------------
+--  Channel
+--  Channels are write-only output ports.
+--  Signals are read-only but have input ports.
+--  Values are sent to a signal via channels.
+--  Channels are non-empty.
+--  The separation of the channel and the signal makes bidirectional syncing potentially more notationally cumbersome, but since the underlying representation is the same this should be the same morally.  The function would be unsafe send :: Signal a -> a -> Effect Unit where it is "known" that the signal is also a channel.
 
-foreign import put :: forall a . a -> Observable a -> Effect Unit
+foreign import channel :: forall a . a -> Effect (Channel a)
 
-foreign import modify :: forall a . (a -> a) -> Observable a -> Effect Unit
+foreign import send :: forall a. Channel a -> a -> Effect Unit
 
--- Use state thread-like techniques to restrict arbitrary effects
-foreign import kind Region 
+foreign import modify :: forall a . (a -> a) -> Channel a -> Signal Unit
 
--- The only impurity should relate to the Observable effect
-newtype Tracking (r :: Region) (a :: Type) = Tracking (Effect a)
+subscribe :: forall a . Channel a -> Signal a
+subscribe = unsafeCoerce
 
-derive instance functorTracking :: Functor (Tracking r)
--- apply, bind, applicative, monad, semigroup, monoid
+--------------------------------------------------------
+-- Signal
 
--- Capture an observable as an effectful thunk
-sample :: forall r a . Observable a -> Tracking r a
-sample o = Tracking (get o)
+foreign import get :: forall a . Signal a -> Effect a
 
--- Retrieve the effectful thunk
-foreign import observe :: forall r a . Tracking r a -> Observable a
+foreign import emit :: forall a . Signal (Effect a) -> Effect a
 
--- NOTE: Is this silly?  The region can be escaped by converting to an observable
--- and then back again.  
+instance functorSignal :: Functor Signal where
+ map = map_
 
--- Ideally the type system would ensure that a Tracking r value can be 
--- obtained only from an Observable value.
+instance applySignal :: Apply Signal where
+ apply = apply_
+
+instance applicativeSignal :: Applicative Signal where
+ pure = pure_
+
+instance semigroupSignal :: Semigroup (Signal a) where
+ append = merge_
+
+instance monoidSignal :: Monoid a => Monoid (Signal a) where
+ mempty = pure_ mempty
+
+foreign import map_ :: forall a b . (a -> b) -> Signal a -> Signal b
+
+foreign import pure_ :: forall a . a -> Signal a
+
+foreign import apply_ :: forall a b . (Signal (a -> b)) -> Signal a -> Signal b
+
+foreign import merge_ :: forall a . Signal a -> Signal a -> Signal a
+

@@ -1,3 +1,5 @@
+-- https://github.com/luwes/sinuous/wiki/Choose-your-own-reactive-library
+
 module Screamer.Core where
 
 import Prelude
@@ -12,17 +14,17 @@ import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data Document :: Type
 
-foreign import data Element :: Type 
+foreign import data Element :: Type
 
 foreign import data Attribute :: Type
 
-foreign import data Event :: Type 
+foreign import data Event :: Type
 
 -- Document
 
 foreign import documentImpl :: Document
 
-document :: Document 
+document :: Document
 document = documentImpl
 
 foreign import querySelectorImpl :: Document -> String -> Effect (Nullable Element)
@@ -40,7 +42,7 @@ foreign import querySelectorAll :: Document -> String -> Effect (Array Element)
 
 foreign import attribute :: String -> String -> Attribute
 
-foreign import on :: String -> (Event -> Effect Unit) -> Attribute
+foreign import handler :: String -> (Event -> Effect Unit) -> Attribute
 
 foreign import element :: String -> Array Attribute -> Array Element -> Element
 
@@ -48,65 +50,31 @@ foreign import element :: String -> Array Attribute -> Array Element -> Element
 
 class IsElement e
 
-instance elementIsElement :: IsElement Element 
-instance stringIsElement :: IsElement String 
-instance intIsElement :: IsElement Int 
+instance elementIsElement :: IsElement Element
+instance stringIsElement :: IsElement String
+instance intIsElement :: IsElement Int
 instance numberIsElement :: IsElement Number
-instance observableIsElement :: IsElement a => IsElement (Observable a)
+instance observableIsElement :: IsElement a => IsElement (Signal a)
 
-coerce :: forall a . IsElement a => a -> Element 
+coerce :: forall a . IsElement a => a -> Element
 coerce = unsafeCoerce
 
-text :: String -> Element 
+text :: String -> Element
 text = unsafeCoerce
 
-integer :: Int -> Element 
+integer :: Int -> Element
 integer = unsafeCoerce
 
 number :: Number -> Element
-number = unsafeCoerce 
+number = unsafeCoerce
 
-observable :: forall a . IsElement a => Observable a -> Element 
-observable = unsafeCoerce
+signal :: forall a . IsElement a => Signal a -> Element
+signal = unsafeCoerce
 
-tracking :: forall r a . IsElement a => Tracking r a -> Element 
-tracking = observe >>> observable
+foreign import mount :: String -> Effect Element -> Effect Unit
 
--- h(type: string, props: object, ...children).
--- props must be an object
+-- NOT REAL
 
--- foreign import observable :: Observable String -> Element
--- foreign import observable :: Observable Element -> Element
--- foreign import observable :: Observable (Array Element) -> Element
+foreign import tutorial :: Effect Unit
 
-
-type Sink a = a -> Effect Unit
-
--- type Component
-
--- type Subscription
-
-foreign import tutorial :: Effect Unit 
-
-foreign import mount :: Effect Element -> Effect Unit
-
-foreign import tick :: Observable Int -> Effect Unit
-
-hello :: Effect Unit 
-hello = do 
-  counter <- new 0
-  mount $ pure $
-    element "div" 
-      [ attribute "style" "color: blue;"
-      ]
-      [ observable counter
-      , element "br" [] []
-      , tracking $ map (_ + 2) (sample counter)
-      , element "br" [] []
-      , tracking $ map (_ + 5) (sample counter)
-      , element "br" [] []
-      , element "button" [ on "click" \_ -> put 0 counter
-      ] [ text "Reset" ]
-      ] 
-  tick counter
-
+foreign import tick :: Channel Int -> Effect Unit

@@ -33,6 +33,7 @@
     "[purescript]": {
       "editor.wordWrap": "bounded",
       "editor.wordWrapColumn": 80,
+      "editor.wrappingIndent": "deepIndent",
     },
     "editor.rulers": [
       80,
