@@ -16,6 +16,7 @@
     , "refs"
     , "psci-support"
     , "random"
+    , "transformers"
     , "web-events"
     , "web-dom"
     , "web-html"

@@ -11,7 +11,7 @@
     "serve": "parcel examples/output/HelloWorld.html"
   },
   "dependencies": {
-    "sinuous": "0.24.0",
+    "sinuous": "0.26.1",
     "s-js": "0.4.9"
   },
   "devDependencies": {

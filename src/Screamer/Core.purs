@@ -4,6 +4,7 @@ module Screamer.Core where
 
 import Prelude
 import Screamer.Observable
+import Screamer.Component.Trans
 
 import Data.Maybe (Maybe)
 import Data.Nullable (Nullable)
@@ -70,6 +71,9 @@ number = unsafeCoerce
 
 signal :: forall a . IsElement a => Signal a -> Element
 signal = unsafeCoerce
+
+component :: forall a . IsElement a => Component (Signal a) -> Element
+component = render >>> signal
 
 foreign import mount :: String -> Effect Element -> Effect Unit
 

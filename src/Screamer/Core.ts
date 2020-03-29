@@ -11,6 +11,24 @@ const h = context({
   root: S.root,
   sample: S.sample,
 });
+
+Is there a way to merge observables without requiring manual imperative cleanup?  The intended semantics are:
+
+```typescript
+const merge = <S>(a: Observable<S>) => (b: Observable<S>) => {
+  const o = observable(sample(a));
+  const unsubscribe_a = subscribe(() => o(a()));
+  const unsubscribe_b = subscribe(() => o(b()));
+  return o;  // goodbye unsubscribe_a and _b
+}
+```
+
+There doesn't seem to be a way to do this through a `computed`.
+
+The problem with failing to unsubscribe is that the downstream observable would continue to update even after a parent computed has been disposed of (or is no longer firing).  This would arise when a grandchild computed subscribes to a grandparent computed and the parent goes out of scope.  The solution is to ensure that the parent computed's cleanup function calls unsubscribe methods attached to all of its children.
+
+The alternative would be to ensure that each observable has a list of unsubscribe functions, and that the cleanup function for any component runs all of the unsubscribe functions of its child observables.  To wrap and hide the imperative state, this would require all of the observable creation to occur in a monad.
+
 */
 
 export const documentImpl: Document = document;
@@ -73,10 +91,8 @@ export const mount = (selector: string) => (component: () => Element) => () => {
 
 // FAKERY
 
-export function tick(counter: Observable<number>) {
-  return function () {
-    setInterval(() => counter(counter() + 1), 100);
-  };
+export const tick = (counter: Observable<number>) => () => {
+  setInterval(() => counter(1), 100);
 };
 
 export const tutorial = () => {
