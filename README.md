@@ -1,5 +1,31 @@
 # Screamer
 
+Everything involving a `Signal a` is effectful.
+
+* Running a signal is effectful because it involves a time-varying quantity.
+
+* Creating a `computed` is morally pure, but actually effectful because `sinuous` modifies the signal graph under the hood.  Any effects referenced in the signal body will be run on creation, but if they are themselves thunked, that run will remain pure apart from modifications of the signal graph (an FFI call).  Differentiation is necessary between `Signal a` and `Signal (Effect a)`.  Ignoring the underlying mutation is an acceptable abstraction similar to the one in `purescript-signal`, which mutated variables under the hood.
+
+As a result, the return value of a component must be thunked, or a signal in order for the value to be deferred.  Creating that signal will result in the execution of any underlying effects.  This will require extreme care in order to maintain basic guarantees.
+
+The accumulation of unsubscribe functions is effectful, but not necessarily monadic because the cleanups can occur in any order.  Thus, an applicative instance should suffice.
+
+We distinguish between a `Channel` and a `Signal`.  When determining whether an action is represented as effectful through the type system, effects that only modify the `sinuous` observable graph are ignored, but all other effects are represented.
+
+A `Channel` can be created in pure fashion because it only modifies the signal graph.  A `Channel` can be reset only through an effectful function.  A `Channel` is never disposed of, other than via disposal of the parent computation.
+
+A `Signal` can be created in a pure fashion from a `Channel`.  A `Signal` ordinarily can be created in a pure function from another `Signal`, with exceptions.
+
+First, merging `Signal`s requires imperative management of the signal graph, and therefore is effectful to the extent that this management will be taken care of within a monad (but not otherwise).  For example, the framework could return an effect so that the operation has type `merge :: Signal a -> Signal a -> { result :: Signal a, cleanup :: Effect Unit }`.
+
+Second, if a `Signal` represents a quantity that depends on side effects (for example, a web socket) its creation will be effectful.  If the side effecting value is thunked, the operation will remain pure because the side effects will not be run.  In a typical case, though, the caller creating the observable will want the socket created, so this runs in effect.
+
+The `Signal` type can accumulate its own cleanup functions.  If the `Signal` is effectful beyond modification of the graph, creation of the signal via `computed` should have type `Effect (Signal a)`.  Running the signal will then also involve an effect and have type `Signal a -> Effect a`.
+
+This is going someplace where there is a `Component` type that everything runs in, and functions `render :: ComponentT Effect -> ComponentT Effect` and `mount :: Component -> Effect Unit`.  But any rendering to a particular `Element` has to run an effect rather than keeping it thunked in order to maintain a sane API.
+
+`Element` (and `Attribute`) then would be opaque types that embed effects, or really, ?.
+
 ## Sinuous
 
 Efficient JS frameworks have a mechanism of tracing state changes to corresponding view changes, and then surgically mutating the affected sections of the DOM.

@@ -15,6 +15,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data Document :: Type
 
+-- Running a signal is effectful because it is a time-varying quantity.
 foreign import data Element :: Type
 
 foreign import data Attribute :: Type
@@ -48,6 +49,7 @@ foreign import handler :: String -> (Event -> Effect Unit) -> Attribute
 foreign import element :: String -> Array Attribute -> Array Element -> Element
 
 -- Primitive types coercible to an HTML (SVG?) element
+-- NOTE: This is a lie, because running a signal is effectful (time-varying)
 
 class IsElement e
 
