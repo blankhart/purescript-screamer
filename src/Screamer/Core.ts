@@ -1,35 +1,5 @@
 import { h } from 'sinuous';
-import { computed, observable, Observable } from 'sinuous/observable';
-
-// NOTE: Unclear how to integrate 'cleanup'
-// import S from 's-js';
-// import { context } from 'sinuous';
-/*
-const h = context({
-  subscribe: S,
-  cleanup: S.cleanup,
-  root: S.root,
-  sample: S.sample,
-});
-
-Is there a way to merge observables without requiring manual imperative cleanup?  The intended semantics are:
-
-```typescript
-const merge = <S>(a: Observable<S>) => (b: Observable<S>) => {
-  const o = observable(sample(a));
-  const unsubscribe_a = subscribe(() => o(a()));
-  const unsubscribe_b = subscribe(() => o(b()));
-  return o;  // goodbye unsubscribe_a and _b
-}
-```
-
-There doesn't seem to be a way to do this through a `computed`.
-
-The problem with failing to unsubscribe is that the downstream observable would continue to update even after a parent computed has been disposed of (or is no longer firing).  This would arise when a grandchild computed subscribes to a grandparent computed and the parent goes out of scope.  The solution is to ensure that the parent computed's cleanup function calls unsubscribe methods attached to all of its children.
-
-The alternative would be to ensure that each observable has a list of unsubscribe functions, and that the cleanup function for any component runs all of the unsubscribe functions of its child observables.  To wrap and hide the imperative state, this would require all of the observable creation to occur in a monad.
-
-*/
+import { computed, observable, subscribe, Observable } from 'sinuous/observable';
 
 export const documentImpl: Document = document;
 
@@ -51,10 +21,10 @@ export const querySelectorAll = (document: Document) => {
 
 type Attribute = { key: string, value: any };
 
-export const attribute = (key: string) => {
-  return (value: any) => {
-    return { key, value };
-  };
+// The initial unit parameter is the empty typeclass dictionary
+// for IsValue v =>
+export const attribute = () => (key: string) => (value: any) => {
+  return { key, value };
 };
 
 // intended to work for HTML only
@@ -64,7 +34,7 @@ export const element = (tag: string) => {
     return (children: HTMLElement[]) => {
       const attrs: Record<string, any> = {};
       for (let { key, value } of attributes) {
-        console.log(`key, value: ${key}, ${value}`);
+        // console.log(`key, value: ${key}, ${value}`);
         attrs[key] = value;
       }
       return h(tag, attrs, children);
@@ -72,7 +42,7 @@ export const element = (tag: string) => {
   };
 };
 
-export function handler(name: string) {
+export function on(name: string) {
   return function (onEvent: (e: Event) => (() => void)) {
     return { key: "on" + name, value: (e: Event) => onEvent(e)() };
   };
@@ -92,7 +62,9 @@ export const mount = (selector: string) => (component: () => Element) => () => {
 // FAKERY
 
 export const tick = (counter: Observable<number>) => () => {
-  setInterval(() => counter(1), 100);
+  subscribe(() => {
+    setInterval(() => counter(1), 100);
+  });
 };
 
 export const tutorial = () => {
@@ -110,4 +82,12 @@ export const tutorial = () => {
 
   document.body.append(view());
   setInterval(() => counter(counter() + 1), 100);
+}
+
+export const property = (a: any) => (b: any) => {
+  return b[a];
+};
+
+export const component = () => <T>(c: () => Observable<T>) => {
+  return h('div', computed(c));
 }

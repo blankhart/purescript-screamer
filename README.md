@@ -1,5 +1,25 @@
 # Screamer
 
+Referential transparency problem?  The concern is that evaluating a putative `Component` to an `Effect` will not be referentially transparent.  If the `Component` produces effects other than modification of the signal graph,  `sinuous` will run those effects when the `Component` is evaluated to an `Element`.
+
+Essentially, evaluating an `Effect Unit` computation will run an effect in the manner of `unsafePerformIO`.  This occurs when an `Effect` value is passed in as the thunk to the `subscribe` or `computed` functions directly rather than as a thunk on a thunk (`() => () => {}`).
+
+The way to explore this would be to have an `x :: Effect Element` function, have it log to the console and construct an element, and then do `let y = x` within the main function and see if that produces side effects.  By limiting the statement to `let y = x` that would avoid executing the effect.  The compiler may optimize away the unused reference.
+
+A possible solution is to use a [free monad transformer](https://pursuit.purescript.org/packages/purescript-freet/5.0.0/docs/Control.Monad.Free.Trans).  This would allow suspended effectful computations to be rendered as pure markup and then interpreted to a single effect (`runFreeT`). Or really any monad transformer over effect.
+
+An important thing would be that the thunks which are run are PureScript thunks so that the underlying `sinuous` implementation doesn't run up against thunks when things start to conditionally render.
+
+## TODO
+
+* Implement a component monad to ensure there is a uniform mechanism to run any cleanups arising from side effects when the component unmounts.  This should have a `MonadEffect` instance.
+
+* Rewrite signal dischargers with the same foreign implementations, but to run in `MonadEffect`.
+
+* Find a type system encoding for the prohibition on setting data signals from within computations to avoid endless loops.
+
+## Effects
+
 Everything involving a `Signal a` is effectful.
 
 * Running a signal is effectful because it involves a time-varying quantity.

@@ -2,9 +2,10 @@
 
 module Screamer.Core where
 
+import Debug.Trace
+
 import Prelude
 import Screamer.Observable
-import Screamer.Component.Trans
 
 import Data.Maybe (Maybe)
 import Data.Nullable (Nullable)
@@ -42,14 +43,15 @@ foreign import querySelectorAll :: Document -> String -> Effect (Array Element)
 
 -- HTML Element creation
 
-foreign import attribute :: String -> String -> Attribute
+foreign import attribute :: forall v . IsValue v => String -> v -> Attribute
 
-foreign import handler :: String -> (Event -> Effect Unit) -> Attribute
+foreign import on :: String -> (Event -> Effect Unit) -> Attribute
 
 foreign import element :: String -> Array Attribute -> Array Element -> Element
 
--- Primitive types coercible to an HTML (SVG?) element
--- NOTE: This is a lie, because running a signal is effectful (time-varying)
+foreign import property :: forall a b c . a -> b -> c
+
+--  Primitive types coercible to a sinuous HTML (SVG) element.  Since running a signal is effectful, the opaque type `Element` represents an effectful computation, and is distinct from an actual DOM `Element`.
 
 class IsElement e
 
@@ -59,8 +61,14 @@ instance intIsElement :: IsElement Int
 instance numberIsElement :: IsElement Number
 instance observableIsElement :: IsElement a => IsElement (Signal a)
 
-coerce :: forall a . IsElement a => a -> Element
-coerce = unsafeCoerce
+--  Primitive types coercible to a Sinuous HTML attribute value.
+
+class IsValue a
+
+instance stringIsValue :: IsValue String
+instance intIsValue :: IsValue Int
+instance numberIsValue :: IsValue Number
+instance observableIsValue :: IsValue a => IsValue (Signal a)
 
 text :: String -> Element
 text = unsafeCoerce
@@ -74,9 +82,6 @@ number = unsafeCoerce
 signal :: forall a . IsElement a => Signal a -> Element
 signal = unsafeCoerce
 
-component :: forall a . IsElement a => Component (Signal a) -> Element
-component = render >>> signal
-
 foreign import mount :: String -> Effect Element -> Effect Unit
 
 -- NOT REAL
@@ -84,3 +89,5 @@ foreign import mount :: String -> Effect Element -> Effect Unit
 foreign import tutorial :: Effect Unit
 
 foreign import tick :: Channel Int -> Effect Unit
+
+foreign import component :: forall a . IsElement a => Effect (Signal a) -> Element

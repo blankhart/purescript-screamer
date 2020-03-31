@@ -6,6 +6,7 @@
     [ "aff"
     , "affjax"
     , "console"
+    , "debug"
     , "effect"
     , "foreign"
     , "generics-rep"

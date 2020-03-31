@@ -1,7 +1,5 @@
 import { sample, computed, observable, subscribe, cleanup, Observable } from 'sinuous/observable';
 
-// import { sample, computed, observable, subscribe, cleanup, Observable } from 's-js';
-
 /////////////////////////////////
 // Channel
 
@@ -40,7 +38,7 @@ export const apply_ = <S, T>(f: Observable<(_: S) => T>) => (s: Observable<S>) =
   return computed(() => f()(s()));
 }
 
-export const merge_ = <S>(a: Observable<S>) => (b: Observable<S>) => {
+export const merge = <S>(a: Observable<S>) => (b: Observable<S>) => {
   const o = observable(sample(a));
   subscribe(() => o(a()));
   subscribe(() => o(b()));
@@ -50,7 +48,7 @@ export const merge_ = <S>(a: Observable<S>) => (b: Observable<S>) => {
 export const filter = <S>(f: (_: S) => boolean) => (seed: S) => (sig: Observable<S>) => {
   const s = sample(sig);
   const o = observable(f(s) ? s : seed);
-  const unsubscribe = subscribe(() => {
+  subscribe(() => {
     const v = sig();
     if (f(v)) o(v);
   });
@@ -62,5 +60,14 @@ export const fold = <S, T>(f: (_: S) => (_: T) => T) => (seed: T) => (sig: Obser
   return computed(() => {
     acc = f(sig())(acc);
     return acc;
+  });
+};
+
+// IGNORE
+
+export const trial = <T>(action: () => T) => (cleanups: () => {}) => () => {
+  return computed(() => {
+    cleanup(cleanups);
+    return action();
   });
 };
