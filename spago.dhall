@@ -9,6 +9,7 @@
     , "debug"
     , "effect"
     , "foreign"
+    , "freet"
     , "generics-rep"
     , "newtype"
     , "nullable"

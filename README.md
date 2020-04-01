@@ -6,9 +6,23 @@ Essentially, evaluating an `Effect Unit` computation will run an effect in the m
 
 The way to explore this would be to have an `x :: Effect Element` function, have it log to the console and construct an element, and then do `let y = x` within the main function and see if that produces side effects.  By limiting the statement to `let y = x` that would avoid executing the effect.  The compiler may optimize away the unused reference.
 
+The obvious solution is to require child component elements to be created effectfully and then inserted into a pure return value.  Essentially, faithful to the types, the conversion of a component into an element would require running the effect.
+
+But what if the component is dynamic, or conditionally rendered?  It could render to a signal, but then there still would be a `Signal (Effect a)` value in the component tree.  The issue is dynamic effectful components; static effectful components.
+
+Is there a way to pull out a `Signal Element` representing effects that may run in the future?  What if all components returned `Signal Element`?
+
+## Hmm.
+
 A possible solution is to use a [free monad transformer](https://pursuit.purescript.org/packages/purescript-freet/5.0.0/docs/Control.Monad.Free.Trans).  This would allow suspended effectful computations to be rendered as pure markup and then interpreted to a single effect (`runFreeT`). Or really any monad transformer over effect.
 
 An important thing would be that the thunks which are run are PureScript thunks so that the underlying `sinuous` implementation doesn't run up against thunks when things start to conditionally render.
+
+But then what about a `Signal (Effect a)`?  Does that ever get to render in the DOM?
+
+What about a dynamic list of components?  It doesn't have a static shape.  Not a dynamic list of elements, but of components each of which has some effect.  This potentially would be difficult to interoperate with the `sinuous` keyed `map/mini`.  That takes an observable array to (typically) a series of elements, presumably by observing changes in the array and returning a computed series of elements.  So this would result in an effect nested under a signal.
+
+Another possibility may be suggested by [SDOM](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html).  The issue here is the signal has to be fine-grained to provide benefits. That would be effected in part by projecting the model to `Signal` values, but could be eliminated if there is a need for `model -> model`.  There is still no way to encode effects in the component tree. Also, this only allows text nodes, attribute values and event handlers to vary with the model.  Everything else must be static.  That forecloses the possibility of dynamic components.
 
 ## TODO
 

@@ -7,6 +7,7 @@ import Debug.Trace
 import Prelude
 import Screamer.Observable
 
+import Data.Traversable (sequence)
 import Data.Maybe (Maybe)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
@@ -16,10 +17,14 @@ import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data Document :: Type
 
--- Running a signal is effectful because it is a time-varying quantity.
-foreign import data Element :: Type
+foreign import data E :: Type
 
-foreign import data Attribute :: Type
+foreign import data V :: Type
+
+-- Running a signal is effectful because it is a time-varying quantity.
+newtype Element = Element (Effect E)
+
+newtype Attribute = Attribute { key :: String, value :: Effect V }
 
 foreign import data Event :: Type
 
@@ -41,48 +46,70 @@ querySelector doc sel = Nullable.toMaybe <$> querySelectorImpl doc sel
 
 foreign import querySelectorAll :: Document -> String -> Effect (Array Element)
 
+-- Run an element
+
+foreign import mount :: String -> Element -> Effect Unit
+
 -- HTML Element creation
 
-foreign import attribute :: forall v . IsValue v => String -> v -> Attribute
+foreign import element_ :: String -> Array Attribute -> Array Element -> Element
 
-foreign import on :: String -> (Event -> Effect Unit) -> Attribute
+attribute_ :: forall v . IsValue v => String -> v -> Attribute
+attribute_ key v = Attribute { key, value: value v }
 
-foreign import element :: String -> Array Attribute -> Array Element -> Element
+foreign import on_ :: String -> (Event -> Effect Unit) -> Attribute
+
+-- Internal, highly unsafe accessor for JavaScript object property
 
 foreign import property :: forall a b c . a -> b -> c
 
 --  Primitive types coercible to a sinuous HTML (SVG) element.  Since running a signal is effectful, the opaque type `Element` represents an effectful computation, and is distinct from an actual DOM `Element`.
 
-class IsElement e
+class IsElement a where
+  element :: a -> Element
 
-instance elementIsElement :: IsElement Element
-instance stringIsElement :: IsElement String
-instance intIsElement :: IsElement Int
-instance numberIsElement :: IsElement Number
-instance observableIsElement :: IsElement a => IsElement (Signal a)
+instance elementIsElement :: IsElement Element where
+  element = identity
+
+instance stringIsElement :: IsElement String where
+  element = Element <<< pure <<< unsafeCoerce
+
+instance intIsElement :: IsElement Int where
+  element = Element <<< pure <<< unsafeCoerce
+
+instance numberIsElement :: IsElement Number where
+  element = Element <<< pure <<< unsafeCoerce
+
+instance effectfulIsElement :: IsElement a => IsElement (Signal (Effect a)) where
+  element = Element <<< _effectfulSignal
+
+else instance observableIsElement :: IsElement a => IsElement (Signal a) where
+  element = Element <<< pure <<< unsafeCoerce
 
 --  Primitive types coercible to a Sinuous HTML attribute value.
 
-class IsValue a
+class IsValue v where
+  value :: v -> Effect V
 
-instance stringIsValue :: IsValue String
-instance intIsValue :: IsValue Int
-instance numberIsValue :: IsValue Number
-instance observableIsValue :: IsValue a => IsValue (Signal a)
+instance booleanIsValue :: IsValue Boolean where
+  value = pure <<< unsafeCoerce
 
-text :: String -> Element
-text = unsafeCoerce
+instance stringIsValue :: IsValue String where
+  value = pure <<< unsafeCoerce
 
-integer :: Int -> Element
-integer = unsafeCoerce
+instance intIsValue :: IsValue Int where
+  value = pure <<< unsafeCoerce
 
-number :: Number -> Element
-number = unsafeCoerce
+instance numberIsValue :: IsValue Number where
+  value = pure <<< unsafeCoerce
 
-signal :: forall a . IsElement a => Signal a -> Element
-signal = unsafeCoerce
+instance effectfulIsValue :: IsValue v => IsValue (Signal (Effect v)) where
+  value = _effectfulSignal
 
-foreign import mount :: String -> Effect Element -> Effect Unit
+else instance observableIsValue :: IsValue a => IsValue (Signal a) where
+  value = pure <<< unsafeCoerce
+
+foreign import _effectfulSignal :: forall a b . Signal (Effect a) -> b
 
 -- NOT REAL
 

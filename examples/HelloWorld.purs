@@ -1,5 +1,6 @@
 module Screamer.Examples.HelloWorld where
 
+import Control.Bind
 import Data.String (toUpper)
 import Effect (Effect)
 import Effect.Console (log)
@@ -14,7 +15,7 @@ consolation = do
   S.subscribe <$> S.channel 3
 
 main :: Effect Unit
-main = S.mount "main" $ do
+main = S.mount "main" =<< do
   ticker <- S.channel 0
   jumper <- S.channel 0
   inputChan <- S.channel "type here"
@@ -24,7 +25,6 @@ main = S.mount "main" $ do
     S.send jumper 400
     j <- S.get (S.subscribe jumper <> S.subscribe cuckoo)
     S.send ticker (-j)
-    log $ "Ran...!"
     S.get (S.subscribe cuckoo)
   let
     count = S.fold (+) 0 (S.subscribe ticker <> S.subscribe jumper)
@@ -33,43 +33,43 @@ main = S.mount "main" $ do
   -- Referential transparency failure occurs here because it runs the effect
   log $ unsafeCoerce $ S.component consolation
   pure $
-    S.element "div"
-      [ S.attribute "style" "color: blue;"
+    S.element_ "div"
+      [ S.attribute_ "style" "color: blue;"
       ]
-      [ S.text "Tangle:"
-      , S.signal tangle
-      , S.element "br" [] []
-      , S.signal count
-      , S.element "br" [] []
-      , S.signal $ map (_ + 2) count
-      , S.element "br" [] []
-      , S.signal $ map (_ + 5) count
-      , S.element "br" [] []
+      [ S.element "Tangle:"
+      , S.element tangle
+      , S.element_ "br" [] []
+      , S.element count
+      , S.element_ "br" [] []
+      , S.element $ map (_ + 2) count
+      , S.element_ "br" [] []
+      , S.element $ map (_ + 5) count
+      , S.element_ "br" [] []
 {-
       , S.element "button"
           [ S.on "click" \_ -> S.send ticker 0 ]
           [ S.text "Reset" ]
 -}
-      , S.element "button"
-          [ S.on "click" \_ -> do
+      , S.element_ "button"
+          [ S.on_ "click" \_ -> do
               S.send jumper 1000
               S.send clicked "clicked!"
           ]
-          [ S.text "Jump" ]
-      , S.signal uppercased
-      , S.element "br" [] []
+          [ S.element "Jump" ]
+      , S.element uppercased
+      , S.element_ "br" [] []
       , input (uppercased <> S.subscribe clicked) inputChan
 --      , S.component consolation
       ]
 
 input :: S.Signal String -> S.Channel String -> S.Element
 input s c = do
-  S.element "input"
-    [ S.on "input" \i -> do
+  S.element_ "input"
+    [ S.on_ "input" \i -> do
         let t = i # S.property "target" # S.property "value"
         log $ "Sending " <> t
         log $ "Got " <> unsafeCoerce i
         S.send c t
-    , S.attribute "value" s
+    , S.attribute_ "value" s
     ]
     []
