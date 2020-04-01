@@ -27,7 +27,7 @@ main = S.mount "main" =<< do
     S.send ticker (-j)
     S.get (S.subscribe cuckoo)
   let
-    count = S.fold (+) 0 (S.subscribe ticker <> S.subscribe jumper)
+    count = S.scan (+) 0 (S.subscribe ticker <> S.subscribe jumper)
     uppercased = toUpper <$> S.subscribe inputChan
   S.tick ticker
   -- Referential transparency failure occurs here because it runs the effect

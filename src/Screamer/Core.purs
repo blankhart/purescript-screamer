@@ -7,12 +7,10 @@ import Debug.Trace
 import Prelude
 import Screamer.Observable
 
-import Data.Traversable (sequence)
 import Data.Maybe (Maybe)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Effect (Effect)
-import Effect.Console (log)
 import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data Document :: Type
@@ -21,7 +19,13 @@ foreign import data E :: Type
 
 foreign import data V :: Type
 
--- Running a signal is effectful because it is a time-varying quantity.
+-- Morally this is a newtype over forall e . Coercible e => Effect e
+-- where Coercible is evidence that e is coercible to E, the types
+-- that the sinuous variant of hyperscript can render as a DOM element.
+-- Performing the coercion requires evaluating the effectful
+-- computation.
+-- Reading a sinuous observable is effectful because it represents
+-- a time-varying quantity.
 newtype Element = Element (Effect E)
 
 newtype Attribute = Attribute { key :: String, value :: Effect V }
@@ -68,6 +72,8 @@ foreign import property :: forall a b c . a -> b -> c
 class IsElement a where
   element :: a -> Element
 
+-- Need instance IsElement E
+
 instance elementIsElement :: IsElement Element where
   element = identity
 
@@ -80,8 +86,11 @@ instance intIsElement :: IsElement Int where
 instance numberIsElement :: IsElement Number where
   element = Element <<< pure <<< unsafeCoerce
 
+--  NOTE: This doesn't actually have much meaning on its own.  A dynamic component would wrap a Signal (Effect a), but only because it would be a Signal Element.
 instance effectfulIsElement :: IsElement a => IsElement (Signal (Effect a)) where
-  element = Element <<< _effectfulSignal
+  element = _effectfulSignal
+
+-- Need instance Signal Element
 
 else instance observableIsElement :: IsElement a => IsElement (Signal a) where
   element = Element <<< pure <<< unsafeCoerce
@@ -109,6 +118,7 @@ instance effectfulIsValue :: IsValue v => IsValue (Signal (Effect v)) where
 else instance observableIsValue :: IsValue a => IsValue (Signal a) where
   value = pure <<< unsafeCoerce
 
+-- While handled through the FFI, morally b ~ Effect (Signal a)
 foreign import _effectfulSignal :: forall a b . Signal (Effect a) -> b
 
 -- NOT REAL
