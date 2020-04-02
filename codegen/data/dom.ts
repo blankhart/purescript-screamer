@@ -1,12 +1,12 @@
 const capitalize = (string: string) =>
   string[0].toUpperCase() + string.slice(1);
 
-namespace codegen {
+export namespace codegen {
 
-  type ValueType = 'boolean' | 'integer' | 'number' | 'string' | 'effect';
+  export type ValueType = 'boolean' | 'integer' | 'number' | 'string' | 'effect';
 
   // https://pursuit.purescript.org/packages/purescript-dom-classy/2.2.0/docs/DOM.Classy.Event
-  type EventClass =
+  export type EventClass =
     | 'Animation'
     | 'Clipboard'
     | 'Composition'
@@ -21,7 +21,7 @@ namespace codegen {
     | 'UI'
     | 'Wheel';
 
-  const EventClassImplies: Record<EventClass, EventClass | null> = {
+  export const EventClassImplies: Record<EventClass, EventClass | null> = {
     Animation: 'Event',
     Clipboard: 'Event',
     Composition: 'UI',
@@ -37,7 +37,7 @@ namespace codegen {
     Wheel: 'Mouse',
   };
 
-  const EventClassFields: Record<EventClass, Record<string, ValueType>> = {
+  export const EventClassFields: Record<EventClass, Record<string, ValueType>> = {
     Animation: {
       animationName: 'string',
       elapsedTime: 'number',
@@ -128,7 +128,7 @@ namespace codegen {
   };
 
   // https://developer.mozilla.org/en-US/docs/Web/Events
-  const EventHandlersAll: Record<EventClass, string[]> = {
+  export const EventHandlersAll: Record<EventClass, string[]> = {
     Animation: [
       'onAnimationEnd',
       'onAnimationIteration',
@@ -206,7 +206,7 @@ namespace codegen {
   };
 
   // https://html.spec.whatwg.org/multipage/indices.html#attributes-3
-  const Properties: Record<string, ValueType | 'record'> = {
+  export const Attributes: Record<string, ValueType | 'record'> = {
     abbr: 'string',
     accept: 'string',
     accept_charset: 'string',
@@ -332,7 +332,7 @@ namespace codegen {
   };
 
   // https://html.spec.whatwg.org/multipage/indices.html#elements-3
-  const Elements: Record<string, string[]> = {
+  export const Elements: Record<string, string[]> = {
     a: [],
     abbr: [],
     address: [],

@@ -6,21 +6,22 @@
   "scripts": {
     "build": "spago build",
     "build:examples": "cd examples",
+    "codegen:dom": "ts-node codegen/dom.ts",
     "hello": "tsc && spago bundle-app --main Screamer.Examples.HelloWorld --to examples/output/HelloWorld.js",
     "postinstall": "spago install",
     "serve": "parcel examples/output/HelloWorld.html"
   },
   "dependencies": {
-    "sinuous": "0.26.1",
-    "s-js": "0.4.9"
+    "sinuous": "0.26.1"
   },
   "devDependencies": {
-    "handlebars": "4.7.3",
+    "@types/node": "^13.9.8",
+    "handlebars": "4.7.4",
     "parcel-bundler": "^1.12.4",
     "purescript": "^0.13.6",
     "purty": "4.6.0",
     "spago": "^0.14.0",
     "ts-node": "8.6.2",
-    "typescript": "^3.7.5"
+    "typescript": "^3.8.3"
   }
 }
