@@ -1,3 +1,9 @@
--- Elements
+module Screamer.DOM.Element where
 
+import Screamer.Core (Element, element_)
 
+{{#each Elements as |value key|}}
+{{key}}_ :: Array Attribute -> Element
+{{key}}_ = element_ "{{key}}"
+
+{{/each}}

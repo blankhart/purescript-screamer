@@ -63,10 +63,6 @@ attribute_ key v = Attribute { key, value: value v }
 
 foreign import on_ :: String -> (Event -> Effect Unit) -> Attribute
 
--- Internal, highly unsafe accessor for JavaScript object property
-
-foreign import property :: forall a b c . a -> b -> c
-
 --  Primitive types coercible to a sinuous HTML (SVG) element.  Since running a signal is effectful, the opaque type `Element` represents an effectful computation, and is distinct from an actual DOM `Element`.
 
 class IsElement a where

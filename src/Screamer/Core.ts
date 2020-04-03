@@ -81,10 +81,6 @@ export const tutorial = () => {
   setInterval(() => counter(counter() + 1), 100);
 }
 
-export const property = (a: any) => (b: any) => {
-  return b[a];
-};
-
 export const component = () => <T>(c: () => Observable<T>) => () => {
   return h('div', computed(c));
 }

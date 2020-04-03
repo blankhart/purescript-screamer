@@ -1,1 +1,1 @@
--- Event handlers returning properties
+module Screamer.DOM.EventHandler where

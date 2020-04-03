@@ -10,6 +10,14 @@ function main() {
   const sourceDir = `./codegen/templates/src`;
   const targetDir = `./src/Screamer/DOM`;
 
+  handlebars.registerHelper('capitalize', (string: string) =>
+    string[0].toUpperCase() + string.slice(1)
+  );
+
+  handlebars.registerHelper('lowercase', (string: string) =>
+    string.toLowerCase()
+  );
+
   fs.readdirSync(sourceDir).forEach(source => {
 
     const sourceFile = `${sourceDir}/${source}`;
@@ -26,6 +34,9 @@ function main() {
     fs.writeFileSync(targetFile, compiled(codegen));
 
   });
+
+  //  console.log(codegen.EventClasses);
+  //  console.log(Object.entries(codegen.EventClassFields));
 
 }
 

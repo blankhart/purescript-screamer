@@ -1,9 +1,12 @@
-const capitalize = (string: string) =>
-  string[0].toUpperCase() + string.slice(1);
-
 export namespace codegen {
 
-  export type ValueType = 'boolean' | 'integer' | 'number' | 'string' | 'effect';
+  export type ValueType =
+    | 'boolean'
+    | 'integer'
+    | 'number'
+    | 'string'
+    | 'effect'
+    ;
 
   // https://pursuit.purescript.org/packages/purescript-dom-classy/2.2.0/docs/DOM.Classy.Event
   export type EventClass =
@@ -13,27 +16,34 @@ export namespace codegen {
     | 'Drag'
     | 'Event'
     | 'Focus'
+    | 'Input'
     | 'Keyboard'
     | 'Mouse'
     | 'Pointer'
     | 'Touch'
     | 'Transition'
-    | 'UI'
-    | 'Wheel';
+    | 'Ui'
+    | 'Wheel'
+    ;
 
+  // This will need to have multiple EventClass superclasses due to synthetic superclasses.  E.g.,
+  // * to express dataTransfer as a property both of InputEvent and DragEvent
+  // * to express event target values (for example of an InputEvent)
+  // These may be more natural as separate types with conversions.
   export const EventClassImplies: Record<EventClass, EventClass | null> = {
     Animation: 'Event',
     Clipboard: 'Event',
-    Composition: 'UI',
+    Composition: 'Ui',
     Drag: 'Mouse',
     Event: null,
-    Focus: 'UI',
-    Keyboard: 'UI',
-    Mouse: 'UI',
+    Focus: 'Ui',
+    Input: 'Ui',
+    Keyboard: 'Ui',
+    Mouse: 'Ui',
     Pointer: 'Mouse',
-    Touch: 'UI',
+    Touch: 'Ui',
     Transition: 'Event',
-    UI: 'Event',
+    Ui: 'Event',
     Wheel: 'Mouse',
   };
 
@@ -45,7 +55,9 @@ export namespace codegen {
     },
     Clipboard: {},
     Composition: {},
-    Drag: {},
+    Drag: {
+      // dataTransfer, overloaded with Input
+    },
     Event: {
       bubbles: 'boolean',
       cancelable: 'boolean',
@@ -57,6 +69,12 @@ export namespace codegen {
       type: 'string',
     },
     Focus: {},
+    Input: {
+      data: 'string',
+      // dataTransfer, overloaded with Drag
+      inputType: 'string',
+      isComposing: 'boolean',
+    },
     Keyboard: {
       altKey: 'boolean',
       charCode: 'number',
@@ -116,7 +134,7 @@ export namespace codegen {
       propertyName: 'string',
       pseudoElement: 'string',
     },
-    UI: {
+    Ui: {
       detail: 'number',
     },
     Wheel: {
@@ -128,7 +146,7 @@ export namespace codegen {
   };
 
   // https://developer.mozilla.org/en-US/docs/Web/Events
-  export const EventHandlersAll: Record<EventClass, string[]> = {
+  export const EventClassHandlers: Record<EventClass, string[]> = {
     Animation: [
       'onAnimationEnd',
       'onAnimationIteration',
@@ -166,6 +184,10 @@ export namespace codegen {
       'onFocusIn',
       'onFocusOut',
     ],
+    Input: [
+      //      onChange,
+      //      onInput,
+    ],
     Keyboard: [
       'onKeyDown',
       'onKeyPress',
@@ -197,13 +219,37 @@ export namespace codegen {
       'onTransitionEnd',
       'onTransitionRun',
     ],
-    UI: [
+    Ui: [
       'onScroll',
     ],
     Wheel: [
       'onWheel',
     ],
   };
+
+  function* superclasses(e: EventClass) {
+    let s = EventClassImplies[e];
+    if (s) {
+      yield s;
+      e = s;
+    } else {
+      return;
+    }
+  };
+
+  export let EventClasses = Object.entries(EventClassFields)
+    .map(([eventClass, fields]) => {
+      return {
+        event_class: eventClass,
+        event_superclasses: [...superclasses(eventClass as EventClass)],
+        event_fields: Object.entries(fields)
+          .filter(([k, v]) => v !== 'effect')
+          .map(([k, v]) => { return { field: k, value: v }; }),
+        event_effects: Object.entries(fields)
+          .filter(([k, v]) => v === 'effect')
+          .map(([k, v]) => { return { field: k, value: v }; }),
+      };
+    });
 
   // https://html.spec.whatwg.org/multipage/indices.html#attributes-3
   export const Attributes: Record<string, ValueType | 'record'> = {

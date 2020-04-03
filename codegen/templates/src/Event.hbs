@@ -1,6 +1,5 @@
--- Event types
-
-module Screamer.Event where
+-- | Event types
+module Screamer.DOM.Event where
 
 import Prelude
 
@@ -8,36 +7,30 @@ import Effect (Effect)
 import Data.Maybe (Maybe)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
+import Screamer.Internal (property, eventEffect, eventCast)
 
-foreign import property :: forall a b c. a -> b -> c
+{{#each EventClasses}}
 
-foreign import effect0 :: forall a b. String -> a -> b
+foreign import data {{event_class}} :: Type
 
-foreign import to :: forall a b. String -> a -> Nullable b
+class Is{{event_class}} a
 
---
+{{#each event_fields}}
+{{field}}_ :: forall a. Is{{../event_class}} a => a -> {{capitalize value}}
+{{field}}_ = property "{{field}}"
 
-foreign import data ${all_name} :: Type
+{{/each}}
+{{#each event_effects}}
+{{field}}_ :: forall a. Is{{../event_class}} a => a -> Effect Unit
+{{field}}_ = eventEffect "{{field}}"
 
-class Is${all_name} a
+{{/each}}
+{{#each event_superclasses}}
+instance is{{this}}{{../event_class}} :: Is{{this}} {{../event_class}}
 
-(If non-effectful)
-${identifier} :: forall a. Is${name} a => a -> ${capitalize(
-v
-)}
-${identifier} = property "${n}"
+{{/each}}
+to{{event_class}} :: forall a. a -> Maybe {{event_class}}
+to{{event_class}} = Nullable.toMaybe <<< eventCast "{{event_class}}"
 
-(If effectful)
-${identifier} :: forall a. Is${name} a => a -> Effect Unit
-${identifier} = effect0 "${n}"
+{{/each}}
 
---
-
-instance is${name}${name} :: Is${name} ${name}
-
--- Extends
-
-instance is${extend}${extends_name} :: Is${extend} ${extends_name}
-
-to${name} :: forall a. a -> Maybe ${name}
-to${name} = Nullable.toMaybe <<< to "${className}"
