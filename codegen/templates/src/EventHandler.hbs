@@ -1,1 +1,19 @@
 module Screamer.DOM.EventHandler where
+
+import Prelude
+
+import Effect (Effect)
+import Unsafe.Coerce (unsafeCoerce)
+import Screamer.Core (on_)
+import Screamer.DOM.Event as Event
+
+{{#each EventHandlers}}
+
+{{#each event_handlers as |event_handler|}}
+
+{{event_handler}}_ :: (Event.{{../event_class}} -> Effect Unit) -> Attribute
+{{event_handler}}_ = on_ "{{handlerize event_handler}}" <<< unsafeCoerce
+
+{{/each}}
+
+{{/each}}

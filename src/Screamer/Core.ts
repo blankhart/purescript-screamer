@@ -1,4 +1,4 @@
-import { h } from 'sinuous';
+import { h, hs } from 'sinuous';
 import { computed, observable, subscribe, Observable } from 'sinuous/observable';
 
 export const documentImpl: Document = document;
@@ -32,6 +32,16 @@ export const element_ = (tag: string) => (attributes: ScreamerAttribute[]) => (c
   }
   const sinuousChildren: Element[] = children.map(e => e());
   return h(tag, sinuousAttrs, sinuousChildren);
+};
+
+export const svg_ = (tag: string) => (attributes: ScreamerAttribute[]) => (children: ScreamerElement[]) => () => {
+  const sinuousAttrs: Record<string, any> = {};
+  for (let { key, value } of attributes) {
+    // console.log(`key, value: ${key}, ${value}`);
+    sinuousAttrs[key] = value();
+  }
+  const sinuousChildren: Element[] = children.map(e => e());
+  return hs(tag, sinuousAttrs, sinuousChildren);
 };
 
 export const on_ = (name: string) => (onEvent: (e: Event) => (() => void)) => {

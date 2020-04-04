@@ -56,7 +56,10 @@ foreign import mount :: String -> Element -> Effect Unit
 
 -- HTML Element creation
 
+-- Rename to html_
 foreign import element_ :: String -> Array Attribute -> Array Element -> Element
+
+foreign import svg_ :: String -> Array Attribute -> Array Element -> Element
 
 attribute_ :: forall v . IsValue v => String -> v -> Attribute
 attribute_ key v = Attribute { key, value: value v }

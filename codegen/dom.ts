@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
-import { codegen } from './data/dom';
+import { codegen } from './data';
 
 function main() {
 
@@ -10,12 +10,20 @@ function main() {
   const sourceDir = `./codegen/templates/src`;
   const targetDir = `./src/Screamer/DOM`;
 
-  handlebars.registerHelper('capitalize', (string: string) =>
-    string[0].toUpperCase() + string.slice(1)
+  const capitalize = (string: string) =>
+    string[0].toUpperCase() + string.slice(1);
+
+  const uncapitalize = (string: string) =>
+    string[0].toLowerCase() + string.slice(1);
+
+  handlebars.registerHelper('capitalize', capitalize);
+
+  handlebars.registerHelper('unhyphenate', (s: string) =>
+    uncapitalize(s.split('-').map(capitalize).join(''))
   );
 
-  handlebars.registerHelper('lowercase', (string: string) =>
-    string.toLowerCase()
+  handlebars.registerHelper('handlerize', (string: string) =>
+    string.replace(/^on/, '').toLowerCase()
   );
 
   fs.readdirSync(sourceDir).forEach(source => {
