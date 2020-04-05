@@ -59,10 +59,10 @@ cite_ = attribute_ "cite"
 color_ :: String -> Attribute
 color_ = attribute_ "color"
 
-cols_ :: Integer -> Attribute
+cols_ :: Int -> Attribute
 cols_ = attribute_ "cols"
 
-colspan_ :: Integer -> Attribute
+colspan_ :: Int -> Attribute
 colspan_ = attribute_ "colspan"
 
 content_ :: String -> Attribute
@@ -224,7 +224,7 @@ method_ = attribute_ "method"
 min_ :: Number -> Attribute
 min_ = attribute_ "min"
 
-minlength_ :: Integer -> Attribute
+minlength_ :: Int -> Attribute
 minlength_ = attribute_ "minlength"
 
 multiple_ :: Boolean -> Attribute
@@ -284,10 +284,10 @@ required_ = attribute_ "required"
 reversed_ :: Boolean -> Attribute
 reversed_ = attribute_ "reversed"
 
-rows_ :: Integer -> Attribute
+rows_ :: Int -> Attribute
 rows_ = attribute_ "rows"
 
-rowspan_ :: Integer -> Attribute
+rowspan_ :: Int -> Attribute
 rowspan_ = attribute_ "rowspan"
 
 sandbox_ :: String -> Attribute
@@ -302,7 +302,7 @@ selected_ = attribute_ "selected"
 shape_ :: String -> Attribute
 shape_ = attribute_ "shape"
 
-size_ :: Integer -> Attribute
+size_ :: Int -> Attribute
 size_ = attribute_ "size"
 
 sizes_ :: String -> Attribute
@@ -311,7 +311,7 @@ sizes_ = attribute_ "sizes"
 slot_ :: String -> Attribute
 slot_ = attribute_ "slot"
 
-span_ :: Integer -> Attribute
+span_ :: Int -> Attribute
 span_ = attribute_ "span"
 
 spellcheck_ :: Boolean -> Attribute
@@ -329,16 +329,13 @@ srclang_ = attribute_ "srclang"
 srcset_ :: String -> Attribute
 srcset_ = attribute_ "srcset"
 
-start_ :: Integer -> Attribute
+start_ :: Int -> Attribute
 start_ = attribute_ "start"
 
 step_ :: Number -> Attribute
 step_ = attribute_ "step"
 
-style_ :: Record -> Attribute
-style_ = attribute_ "style"
-
-tabindex_ :: Integer -> Attribute
+tabindex_ :: Int -> Attribute
 tabindex_ = attribute_ "tabindex"
 
 target_ :: String -> Attribute
@@ -362,7 +359,7 @@ usemap_ = attribute_ "usemap"
 value_ :: String -> Attribute
 value_ = attribute_ "value"
 
-width_ :: Integer -> Attribute
+width_ :: Int -> Attribute
 width_ = attribute_ "width"
 
 wrap_ :: String -> Attribute

@@ -2,7 +2,7 @@ export namespace codegen {
 
   export type ValueType =
     | 'boolean'
-    | 'integer'
+    | 'int'
     | 'number'
     | 'string'
     | 'effect'
@@ -30,6 +30,9 @@ export namespace codegen {
   // * to express dataTransfer as a property both of InputEvent and DragEvent
   // * to express event target values (for example of an InputEvent)
   // These may be more natural as separate types with conversions.
+  // There are also issues with shiftKey, which applies to both MouseEvent and KeyboardEvent and TouchEvent
+  // Both HTML and SVG allow <style> tags, which are ignored
+  // Svg "mask" is both en element and then an attribute that references the element
   export const EventClassImplies: Record<EventClass, EventClass | null> = {
     Animation: 'Event',
     Clipboard: 'Event',
@@ -51,7 +54,7 @@ export namespace codegen {
     Animation: {
       animationName: 'string',
       elapsedTime: 'number',
-      pseudoElement: 'string',
+      //      pseudoElement: 'string',
     },
     Clipboard: {},
     Composition: {},
@@ -86,18 +89,18 @@ export namespace codegen {
       metaKey: 'boolean',
       repeat: 'boolean',
       shiftKey: 'boolean',
-      which: 'number',
+      // which: ... deprecated
     },
     Mouse: {
-      altKey: 'boolean',
+      // altKey: 'boolean',
       button: 'number',
       buttons: 'number',
       clientX: 'number',
       clientY: 'number',
-      ctrlKey: 'boolean',
+      // ctrlKey: 'boolean',
       layerX: 'number',
       layerY: 'number',
-      metaKey: 'boolean',
+      // metaKey: 'boolean',
       movementX: 'number',
       movementY: 'number',
       offsetX: 'number',
@@ -106,7 +109,7 @@ export namespace codegen {
       pageY: 'number',
       screenX: 'number',
       screenY: 'number',
-      shiftKey: 'boolean',
+      //      shiftKey: 'boolean',
       which: 'number',
       x: 'number',
       y: 'number',
@@ -124,13 +127,13 @@ export namespace codegen {
       width: 'number',
     },
     Touch: {
-      altKey: 'boolean',
-      ctrlKey: 'boolean',
-      metaKey: 'boolean',
-      shiftKey: 'boolean',
+      // altKey: 'boolean',
+      // ctrlKey: 'boolean',
+      // metaKey: 'boolean',
+      //      shiftKey: 'boolean',
     },
     Transition: {
-      elapsedTime: 'number',
+      // elapsedTime: 'number',
       propertyName: 'string',
       pseudoElement: 'string',
     },
@@ -173,7 +176,6 @@ export namespace codegen {
     ],
     Event: [
       'onChange',
-      'onInput',
       'onReset',
       'onSelect',
       'onSubmit',
@@ -185,8 +187,7 @@ export namespace codegen {
       'onFocusOut',
     ],
     Input: [
-      //      onChange,
-      //      onInput,
+      'onInput',
     ],
     Keyboard: [
       'onKeyDown',
@@ -277,8 +278,8 @@ export namespace codegen {
     checked: 'boolean',
     cite: 'string',
     color: 'string',
-    cols: 'integer',
-    colspan: 'integer',
+    cols: 'int',
+    colspan: 'int',
     content: 'string',
     contenteditable: 'boolean',
     controls: 'boolean',
@@ -332,7 +333,7 @@ export namespace codegen {
     media: 'string',
     method: 'string',
     min: 'number',
-    minlength: 'integer',
+    minlength: 'int',
     multiple: 'boolean',
     muted: 'boolean',
     name: 'string',
@@ -352,25 +353,25 @@ export namespace codegen {
     rel: 'string',
     required: 'boolean',
     reversed: 'boolean',
-    rows: 'integer',
-    rowspan: 'integer',
+    rows: 'int',
+    rowspan: 'int',
     sandbox: 'string',
     scope: 'string',
     selected: 'boolean',
     shape: 'string',
-    size: 'integer',
+    size: 'int',
     sizes: 'string',
     slot: 'string',
-    span: 'integer',
+    span: 'int',
     spellcheck: 'boolean',
     src: 'string',
     srcdoc: 'string',
     srclang: 'string',
     srcset: 'string',
-    start: 'integer',
+    start: 'int',
     step: 'number',
-    style: 'record',
-    tabindex: 'integer',
+    //    style: 'record',
+    tabindex: 'int',
     target: 'string',
     title: 'string',
     translate: 'boolean',
@@ -378,7 +379,7 @@ export namespace codegen {
     typemustmatch: 'boolean',
     usemap: 'string',
     value: 'string',
-    width: 'integer',
+    width: 'int',
     wrap: 'string',
   };
 
@@ -475,7 +476,7 @@ export namespace codegen {
     source: [],
     span: [],
     strong: [],
-    style: [],
+    //    style: [],
     sub: [],
     summary: [],
     sup: [],
@@ -505,13 +506,16 @@ export namespace codegen {
 
   // https://developer.mozilla.org/en-US/docs/Web/SVG/Element
 
-  export const SvgElements: string[] = names(`a animate animateMotion animateTransform circle clipPath color-profile defs desc discard ellipse feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence filter foreignObject g hatch hatchpath image line linearGradient marker mask mesh meshgradient meshpatch meshrow metadata mpath path pattern polygon polyline radialGradient rect script set solidcolor stop style svg switch symbol text textPath title tspan unknown use view`);
+  export const SvgElements: string[] = names(`a animate animateMotion animateTransform circle defs desc discard ellipse feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence foreignObject g hatch hatchpath image line linearGradient marker mesh meshgradient meshpatch meshrow metadata mpath path pattern polygon polyline radialGradient rect script set solidcolor stop svg switch symbol text textPath title tspan unknown use view`);
+  // TODO: Add back `mask` and `filter`
+  // TODO: Add back `color-profile`?
+  // TODO: Add back `clipPath` which conflicts with attribute `clip-path`
 
   // https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute
 
   export const SvgAttributes = Object.entries({
     boolean: names(`externalResourcesRequired preserveAlpha`),
-    integer: names(`numOctaves tabindex`),
+    int: names(`numOctaves tabindex`),
     number: names(`accent-height ascent azimuth bias diffuseConstant divisor elevation fr k1 k2 k3 k4 limitingConeAngle overline-position overline-thickness pathLength pointsAtX pointsAtY pointsAtZ refX refY scale seed specularConstant specularExponent strikethrough-position strikethrough-thickness stroke-miterlimit surfaceScale targetX targetY underline-position underline-thickness version`),
     string: names(`cx cy fill-opacity fx fy height markerHeight markerWidth r stroke-dashoffset stroke-opacity stroke-width textLength width x x1 x2 y y1 y2 accumulate additive alignment-baseline attributeName attributeType baseFrequency baseline-shift baseProfile begin calcMode class clipPathUnits clip-path clip-rule color color-interpolation color-interpolation-filters color-profile color-rendering contentScriptType contentStyleType cursor d direction display dominant-baseline dur dx dy edgeMode end fill fill-rule filter filterUnits flood-color flood-opacity font-family font-size font-size-adjust font-stretch font-style font-variant font-weight from gradientTransform gradientUnits href image-rendering in in2 kernelMatrix kernelUnitLength kerning keySplines keyTimes lengthAdjust letter-spacing lighting-color local marker-end marker-mid marker-start markerUnits mask maskContentUnits maskUnits max min mode opacity operator order overflow paint-order patternContentUnits patternTransform patternUnits pointer-events points preserveAspectRatio primitiveUnits radius repeatCount repeatDur requiredFeatures restart result rx ry shape-rendering stdDeviation stitchTiles stop-color stop-opacity stroke stroke-dasharray stroke-linecap stroke-linejoin style text-anchor text-decoration text-rendering to transform type values vector-effect viewBox visibility word-spacing writing-mode xChannelSelector yChannelSelector`),
   }).map(([v, k]) => {

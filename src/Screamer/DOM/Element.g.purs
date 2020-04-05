@@ -1,6 +1,6 @@
 module Screamer.DOM.Element where
 
-import Screamer.Core (Element, element_)
+import Screamer.Core (Attribute, Element, element_)
 
 a_ :: Array Attribute -> Array Element -> Element
 a_ = element_ "a"
@@ -274,9 +274,6 @@ span_ = element_ "span"
 
 strong_ :: Array Attribute -> Array Element -> Element
 strong_ = element_ "strong"
-
-style_ :: Array Attribute -> Array Element -> Element
-style_ = element_ "style"
 
 sub_ :: Array Attribute -> Array Element -> Element
 sub_ = element_ "sub"

@@ -1,740 +1,725 @@
 module Screamer.DOM.Svg where
 
-import Screamer.Core (Element, svg_)
+import Screamer.Core (Attribute, Element, attribute_, svgElement_)
 
 a_ :: Array Attribute -> Array Element -> Element
-a_ = svg_ "a"
+a_ = svgElement_ "a"
 
 animate_ :: Array Attribute -> Array Element -> Element
-animate_ = svg_ "animate"
+animate_ = svgElement_ "animate"
 
 animateMotion_ :: Array Attribute -> Array Element -> Element
-animateMotion_ = svg_ "animateMotion"
+animateMotion_ = svgElement_ "animateMotion"
 
 animateTransform_ :: Array Attribute -> Array Element -> Element
-animateTransform_ = svg_ "animateTransform"
+animateTransform_ = svgElement_ "animateTransform"
 
 circle_ :: Array Attribute -> Array Element -> Element
-circle_ = svg_ "circle"
-
-clipPath_ :: Array Attribute -> Array Element -> Element
-clipPath_ = svg_ "clipPath"
-
-colorProfile_ :: Array Attribute -> Array Element -> Element
-colorProfile_ = svg_ "color-profile"
+circle_ = svgElement_ "circle"
 
 defs_ :: Array Attribute -> Array Element -> Element
-defs_ = svg_ "defs"
+defs_ = svgElement_ "defs"
 
 desc_ :: Array Attribute -> Array Element -> Element
-desc_ = svg_ "desc"
+desc_ = svgElement_ "desc"
 
 discard_ :: Array Attribute -> Array Element -> Element
-discard_ = svg_ "discard"
+discard_ = svgElement_ "discard"
 
 ellipse_ :: Array Attribute -> Array Element -> Element
-ellipse_ = svg_ "ellipse"
+ellipse_ = svgElement_ "ellipse"
 
 feBlend_ :: Array Attribute -> Array Element -> Element
-feBlend_ = svg_ "feBlend"
+feBlend_ = svgElement_ "feBlend"
 
 feColorMatrix_ :: Array Attribute -> Array Element -> Element
-feColorMatrix_ = svg_ "feColorMatrix"
+feColorMatrix_ = svgElement_ "feColorMatrix"
 
 feComponentTransfer_ :: Array Attribute -> Array Element -> Element
-feComponentTransfer_ = svg_ "feComponentTransfer"
+feComponentTransfer_ = svgElement_ "feComponentTransfer"
 
 feComposite_ :: Array Attribute -> Array Element -> Element
-feComposite_ = svg_ "feComposite"
+feComposite_ = svgElement_ "feComposite"
 
 feConvolveMatrix_ :: Array Attribute -> Array Element -> Element
-feConvolveMatrix_ = svg_ "feConvolveMatrix"
+feConvolveMatrix_ = svgElement_ "feConvolveMatrix"
 
 feDiffuseLighting_ :: Array Attribute -> Array Element -> Element
-feDiffuseLighting_ = svg_ "feDiffuseLighting"
+feDiffuseLighting_ = svgElement_ "feDiffuseLighting"
 
 feDisplacementMap_ :: Array Attribute -> Array Element -> Element
-feDisplacementMap_ = svg_ "feDisplacementMap"
+feDisplacementMap_ = svgElement_ "feDisplacementMap"
 
 feDistantLight_ :: Array Attribute -> Array Element -> Element
-feDistantLight_ = svg_ "feDistantLight"
+feDistantLight_ = svgElement_ "feDistantLight"
 
 feDropShadow_ :: Array Attribute -> Array Element -> Element
-feDropShadow_ = svg_ "feDropShadow"
+feDropShadow_ = svgElement_ "feDropShadow"
 
 feFlood_ :: Array Attribute -> Array Element -> Element
-feFlood_ = svg_ "feFlood"
+feFlood_ = svgElement_ "feFlood"
 
 feFuncA_ :: Array Attribute -> Array Element -> Element
-feFuncA_ = svg_ "feFuncA"
+feFuncA_ = svgElement_ "feFuncA"
 
 feFuncB_ :: Array Attribute -> Array Element -> Element
-feFuncB_ = svg_ "feFuncB"
+feFuncB_ = svgElement_ "feFuncB"
 
 feFuncG_ :: Array Attribute -> Array Element -> Element
-feFuncG_ = svg_ "feFuncG"
+feFuncG_ = svgElement_ "feFuncG"
 
 feFuncR_ :: Array Attribute -> Array Element -> Element
-feFuncR_ = svg_ "feFuncR"
+feFuncR_ = svgElement_ "feFuncR"
 
 feGaussianBlur_ :: Array Attribute -> Array Element -> Element
-feGaussianBlur_ = svg_ "feGaussianBlur"
+feGaussianBlur_ = svgElement_ "feGaussianBlur"
 
 feImage_ :: Array Attribute -> Array Element -> Element
-feImage_ = svg_ "feImage"
+feImage_ = svgElement_ "feImage"
 
 feMerge_ :: Array Attribute -> Array Element -> Element
-feMerge_ = svg_ "feMerge"
+feMerge_ = svgElement_ "feMerge"
 
 feMergeNode_ :: Array Attribute -> Array Element -> Element
-feMergeNode_ = svg_ "feMergeNode"
+feMergeNode_ = svgElement_ "feMergeNode"
 
 feMorphology_ :: Array Attribute -> Array Element -> Element
-feMorphology_ = svg_ "feMorphology"
+feMorphology_ = svgElement_ "feMorphology"
 
 feOffset_ :: Array Attribute -> Array Element -> Element
-feOffset_ = svg_ "feOffset"
+feOffset_ = svgElement_ "feOffset"
 
 fePointLight_ :: Array Attribute -> Array Element -> Element
-fePointLight_ = svg_ "fePointLight"
+fePointLight_ = svgElement_ "fePointLight"
 
 feSpecularLighting_ :: Array Attribute -> Array Element -> Element
-feSpecularLighting_ = svg_ "feSpecularLighting"
+feSpecularLighting_ = svgElement_ "feSpecularLighting"
 
 feSpotLight_ :: Array Attribute -> Array Element -> Element
-feSpotLight_ = svg_ "feSpotLight"
+feSpotLight_ = svgElement_ "feSpotLight"
 
 feTile_ :: Array Attribute -> Array Element -> Element
-feTile_ = svg_ "feTile"
+feTile_ = svgElement_ "feTile"
 
 feTurbulence_ :: Array Attribute -> Array Element -> Element
-feTurbulence_ = svg_ "feTurbulence"
-
-filter_ :: Array Attribute -> Array Element -> Element
-filter_ = svg_ "filter"
+feTurbulence_ = svgElement_ "feTurbulence"
 
 foreignObject_ :: Array Attribute -> Array Element -> Element
-foreignObject_ = svg_ "foreignObject"
+foreignObject_ = svgElement_ "foreignObject"
 
 g_ :: Array Attribute -> Array Element -> Element
-g_ = svg_ "g"
+g_ = svgElement_ "g"
 
 hatch_ :: Array Attribute -> Array Element -> Element
-hatch_ = svg_ "hatch"
+hatch_ = svgElement_ "hatch"
 
 hatchpath_ :: Array Attribute -> Array Element -> Element
-hatchpath_ = svg_ "hatchpath"
+hatchpath_ = svgElement_ "hatchpath"
 
 image_ :: Array Attribute -> Array Element -> Element
-image_ = svg_ "image"
+image_ = svgElement_ "image"
 
 line_ :: Array Attribute -> Array Element -> Element
-line_ = svg_ "line"
+line_ = svgElement_ "line"
 
 linearGradient_ :: Array Attribute -> Array Element -> Element
-linearGradient_ = svg_ "linearGradient"
+linearGradient_ = svgElement_ "linearGradient"
 
 marker_ :: Array Attribute -> Array Element -> Element
-marker_ = svg_ "marker"
-
-mask_ :: Array Attribute -> Array Element -> Element
-mask_ = svg_ "mask"
+marker_ = svgElement_ "marker"
 
 mesh_ :: Array Attribute -> Array Element -> Element
-mesh_ = svg_ "mesh"
+mesh_ = svgElement_ "mesh"
 
 meshgradient_ :: Array Attribute -> Array Element -> Element
-meshgradient_ = svg_ "meshgradient"
+meshgradient_ = svgElement_ "meshgradient"
 
 meshpatch_ :: Array Attribute -> Array Element -> Element
-meshpatch_ = svg_ "meshpatch"
+meshpatch_ = svgElement_ "meshpatch"
 
 meshrow_ :: Array Attribute -> Array Element -> Element
-meshrow_ = svg_ "meshrow"
+meshrow_ = svgElement_ "meshrow"
 
 metadata_ :: Array Attribute -> Array Element -> Element
-metadata_ = svg_ "metadata"
+metadata_ = svgElement_ "metadata"
 
 mpath_ :: Array Attribute -> Array Element -> Element
-mpath_ = svg_ "mpath"
+mpath_ = svgElement_ "mpath"
 
 path_ :: Array Attribute -> Array Element -> Element
-path_ = svg_ "path"
+path_ = svgElement_ "path"
 
 pattern_ :: Array Attribute -> Array Element -> Element
-pattern_ = svg_ "pattern"
+pattern_ = svgElement_ "pattern"
 
 polygon_ :: Array Attribute -> Array Element -> Element
-polygon_ = svg_ "polygon"
+polygon_ = svgElement_ "polygon"
 
 polyline_ :: Array Attribute -> Array Element -> Element
-polyline_ = svg_ "polyline"
+polyline_ = svgElement_ "polyline"
 
 radialGradient_ :: Array Attribute -> Array Element -> Element
-radialGradient_ = svg_ "radialGradient"
+radialGradient_ = svgElement_ "radialGradient"
 
 rect_ :: Array Attribute -> Array Element -> Element
-rect_ = svg_ "rect"
+rect_ = svgElement_ "rect"
 
 script_ :: Array Attribute -> Array Element -> Element
-script_ = svg_ "script"
+script_ = svgElement_ "script"
 
 set_ :: Array Attribute -> Array Element -> Element
-set_ = svg_ "set"
+set_ = svgElement_ "set"
 
 solidcolor_ :: Array Attribute -> Array Element -> Element
-solidcolor_ = svg_ "solidcolor"
+solidcolor_ = svgElement_ "solidcolor"
 
 stop_ :: Array Attribute -> Array Element -> Element
-stop_ = svg_ "stop"
-
-style_ :: Array Attribute -> Array Element -> Element
-style_ = svg_ "style"
+stop_ = svgElement_ "stop"
 
 svg_ :: Array Attribute -> Array Element -> Element
-svg_ = svg_ "svg"
+svg_ = svgElement_ "svg"
 
 switch_ :: Array Attribute -> Array Element -> Element
-switch_ = svg_ "switch"
+switch_ = svgElement_ "switch"
 
 symbol_ :: Array Attribute -> Array Element -> Element
-symbol_ = svg_ "symbol"
+symbol_ = svgElement_ "symbol"
 
 text_ :: Array Attribute -> Array Element -> Element
-text_ = svg_ "text"
+text_ = svgElement_ "text"
 
 textPath_ :: Array Attribute -> Array Element -> Element
-textPath_ = svg_ "textPath"
+textPath_ = svgElement_ "textPath"
 
 title_ :: Array Attribute -> Array Element -> Element
-title_ = svg_ "title"
+title_ = svgElement_ "title"
 
 tspan_ :: Array Attribute -> Array Element -> Element
-tspan_ = svg_ "tspan"
+tspan_ = svgElement_ "tspan"
 
 unknown_ :: Array Attribute -> Array Element -> Element
-unknown_ = svg_ "unknown"
+unknown_ = svgElement_ "unknown"
 
 use_ :: Array Attribute -> Array Element -> Element
-use_ = svg_ "use"
+use_ = svgElement_ "use"
 
 view_ :: Array Attribute -> Array Element -> Element
-view_ = svg_ "view"
+view_ = svgElement_ "view"
 
 
 externalResourcesRequired_ :: Boolean -> Attribute
-externalResourcesRequired_ = svg_ "externalResourcesRequired"
+externalResourcesRequired_ = attribute_ "externalResourcesRequired"
 
 preserveAlpha_ :: Boolean -> Attribute
-preserveAlpha_ = svg_ "preserveAlpha"
+preserveAlpha_ = attribute_ "preserveAlpha"
 
-numOctaves_ :: Integer -> Attribute
-numOctaves_ = svg_ "numOctaves"
+numOctaves_ :: Int -> Attribute
+numOctaves_ = attribute_ "numOctaves"
 
-tabindex_ :: Integer -> Attribute
-tabindex_ = svg_ "tabindex"
+tabindex_ :: Int -> Attribute
+tabindex_ = attribute_ "tabindex"
 
 accentHeight_ :: Number -> Attribute
-accentHeight_ = svg_ "accent-height"
+accentHeight_ = attribute_ "accent-height"
 
 ascent_ :: Number -> Attribute
-ascent_ = svg_ "ascent"
+ascent_ = attribute_ "ascent"
 
 azimuth_ :: Number -> Attribute
-azimuth_ = svg_ "azimuth"
+azimuth_ = attribute_ "azimuth"
 
 bias_ :: Number -> Attribute
-bias_ = svg_ "bias"
+bias_ = attribute_ "bias"
 
 diffuseConstant_ :: Number -> Attribute
-diffuseConstant_ = svg_ "diffuseConstant"
+diffuseConstant_ = attribute_ "diffuseConstant"
 
 divisor_ :: Number -> Attribute
-divisor_ = svg_ "divisor"
+divisor_ = attribute_ "divisor"
 
 elevation_ :: Number -> Attribute
-elevation_ = svg_ "elevation"
+elevation_ = attribute_ "elevation"
 
 fr_ :: Number -> Attribute
-fr_ = svg_ "fr"
+fr_ = attribute_ "fr"
 
 k1_ :: Number -> Attribute
-k1_ = svg_ "k1"
+k1_ = attribute_ "k1"
 
 k2_ :: Number -> Attribute
-k2_ = svg_ "k2"
+k2_ = attribute_ "k2"
 
 k3_ :: Number -> Attribute
-k3_ = svg_ "k3"
+k3_ = attribute_ "k3"
 
 k4_ :: Number -> Attribute
-k4_ = svg_ "k4"
+k4_ = attribute_ "k4"
 
 limitingConeAngle_ :: Number -> Attribute
-limitingConeAngle_ = svg_ "limitingConeAngle"
+limitingConeAngle_ = attribute_ "limitingConeAngle"
 
 overlinePosition_ :: Number -> Attribute
-overlinePosition_ = svg_ "overline-position"
+overlinePosition_ = attribute_ "overline-position"
 
 overlineThickness_ :: Number -> Attribute
-overlineThickness_ = svg_ "overline-thickness"
+overlineThickness_ = attribute_ "overline-thickness"
 
 pathLength_ :: Number -> Attribute
-pathLength_ = svg_ "pathLength"
+pathLength_ = attribute_ "pathLength"
 
 pointsAtX_ :: Number -> Attribute
-pointsAtX_ = svg_ "pointsAtX"
+pointsAtX_ = attribute_ "pointsAtX"
 
 pointsAtY_ :: Number -> Attribute
-pointsAtY_ = svg_ "pointsAtY"
+pointsAtY_ = attribute_ "pointsAtY"
 
 pointsAtZ_ :: Number -> Attribute
-pointsAtZ_ = svg_ "pointsAtZ"
+pointsAtZ_ = attribute_ "pointsAtZ"
 
 refX_ :: Number -> Attribute
-refX_ = svg_ "refX"
+refX_ = attribute_ "refX"
 
 refY_ :: Number -> Attribute
-refY_ = svg_ "refY"
+refY_ = attribute_ "refY"
 
 scale_ :: Number -> Attribute
-scale_ = svg_ "scale"
+scale_ = attribute_ "scale"
 
 seed_ :: Number -> Attribute
-seed_ = svg_ "seed"
+seed_ = attribute_ "seed"
 
 specularConstant_ :: Number -> Attribute
-specularConstant_ = svg_ "specularConstant"
+specularConstant_ = attribute_ "specularConstant"
 
 specularExponent_ :: Number -> Attribute
-specularExponent_ = svg_ "specularExponent"
+specularExponent_ = attribute_ "specularExponent"
 
 strikethroughPosition_ :: Number -> Attribute
-strikethroughPosition_ = svg_ "strikethrough-position"
+strikethroughPosition_ = attribute_ "strikethrough-position"
 
 strikethroughThickness_ :: Number -> Attribute
-strikethroughThickness_ = svg_ "strikethrough-thickness"
+strikethroughThickness_ = attribute_ "strikethrough-thickness"
 
 strokeMiterlimit_ :: Number -> Attribute
-strokeMiterlimit_ = svg_ "stroke-miterlimit"
+strokeMiterlimit_ = attribute_ "stroke-miterlimit"
 
 surfaceScale_ :: Number -> Attribute
-surfaceScale_ = svg_ "surfaceScale"
+surfaceScale_ = attribute_ "surfaceScale"
 
 targetX_ :: Number -> Attribute
-targetX_ = svg_ "targetX"
+targetX_ = attribute_ "targetX"
 
 targetY_ :: Number -> Attribute
-targetY_ = svg_ "targetY"
+targetY_ = attribute_ "targetY"
 
 underlinePosition_ :: Number -> Attribute
-underlinePosition_ = svg_ "underline-position"
+underlinePosition_ = attribute_ "underline-position"
 
 underlineThickness_ :: Number -> Attribute
-underlineThickness_ = svg_ "underline-thickness"
+underlineThickness_ = attribute_ "underline-thickness"
 
 version_ :: Number -> Attribute
-version_ = svg_ "version"
+version_ = attribute_ "version"
 
 cx_ :: String -> Attribute
-cx_ = svg_ "cx"
+cx_ = attribute_ "cx"
 
 cy_ :: String -> Attribute
-cy_ = svg_ "cy"
+cy_ = attribute_ "cy"
 
 fillOpacity_ :: String -> Attribute
-fillOpacity_ = svg_ "fill-opacity"
+fillOpacity_ = attribute_ "fill-opacity"
 
 fx_ :: String -> Attribute
-fx_ = svg_ "fx"
+fx_ = attribute_ "fx"
 
 fy_ :: String -> Attribute
-fy_ = svg_ "fy"
+fy_ = attribute_ "fy"
 
 height_ :: String -> Attribute
-height_ = svg_ "height"
+height_ = attribute_ "height"
 
 markerHeight_ :: String -> Attribute
-markerHeight_ = svg_ "markerHeight"
+markerHeight_ = attribute_ "markerHeight"
 
 markerWidth_ :: String -> Attribute
-markerWidth_ = svg_ "markerWidth"
+markerWidth_ = attribute_ "markerWidth"
 
 r_ :: String -> Attribute
-r_ = svg_ "r"
+r_ = attribute_ "r"
 
 strokeDashoffset_ :: String -> Attribute
-strokeDashoffset_ = svg_ "stroke-dashoffset"
+strokeDashoffset_ = attribute_ "stroke-dashoffset"
 
 strokeOpacity_ :: String -> Attribute
-strokeOpacity_ = svg_ "stroke-opacity"
+strokeOpacity_ = attribute_ "stroke-opacity"
 
 strokeWidth_ :: String -> Attribute
-strokeWidth_ = svg_ "stroke-width"
+strokeWidth_ = attribute_ "stroke-width"
 
 textLength_ :: String -> Attribute
-textLength_ = svg_ "textLength"
+textLength_ = attribute_ "textLength"
 
 width_ :: String -> Attribute
-width_ = svg_ "width"
+width_ = attribute_ "width"
 
 x_ :: String -> Attribute
-x_ = svg_ "x"
+x_ = attribute_ "x"
 
 x1_ :: String -> Attribute
-x1_ = svg_ "x1"
+x1_ = attribute_ "x1"
 
 x2_ :: String -> Attribute
-x2_ = svg_ "x2"
+x2_ = attribute_ "x2"
 
 y_ :: String -> Attribute
-y_ = svg_ "y"
+y_ = attribute_ "y"
 
 y1_ :: String -> Attribute
-y1_ = svg_ "y1"
+y1_ = attribute_ "y1"
 
 y2_ :: String -> Attribute
-y2_ = svg_ "y2"
+y2_ = attribute_ "y2"
 
 accumulate_ :: String -> Attribute
-accumulate_ = svg_ "accumulate"
+accumulate_ = attribute_ "accumulate"
 
 additive_ :: String -> Attribute
-additive_ = svg_ "additive"
+additive_ = attribute_ "additive"
 
 alignmentBaseline_ :: String -> Attribute
-alignmentBaseline_ = svg_ "alignment-baseline"
+alignmentBaseline_ = attribute_ "alignment-baseline"
 
 attributeName_ :: String -> Attribute
-attributeName_ = svg_ "attributeName"
+attributeName_ = attribute_ "attributeName"
 
 attributeType_ :: String -> Attribute
-attributeType_ = svg_ "attributeType"
+attributeType_ = attribute_ "attributeType"
 
 baseFrequency_ :: String -> Attribute
-baseFrequency_ = svg_ "baseFrequency"
+baseFrequency_ = attribute_ "baseFrequency"
 
 baselineShift_ :: String -> Attribute
-baselineShift_ = svg_ "baseline-shift"
+baselineShift_ = attribute_ "baseline-shift"
 
 baseProfile_ :: String -> Attribute
-baseProfile_ = svg_ "baseProfile"
+baseProfile_ = attribute_ "baseProfile"
 
 begin_ :: String -> Attribute
-begin_ = svg_ "begin"
+begin_ = attribute_ "begin"
 
 calcMode_ :: String -> Attribute
-calcMode_ = svg_ "calcMode"
+calcMode_ = attribute_ "calcMode"
 
 class_ :: String -> Attribute
-class_ = svg_ "class"
+class_ = attribute_ "class"
 
 clipPathUnits_ :: String -> Attribute
-clipPathUnits_ = svg_ "clipPathUnits"
+clipPathUnits_ = attribute_ "clipPathUnits"
 
 clipPath_ :: String -> Attribute
-clipPath_ = svg_ "clip-path"
+clipPath_ = attribute_ "clip-path"
 
 clipRule_ :: String -> Attribute
-clipRule_ = svg_ "clip-rule"
+clipRule_ = attribute_ "clip-rule"
 
 color_ :: String -> Attribute
-color_ = svg_ "color"
+color_ = attribute_ "color"
 
 colorInterpolation_ :: String -> Attribute
-colorInterpolation_ = svg_ "color-interpolation"
+colorInterpolation_ = attribute_ "color-interpolation"
 
 colorInterpolationFilters_ :: String -> Attribute
-colorInterpolationFilters_ = svg_ "color-interpolation-filters"
+colorInterpolationFilters_ = attribute_ "color-interpolation-filters"
 
 colorProfile_ :: String -> Attribute
-colorProfile_ = svg_ "color-profile"
+colorProfile_ = attribute_ "color-profile"
 
 colorRendering_ :: String -> Attribute
-colorRendering_ = svg_ "color-rendering"
+colorRendering_ = attribute_ "color-rendering"
 
 contentScriptType_ :: String -> Attribute
-contentScriptType_ = svg_ "contentScriptType"
+contentScriptType_ = attribute_ "contentScriptType"
 
 contentStyleType_ :: String -> Attribute
-contentStyleType_ = svg_ "contentStyleType"
+contentStyleType_ = attribute_ "contentStyleType"
 
 cursor_ :: String -> Attribute
-cursor_ = svg_ "cursor"
+cursor_ = attribute_ "cursor"
 
 d_ :: String -> Attribute
-d_ = svg_ "d"
+d_ = attribute_ "d"
 
 direction_ :: String -> Attribute
-direction_ = svg_ "direction"
+direction_ = attribute_ "direction"
 
 display_ :: String -> Attribute
-display_ = svg_ "display"
+display_ = attribute_ "display"
 
 dominantBaseline_ :: String -> Attribute
-dominantBaseline_ = svg_ "dominant-baseline"
+dominantBaseline_ = attribute_ "dominant-baseline"
 
 dur_ :: String -> Attribute
-dur_ = svg_ "dur"
+dur_ = attribute_ "dur"
 
 dx_ :: String -> Attribute
-dx_ = svg_ "dx"
+dx_ = attribute_ "dx"
 
 dy_ :: String -> Attribute
-dy_ = svg_ "dy"
+dy_ = attribute_ "dy"
 
 edgeMode_ :: String -> Attribute
-edgeMode_ = svg_ "edgeMode"
+edgeMode_ = attribute_ "edgeMode"
 
 end_ :: String -> Attribute
-end_ = svg_ "end"
+end_ = attribute_ "end"
 
 fill_ :: String -> Attribute
-fill_ = svg_ "fill"
+fill_ = attribute_ "fill"
 
 fillRule_ :: String -> Attribute
-fillRule_ = svg_ "fill-rule"
+fillRule_ = attribute_ "fill-rule"
 
 filter_ :: String -> Attribute
-filter_ = svg_ "filter"
+filter_ = attribute_ "filter"
 
 filterUnits_ :: String -> Attribute
-filterUnits_ = svg_ "filterUnits"
+filterUnits_ = attribute_ "filterUnits"
 
 floodColor_ :: String -> Attribute
-floodColor_ = svg_ "flood-color"
+floodColor_ = attribute_ "flood-color"
 
 floodOpacity_ :: String -> Attribute
-floodOpacity_ = svg_ "flood-opacity"
+floodOpacity_ = attribute_ "flood-opacity"
 
 fontFamily_ :: String -> Attribute
-fontFamily_ = svg_ "font-family"
+fontFamily_ = attribute_ "font-family"
 
 fontSize_ :: String -> Attribute
-fontSize_ = svg_ "font-size"
+fontSize_ = attribute_ "font-size"
 
 fontSizeAdjust_ :: String -> Attribute
-fontSizeAdjust_ = svg_ "font-size-adjust"
+fontSizeAdjust_ = attribute_ "font-size-adjust"
 
 fontStretch_ :: String -> Attribute
-fontStretch_ = svg_ "font-stretch"
+fontStretch_ = attribute_ "font-stretch"
 
 fontStyle_ :: String -> Attribute
-fontStyle_ = svg_ "font-style"
+fontStyle_ = attribute_ "font-style"
 
 fontVariant_ :: String -> Attribute
-fontVariant_ = svg_ "font-variant"
+fontVariant_ = attribute_ "font-variant"
 
 fontWeight_ :: String -> Attribute
-fontWeight_ = svg_ "font-weight"
+fontWeight_ = attribute_ "font-weight"
 
 from_ :: String -> Attribute
-from_ = svg_ "from"
+from_ = attribute_ "from"
 
 gradientTransform_ :: String -> Attribute
-gradientTransform_ = svg_ "gradientTransform"
+gradientTransform_ = attribute_ "gradientTransform"
 
 gradientUnits_ :: String -> Attribute
-gradientUnits_ = svg_ "gradientUnits"
+gradientUnits_ = attribute_ "gradientUnits"
 
 href_ :: String -> Attribute
-href_ = svg_ "href"
+href_ = attribute_ "href"
 
 imageRendering_ :: String -> Attribute
-imageRendering_ = svg_ "image-rendering"
+imageRendering_ = attribute_ "image-rendering"
 
 in_ :: String -> Attribute
-in_ = svg_ "in"
+in_ = attribute_ "in"
 
 in2_ :: String -> Attribute
-in2_ = svg_ "in2"
+in2_ = attribute_ "in2"
 
 kernelMatrix_ :: String -> Attribute
-kernelMatrix_ = svg_ "kernelMatrix"
+kernelMatrix_ = attribute_ "kernelMatrix"
 
 kernelUnitLength_ :: String -> Attribute
-kernelUnitLength_ = svg_ "kernelUnitLength"
+kernelUnitLength_ = attribute_ "kernelUnitLength"
 
 kerning_ :: String -> Attribute
-kerning_ = svg_ "kerning"
+kerning_ = attribute_ "kerning"
 
 keySplines_ :: String -> Attribute
-keySplines_ = svg_ "keySplines"
+keySplines_ = attribute_ "keySplines"
 
 keyTimes_ :: String -> Attribute
-keyTimes_ = svg_ "keyTimes"
+keyTimes_ = attribute_ "keyTimes"
 
 lengthAdjust_ :: String -> Attribute
-lengthAdjust_ = svg_ "lengthAdjust"
+lengthAdjust_ = attribute_ "lengthAdjust"
 
 letterSpacing_ :: String -> Attribute
-letterSpacing_ = svg_ "letter-spacing"
+letterSpacing_ = attribute_ "letter-spacing"
 
 lightingColor_ :: String -> Attribute
-lightingColor_ = svg_ "lighting-color"
+lightingColor_ = attribute_ "lighting-color"
 
 local_ :: String -> Attribute
-local_ = svg_ "local"
+local_ = attribute_ "local"
 
 markerEnd_ :: String -> Attribute
-markerEnd_ = svg_ "marker-end"
+markerEnd_ = attribute_ "marker-end"
 
 markerMid_ :: String -> Attribute
-markerMid_ = svg_ "marker-mid"
+markerMid_ = attribute_ "marker-mid"
 
 markerStart_ :: String -> Attribute
-markerStart_ = svg_ "marker-start"
+markerStart_ = attribute_ "marker-start"
 
 markerUnits_ :: String -> Attribute
-markerUnits_ = svg_ "markerUnits"
+markerUnits_ = attribute_ "markerUnits"
 
 mask_ :: String -> Attribute
-mask_ = svg_ "mask"
+mask_ = attribute_ "mask"
 
 maskContentUnits_ :: String -> Attribute
-maskContentUnits_ = svg_ "maskContentUnits"
+maskContentUnits_ = attribute_ "maskContentUnits"
 
 maskUnits_ :: String -> Attribute
-maskUnits_ = svg_ "maskUnits"
+maskUnits_ = attribute_ "maskUnits"
 
 max_ :: String -> Attribute
-max_ = svg_ "max"
+max_ = attribute_ "max"
 
 min_ :: String -> Attribute
-min_ = svg_ "min"
+min_ = attribute_ "min"
 
 mode_ :: String -> Attribute
-mode_ = svg_ "mode"
+mode_ = attribute_ "mode"
 
 opacity_ :: String -> Attribute
-opacity_ = svg_ "opacity"
+opacity_ = attribute_ "opacity"
 
 operator_ :: String -> Attribute
-operator_ = svg_ "operator"
+operator_ = attribute_ "operator"
 
 order_ :: String -> Attribute
-order_ = svg_ "order"
+order_ = attribute_ "order"
 
 overflow_ :: String -> Attribute
-overflow_ = svg_ "overflow"
+overflow_ = attribute_ "overflow"
 
 paintOrder_ :: String -> Attribute
-paintOrder_ = svg_ "paint-order"
+paintOrder_ = attribute_ "paint-order"
 
 patternContentUnits_ :: String -> Attribute
-patternContentUnits_ = svg_ "patternContentUnits"
+patternContentUnits_ = attribute_ "patternContentUnits"
 
 patternTransform_ :: String -> Attribute
-patternTransform_ = svg_ "patternTransform"
+patternTransform_ = attribute_ "patternTransform"
 
 patternUnits_ :: String -> Attribute
-patternUnits_ = svg_ "patternUnits"
+patternUnits_ = attribute_ "patternUnits"
 
 pointerEvents_ :: String -> Attribute
-pointerEvents_ = svg_ "pointer-events"
+pointerEvents_ = attribute_ "pointer-events"
 
 points_ :: String -> Attribute
-points_ = svg_ "points"
+points_ = attribute_ "points"
 
 preserveAspectRatio_ :: String -> Attribute
-preserveAspectRatio_ = svg_ "preserveAspectRatio"
+preserveAspectRatio_ = attribute_ "preserveAspectRatio"
 
 primitiveUnits_ :: String -> Attribute
-primitiveUnits_ = svg_ "primitiveUnits"
+primitiveUnits_ = attribute_ "primitiveUnits"
 
 radius_ :: String -> Attribute
-radius_ = svg_ "radius"
+radius_ = attribute_ "radius"
 
 repeatCount_ :: String -> Attribute
-repeatCount_ = svg_ "repeatCount"
+repeatCount_ = attribute_ "repeatCount"
 
 repeatDur_ :: String -> Attribute
-repeatDur_ = svg_ "repeatDur"
+repeatDur_ = attribute_ "repeatDur"
 
 requiredFeatures_ :: String -> Attribute
-requiredFeatures_ = svg_ "requiredFeatures"
+requiredFeatures_ = attribute_ "requiredFeatures"
 
 restart_ :: String -> Attribute
-restart_ = svg_ "restart"
+restart_ = attribute_ "restart"
 
 result_ :: String -> Attribute
-result_ = svg_ "result"
+result_ = attribute_ "result"
 
 rx_ :: String -> Attribute
-rx_ = svg_ "rx"
+rx_ = attribute_ "rx"
 
 ry_ :: String -> Attribute
-ry_ = svg_ "ry"
+ry_ = attribute_ "ry"
 
 shapeRendering_ :: String -> Attribute
-shapeRendering_ = svg_ "shape-rendering"
+shapeRendering_ = attribute_ "shape-rendering"
 
 stdDeviation_ :: String -> Attribute
-stdDeviation_ = svg_ "stdDeviation"
+stdDeviation_ = attribute_ "stdDeviation"
 
 stitchTiles_ :: String -> Attribute
-stitchTiles_ = svg_ "stitchTiles"
+stitchTiles_ = attribute_ "stitchTiles"
 
 stopColor_ :: String -> Attribute
-stopColor_ = svg_ "stop-color"
+stopColor_ = attribute_ "stop-color"
 
 stopOpacity_ :: String -> Attribute
-stopOpacity_ = svg_ "stop-opacity"
+stopOpacity_ = attribute_ "stop-opacity"
 
 stroke_ :: String -> Attribute
-stroke_ = svg_ "stroke"
+stroke_ = attribute_ "stroke"
 
 strokeDasharray_ :: String -> Attribute
-strokeDasharray_ = svg_ "stroke-dasharray"
+strokeDasharray_ = attribute_ "stroke-dasharray"
 
 strokeLinecap_ :: String -> Attribute
-strokeLinecap_ = svg_ "stroke-linecap"
+strokeLinecap_ = attribute_ "stroke-linecap"
 
 strokeLinejoin_ :: String -> Attribute
-strokeLinejoin_ = svg_ "stroke-linejoin"
+strokeLinejoin_ = attribute_ "stroke-linejoin"
 
 style_ :: String -> Attribute
-style_ = svg_ "style"
+style_ = attribute_ "style"
 
 textAnchor_ :: String -> Attribute
-textAnchor_ = svg_ "text-anchor"
+textAnchor_ = attribute_ "text-anchor"
 
 textDecoration_ :: String -> Attribute
-textDecoration_ = svg_ "text-decoration"
+textDecoration_ = attribute_ "text-decoration"
 
 textRendering_ :: String -> Attribute
-textRendering_ = svg_ "text-rendering"
+textRendering_ = attribute_ "text-rendering"
 
 to_ :: String -> Attribute
-to_ = svg_ "to"
+to_ = attribute_ "to"
 
 transform_ :: String -> Attribute
-transform_ = svg_ "transform"
+transform_ = attribute_ "transform"
 
 type_ :: String -> Attribute
-type_ = svg_ "type"
+type_ = attribute_ "type"
 
 values_ :: String -> Attribute
-values_ = svg_ "values"
+values_ = attribute_ "values"
 
 vectorEffect_ :: String -> Attribute
-vectorEffect_ = svg_ "vector-effect"
+vectorEffect_ = attribute_ "vector-effect"
 
 viewBox_ :: String -> Attribute
-viewBox_ = svg_ "viewBox"
+viewBox_ = attribute_ "viewBox"
 
 visibility_ :: String -> Attribute
-visibility_ = svg_ "visibility"
+visibility_ = attribute_ "visibility"
 
 wordSpacing_ :: String -> Attribute
-wordSpacing_ = svg_ "word-spacing"
+wordSpacing_ = attribute_ "word-spacing"
 
 writingMode_ :: String -> Attribute
-writingMode_ = svg_ "writing-mode"
+writingMode_ = attribute_ "writing-mode"
 
 xChannelSelector_ :: String -> Attribute
-xChannelSelector_ = svg_ "xChannelSelector"
+xChannelSelector_ = attribute_ "xChannelSelector"
 
 yChannelSelector_ :: String -> Attribute
-yChannelSelector_ = svg_ "yChannelSelector"
+yChannelSelector_ = attribute_ "yChannelSelector"
 

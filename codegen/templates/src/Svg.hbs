@@ -1,17 +1,17 @@
 module Screamer.DOM.Svg where
 
-import Screamer.Core (Element, svg_)
+import Screamer.Core (Attribute, Element, attribute_, svgElement_)
 
 {{#each SvgElements as |name|}}
 {{unhyphenate name}}_ :: Array Attribute -> Array Element -> Element
-{{unhyphenate name}}_ = svg_ "{{this}}"
+{{unhyphenate name}}_ = svgElement_ "{{this}}"
 
 {{/each}}
 
 {{#each SvgAttributes}}
 {{#each names as |name|}}
 {{unhyphenate name}}_ :: {{capitalize ../value}} -> Attribute
-{{unhyphenate name}}_ = svg_ "{{name}}"
+{{unhyphenate name}}_ = attribute_ "{{name}}"
 
 {{/each}}
 {{/each}}

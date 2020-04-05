@@ -4,6 +4,8 @@
     "module": "commonjs",
     "strict": true,
     "downlevelIteration": true,
+    //https://stackoverflow.com/questions/42987268/is-there-any-way-to-get-warnings-not-errors-for-noimplicitany-noncompliance
+    "noImplicitAny": false,
   },
   "include": [
     "src/**/*"

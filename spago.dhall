@@ -11,6 +11,7 @@
     , "foreign"
     , "freet"
     , "generics-rep"
+    , "math"
     , "newtype"
     , "nullable"
     , "prelude"

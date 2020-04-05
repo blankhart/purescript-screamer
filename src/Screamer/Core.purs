@@ -59,7 +59,9 @@ foreign import mount :: String -> Element -> Effect Unit
 -- Rename to html_
 foreign import element_ :: String -> Array Attribute -> Array Element -> Element
 
-foreign import svg_ :: String -> Array Attribute -> Array Element -> Element
+foreign import svgElement_ :: String -> Array Attribute -> Array Element -> Element
+
+foreign import elements_ :: forall a. Signal (Array a) -> (a -> Element) -> Element
 
 attribute_ :: forall v . IsValue v => String -> v -> Attribute
 attribute_ key v = Attribute { key, value: value v }

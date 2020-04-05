@@ -1,12 +1,17 @@
 module Screamer.Examples.HelloWorld where
 
 import Control.Bind
-import Data.String (toUpper)
+import Data.String (split, Pattern(..), toUpper)
+import Data.String.CodeUnits (toCharArray)
 import Effect (Effect)
 import Effect.Console (log)
 import Prelude
 import Screamer.Core as S
 import Screamer.Observable as S
+import Screamer.DOM.Element as S
+import Screamer.DOM.Event as S
+import Screamer.DOM.EventHandler as S
+import Screamer.Internal as S
 import Unsafe.Coerce (unsafeCoerce)
 
 consolation :: Effect (S.Signal Int)
@@ -23,12 +28,13 @@ main = S.mount "main" =<< do
   tangle <- flip S.trial (pure unit) do
     cuckoo <- S.channel 9
     S.send jumper 400
-    j <- S.get (S.subscribe jumper <> S.subscribe cuckoo)
+    j <- S.sample (S.subscribe jumper <> S.subscribe cuckoo)
     S.send ticker (-j)
-    S.get (S.subscribe cuckoo)
+    S.sample (S.subscribe cuckoo)
   let
-    count = S.scan (+) 0 (S.subscribe ticker <> S.subscribe jumper)
+    count = S.fold (+) 0 (S.subscribe ticker <> S.subscribe jumper)
     uppercased = toUpper <$> S.subscribe inputChan
+    letters = split (Pattern "") <$> uppercased
   S.tick ticker
   -- Referential transparency failure occurs here because it runs the effect
   log $ unsafeCoerce $ S.component consolation
@@ -38,11 +44,11 @@ main = S.mount "main" =<< do
       ]
       [ S.element "Tangle:"
       , S.element tangle
-      , S.element_ "br" [] []
+      , S.br_ [] []
       , S.element count
-      , S.element_ "br" [] []
+      , S.br_ [] []
       , S.element $ map (_ + 2) count
-      , S.element_ "br" [] []
+      , S.br_ [] []
       , S.element $ map (_ + 5) count
       , S.element_ "br" [] []
 {-
@@ -57,19 +63,19 @@ main = S.mount "main" =<< do
           ]
           [ S.element "Jump" ]
       , S.element uppercased
-      , S.element_ "br" [] []
+      , S.br_ [] []
       , input (uppercased <> S.subscribe clicked) inputChan
+      , S.br_ [] []
+      , S.div_ [] [ S.elements_ letters \s -> S.element s ]
 --      , S.component consolation
       ]
 
 input :: S.Signal String -> S.Channel String -> S.Element
 input s c = do
   S.element_ "input"
-    [ S.on_ "input" \i -> do
-        let t = i # S.property "target" # S.property "value"
-        log $ "Sending " <> t
+    [ S.onInput_ \i -> do
         log $ "Got " <> unsafeCoerce i
-        S.send c t
+        S.send c (S.inputValue i)
     , S.attribute_ "value" s
     ]
     []

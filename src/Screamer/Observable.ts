@@ -19,9 +19,9 @@ export const modify = <T>(f: (_: T) => T) => (o: Observable<T>) => () => {
 /////////////////////////////////
 // Signal
 
-export const get = <T>(o: Observable<T>) => () => {
-  return o();
-}
+// export const get = <T>(o: Observable<T>) => () => {
+//  return o();
+// }
 
 export const sample = <T>(o: Observable<T>) => () => {
   return sinuous.sample(o);
@@ -31,7 +31,7 @@ export const emit = <T>(e: Observable<() => T>) => () => {
   return e()();
 }
 
-export const pure_ = <T>(t: T) => () => {
+export const pure_ = <T>(t: T) => {
   return sinuous.observable(t);
 }
 
@@ -60,7 +60,7 @@ export const filter = <S>(f: (_: S) => boolean) => (seed: S) => (sig: Observable
   return o;
 };
 
-export const scan = <S, T>(f: (_: S) => (_: T) => T) => (seed: T) => (sig: Observable<S>) => {
+export const fold = <S, T>(f: (_: S) => (_: T) => T) => (seed: T) => (sig: Observable<S>) => {
   var acc = seed;
   return sinuous.computed(() => {
     acc = f(sig())(acc);

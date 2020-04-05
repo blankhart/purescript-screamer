@@ -5,9 +5,9 @@ import Prelude
 
 import Effect (Effect)
 import Data.Maybe (Maybe)
-import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Screamer.Internal (property, eventEffect, eventCast)
+import Web.Event.EventTarget (EventTarget)
 
 {{#each EventClasses}}
 
@@ -25,6 +25,8 @@ class Is{{event_class}} a
 {{field}}_ = eventEffect "{{field}}"
 
 {{/each}}
+instance is{{event_class}}{{event_class}} :: Is{{event_class}} {{event_class}}
+
 {{#each event_superclasses}}
 instance is{{this}}{{../event_class}} :: Is{{this}} {{../event_class}}
 
@@ -34,3 +36,12 @@ to{{event_class}} = Nullable.toMaybe <<< eventCast "{{event_class}}"
 
 {{/each}}
 
+-- EventTarget should have a phantom type parameter preserving evidence about
+-- the event that generated it so that it can safely be unwrapped in some cases.
+-- For example, returning the value of the node on an InputEvent.
+
+target :: forall a . IsEvent a => a -> EventTarget
+target = property "target"
+
+inputValue :: forall a. IsInput a => a -> String
+inputValue = property "target" >>> property "value"

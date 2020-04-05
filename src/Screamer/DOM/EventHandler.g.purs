@@ -4,7 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Unsafe.Coerce (unsafeCoerce)
-import Screamer.Core (on_)
+import Screamer.Core (Attribute, on_)
 import Screamer.DOM.Event as Event
 
 
@@ -85,10 +85,6 @@ onChange_ :: (Event.Event -> Effect Unit) -> Attribute
 onChange_ = on_ "change" <<< unsafeCoerce
 
 
-onInput_ :: (Event.Event -> Effect Unit) -> Attribute
-onInput_ = on_ "input" <<< unsafeCoerce
-
-
 onReset_ :: (Event.Event -> Effect Unit) -> Attribute
 onReset_ = on_ "reset" <<< unsafeCoerce
 
@@ -119,6 +115,10 @@ onFocusOut_ :: (Event.Focus -> Effect Unit) -> Attribute
 onFocusOut_ = on_ "focusout" <<< unsafeCoerce
 
 
+
+
+onInput_ :: (Event.Input -> Effect Unit) -> Attribute
+onInput_ = on_ "input" <<< unsafeCoerce
 
 
 

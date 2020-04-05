@@ -5,9 +5,9 @@ import Prelude
 
 import Effect (Effect)
 import Data.Maybe (Maybe)
-import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Screamer.Internal (property, eventEffect, eventCast)
+import Web.Event.EventTarget (EventTarget)
 
 
 foreign import data Animation :: Type
@@ -20,8 +20,7 @@ animationName_ = property "animationName"
 elapsedTime_ :: forall a. IsAnimation a => a -> Number
 elapsedTime_ = property "elapsedTime"
 
-pseudoElement_ :: forall a. IsAnimation a => a -> String
-pseudoElement_ = property "pseudoElement"
+instance isAnimationAnimation :: IsAnimation Animation
 
 instance isEventAnimation :: IsEvent Animation
 
@@ -33,6 +32,8 @@ foreign import data Clipboard :: Type
 
 class IsClipboard a
 
+instance isClipboardClipboard :: IsClipboard Clipboard
+
 instance isEventClipboard :: IsEvent Clipboard
 
 toClipboard :: forall a. a -> Maybe Clipboard
@@ -43,6 +44,8 @@ foreign import data Composition :: Type
 
 class IsComposition a
 
+instance isCompositionComposition :: IsComposition Composition
+
 instance isUiComposition :: IsUi Composition
 
 toComposition :: forall a. a -> Maybe Composition
@@ -52,6 +55,8 @@ toComposition = Nullable.toMaybe <<< eventCast "Composition"
 foreign import data Drag :: Type
 
 class IsDrag a
+
+instance isDragDrag :: IsDrag Drag
 
 instance isMouseDrag :: IsMouse Drag
 
@@ -87,6 +92,8 @@ stopImmediatePropagation_ = eventEffect "stopImmediatePropagation"
 stopPropagation_ :: forall a. IsEvent a => a -> Effect Unit
 stopPropagation_ = eventEffect "stopPropagation"
 
+instance isEventEvent :: IsEvent Event
+
 toEvent :: forall a. a -> Maybe Event
 toEvent = Nullable.toMaybe <<< eventCast "Event"
 
@@ -94,6 +101,8 @@ toEvent = Nullable.toMaybe <<< eventCast "Event"
 foreign import data Focus :: Type
 
 class IsFocus a
+
+instance isFocusFocus :: IsFocus Focus
 
 instance isUiFocus :: IsUi Focus
 
@@ -113,6 +122,8 @@ inputType_ = property "inputType"
 
 isComposing_ :: forall a. IsInput a => a -> Boolean
 isComposing_ = property "isComposing"
+
+instance isInputInput :: IsInput Input
 
 instance isUiInput :: IsUi Input
 
@@ -154,8 +165,7 @@ repeat_ = property "repeat"
 shiftKey_ :: forall a. IsKeyboard a => a -> Boolean
 shiftKey_ = property "shiftKey"
 
-which_ :: forall a. IsKeyboard a => a -> Number
-which_ = property "which"
+instance isKeyboardKeyboard :: IsKeyboard Keyboard
 
 instance isUiKeyboard :: IsUi Keyboard
 
@@ -166,9 +176,6 @@ toKeyboard = Nullable.toMaybe <<< eventCast "Keyboard"
 foreign import data Mouse :: Type
 
 class IsMouse a
-
-altKey_ :: forall a. IsMouse a => a -> Boolean
-altKey_ = property "altKey"
 
 button_ :: forall a. IsMouse a => a -> Number
 button_ = property "button"
@@ -182,17 +189,11 @@ clientX_ = property "clientX"
 clientY_ :: forall a. IsMouse a => a -> Number
 clientY_ = property "clientY"
 
-ctrlKey_ :: forall a. IsMouse a => a -> Boolean
-ctrlKey_ = property "ctrlKey"
-
 layerX_ :: forall a. IsMouse a => a -> Number
 layerX_ = property "layerX"
 
 layerY_ :: forall a. IsMouse a => a -> Number
 layerY_ = property "layerY"
-
-metaKey_ :: forall a. IsMouse a => a -> Boolean
-metaKey_ = property "metaKey"
 
 movementX_ :: forall a. IsMouse a => a -> Number
 movementX_ = property "movementX"
@@ -218,9 +219,6 @@ screenX_ = property "screenX"
 screenY_ :: forall a. IsMouse a => a -> Number
 screenY_ = property "screenY"
 
-shiftKey_ :: forall a. IsMouse a => a -> Boolean
-shiftKey_ = property "shiftKey"
-
 which_ :: forall a. IsMouse a => a -> Number
 which_ = property "which"
 
@@ -229,6 +227,8 @@ x_ = property "x"
 
 y_ :: forall a. IsMouse a => a -> Number
 y_ = property "y"
+
+instance isMouseMouse :: IsMouse Mouse
 
 instance isUiMouse :: IsUi Mouse
 
@@ -270,6 +270,8 @@ twist_ = property "twist"
 width_ :: forall a. IsPointer a => a -> Number
 width_ = property "width"
 
+instance isPointerPointer :: IsPointer Pointer
+
 instance isMousePointer :: IsMouse Pointer
 
 toPointer :: forall a. a -> Maybe Pointer
@@ -280,17 +282,7 @@ foreign import data Touch :: Type
 
 class IsTouch a
 
-altKey_ :: forall a. IsTouch a => a -> Boolean
-altKey_ = property "altKey"
-
-ctrlKey_ :: forall a. IsTouch a => a -> Boolean
-ctrlKey_ = property "ctrlKey"
-
-metaKey_ :: forall a. IsTouch a => a -> Boolean
-metaKey_ = property "metaKey"
-
-shiftKey_ :: forall a. IsTouch a => a -> Boolean
-shiftKey_ = property "shiftKey"
+instance isTouchTouch :: IsTouch Touch
 
 instance isUiTouch :: IsUi Touch
 
@@ -302,14 +294,13 @@ foreign import data Transition :: Type
 
 class IsTransition a
 
-elapsedTime_ :: forall a. IsTransition a => a -> Number
-elapsedTime_ = property "elapsedTime"
-
 propertyName_ :: forall a. IsTransition a => a -> String
 propertyName_ = property "propertyName"
 
 pseudoElement_ :: forall a. IsTransition a => a -> String
 pseudoElement_ = property "pseudoElement"
+
+instance isTransitionTransition :: IsTransition Transition
 
 instance isEventTransition :: IsEvent Transition
 
@@ -323,6 +314,8 @@ class IsUi a
 
 detail_ :: forall a. IsUi a => a -> Number
 detail_ = property "detail"
+
+instance isUiUi :: IsUi Ui
 
 instance isEventUi :: IsEvent Ui
 
@@ -346,9 +339,20 @@ deltaY_ = property "deltaY"
 deltaZ_ :: forall a. IsWheel a => a -> Number
 deltaZ_ = property "deltaZ"
 
+instance isWheelWheel :: IsWheel Wheel
+
 instance isMouseWheel :: IsMouse Wheel
 
 toWheel :: forall a. a -> Maybe Wheel
 toWheel = Nullable.toMaybe <<< eventCast "Wheel"
 
 
+-- EventTarget should have a phantom type parameter preserving evidence about
+-- the event that generated it so that it can safely be unwrapped in some cases.
+-- For example, returning the value of the node on an InputEvent.
+
+target :: forall a . IsEvent a => a -> EventTarget
+target = property "target"
+
+inputValue :: forall a. IsInput a => a -> String
+inputValue = property "target" >>> property "value"

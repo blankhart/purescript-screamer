@@ -1,5 +1,6 @@
 import { h, hs } from 'sinuous';
-import { computed, observable, subscribe, Observable } from 'sinuous/observable';
+import { computed, observable, sample, subscribe, Observable } from 'sinuous/observable';
+import { map } from 'sinuous/map/mini';
 
 export const documentImpl: Document = document;
 
@@ -34,7 +35,7 @@ export const element_ = (tag: string) => (attributes: ScreamerAttribute[]) => (c
   return h(tag, sinuousAttrs, sinuousChildren);
 };
 
-export const svg_ = (tag: string) => (attributes: ScreamerAttribute[]) => (children: ScreamerElement[]) => () => {
+export const svgElement_ = (tag: string) => (attributes: ScreamerAttribute[]) => (children: ScreamerElement[]) => () => {
   const sinuousAttrs: Record<string, any> = {};
   for (let { key, value } of attributes) {
     // console.log(`key, value: ${key}, ${value}`);
@@ -42,6 +43,12 @@ export const svg_ = (tag: string) => (attributes: ScreamerAttribute[]) => (child
   }
   const sinuousChildren: Element[] = children.map(e => e());
   return hs(tag, sinuousAttrs, sinuousChildren);
+};
+
+export const elements_ = <T>(items: Observable<T[]>) => (expr: (_: T) => ScreamerElement) => () => {
+  console.log(`Items to map: ${sample(items)}`);
+  //  console.log(`Example mapping: ${expr(items()[0])()}`);
+  return map(items, (item: T) => expr(item)());
 };
 
 export const on_ = (name: string) => (onEvent: (e: Event) => (() => void)) => {
@@ -55,10 +62,10 @@ export const _effectfulSignal = <T>(o: Observable<() => T>) => () => {
   return computed(() => o());
 }
 
-export const mount = (selector: string) => (component: ScreamerElement) => () => {
+export const mount = (selector: string) => (app: ScreamerElement) => () => {
   const mountPoint = document.querySelector(selector);
   if (mountPoint) {
-    mountPoint.appendChild(component());
+    mountPoint.appendChild(app());
   } else {
     console.error(
       `unable to mount at selector "${selector}" because the document has no matching element`

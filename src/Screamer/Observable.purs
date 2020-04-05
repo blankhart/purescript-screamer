@@ -11,7 +11,7 @@
 --  * Actions which modify the signal graph but have no other side effects are considered a part of the runtime rather than as having effectful semantics.
 --  * Actions which alter signals based only on temporal characteristics (such as debouncing or throttling) are not regarded as introducing new effects - i.e., they do not transform `Signal a` into a `Signal (Effect a)`.  The notion of a signal is inherently time-varying and sampling its value always runs in effect.
 
--- TODO: Signals are inherently effectful, in that they are set by effects and read in effects. This is evident from the ability to convert a Signal (Effect a) into an Effect (Signal a). They have different meanings but are closely allied. 
+-- TODO: Signals are inherently effectful, in that they are set by effects and read in effects. This is evident from the ability to convert a Signal (Effect a) into an Effect (Signal a). They have different meanings but are closely allied.
 -- See the `unwrap` function in the original purescript-signal implementation.  Takes a signal of effects of `a`, and produces an effect which returns a signal which will take each effect produced by the input signal, run it, and yield its returned value.
 
 module Screamer.Observable where
@@ -39,11 +39,11 @@ foreign import data Signal :: Type -> Type
 subscribe :: forall a . Channel a -> Signal a
 subscribe = unsafeCoerce
 
+--  Never appropriate to depend on the observable in the sinuous sense.  The only way to generate dependencies (signals) is through other combinators.
 --  When is it appropriate to depend on the signal?  This is effectful and should only run in a computed, which generally should be run in the FFI.
 --  So users of the library arguably should only need one of o() or sample(o) and the result would have the semantics of sample(o).
-foreign import get :: forall a . Signal a -> Effect a
+-- foreign import get :: forall a . Signal a -> Effect a
 
---  Possibly omit or keep get with this name to avoid confusion with the sinuous API.
 foreign import sample :: forall a . Signal a -> Effect a
 
 foreign import emit :: forall a . Signal (Effect a) -> Effect a
@@ -74,11 +74,13 @@ empty = pure mempty
 
 foreign import merge :: forall a . Signal a -> Signal a -> Signal a
 
-foreign import scan :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b
+foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b
 
 foreign import filter :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
 
 -- foreign import filterMap -- catMaybes?
+
+-- catMaybes :: Signal (Maybe a) -> Signal a
 
 -- mapWithIndex
 
