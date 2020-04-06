@@ -62,7 +62,7 @@ main = S.mount "main" =<< do
         , color:
             let hue c =
                   show (Int.round (f * 255.0 + Int.toNumber c * 10.0) `mod` 255)
-            in (\c -> "hsl('" <> hue c <> ",100%,50%)'") <$> heartbeat
+            in (\c -> "hsl(" <> hue c <> ",100%,50%)") <$> heartbeat
         }
     mkDotArray max = mkDot max <$> A.range 0 max
     -- Signal (Array (Signal Dot))
@@ -70,7 +70,7 @@ main = S.mount "main" =<< do
     -- But the style changes on each heartbeat.
     dots = mkDotArray <$> maxHb
 
-  let -- Ensure this is MagicDo'd
+  let
     runHeartbeat = do
       S.modify (_ + 1) hb
       HTML.window >>= void <<< HTML.requestAnimationFrame runHeartbeat
@@ -104,11 +104,12 @@ dot isBig d =
   S.div_
     -- CSS classes concat with " "
     -- missing "label" class in original example
+    -- the style x and y objects could just be directly built
     [ S.class_ ((\big -> if big then "big cursor" else "cursor") <$> isBig)
     , S.style_ $
       { left: d.x <#> \x -> show x <> "px"
       , top: d.y <#> \y -> show y <> "px"
-      , borderColor: d.color
+      , "border-color": d.color
       }
     ]
 
