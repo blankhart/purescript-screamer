@@ -25,7 +25,21 @@ counts = [200, 500, 1000, 2000]
 loops :: Number
 loops = 6.0
 
-type Dot = { x :: Signal Number, y :: Signal Number, color :: Signal String }
+type Dot =
+  { x :: Signal Number
+  , y :: Signal Number
+  , color :: Signal String
+  --, isActive :: Signal Boolean
+  }
+
+-- New strategy: Allocate a single array of signals
+-- The array depends on numerosity (assuming sin x is maximum value)
+-- and so may be reallocated from time to time.
+-- But then within that, dots render only if they are "active" which
+-- is determined by max.
+-- Additionally, with this change (and even on the current version) it
+-- should be possible to ditch map mini.  But we do still need a way to
+-- render a Signal (Array Element) without mapping.
 
 main :: Effect Unit
 main = S.mount "main" =<< do
