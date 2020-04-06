@@ -7,3 +7,5 @@ import Screamer.Core (Attribute, attribute_)
 {{key}}_ = attribute_ "{{key}}"
 
 {{/each}}
+style_ :: forall a . {|a} -> Attribute
+style_ = attribute_ "style"

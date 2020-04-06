@@ -11,7 +11,8 @@
       "**/node_modules": true,
       "*~": true,
       "**/dist": true,
-      "**/output": true,
+      "**/output": false,
+      "**/target": false,
       "src/**/*.js": false,
       "yarn.lock": true
     },

@@ -25,13 +25,8 @@ main = S.mount "main" =<< do
   jumper <- S.channel 0
   inputChan <- S.channel "type here"
   clicked <- S.channel "unclicked"
-  tangle <- flip S.trial (pure unit) do
-    cuckoo <- S.channel 9
-    S.send jumper 400
-    j <- S.sample (S.subscribe jumper <> S.subscribe cuckoo)
-    S.send ticker (-j)
-    S.sample (S.subscribe cuckoo)
   let
+    tangle = S.sampleOn (S.subscribe jumper) (S.subscribe inputChan)
     count = S.fold (+) 0 (S.subscribe ticker <> S.subscribe jumper)
     uppercased = toUpper <$> S.subscribe inputChan
     letters = split (Pattern "") <$> uppercased

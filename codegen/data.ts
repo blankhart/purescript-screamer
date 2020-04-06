@@ -33,6 +33,7 @@ export namespace codegen {
   // There are also issues with shiftKey, which applies to both MouseEvent and KeyboardEvent and TouchEvent
   // Both HTML and SVG allow <style> tags, which are ignored
   // Svg "mask" is both en element and then an attribute that references the element
+  // Not generating IsEvent instances
   export const EventClassImplies: Record<EventClass, EventClass | null> = {
     Animation: 'Event',
     Clipboard: 'Event',
@@ -277,6 +278,7 @@ export namespace codegen {
     charset: 'string',
     checked: 'boolean',
     cite: 'string',
+    class: 'string',
     color: 'string',
     cols: 'int',
     colspan: 'int',
@@ -362,7 +364,7 @@ export namespace codegen {
     size: 'int',
     sizes: 'string',
     slot: 'string',
-    span: 'int',
+    //    span: 'int',
     spellcheck: 'boolean',
     src: 'string',
     srcdoc: 'string',

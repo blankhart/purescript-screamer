@@ -1,6 +1,6 @@
 module Screamer.DOM.Attribute where
 
-import Screamer.Core (Attribute, attribute_)
+import Screamer.Core (Attribute, attribute_, class IsValue)
 
 abbr_ :: String -> Attribute
 abbr_ = attribute_ "abbr"
@@ -55,6 +55,9 @@ checked_ = attribute_ "checked"
 
 cite_ :: String -> Attribute
 cite_ = attribute_ "cite"
+
+class_ :: forall v . IsValue v => v -> Attribute
+class_ = attribute_ "class"
 
 color_ :: String -> Attribute
 color_ = attribute_ "color"
@@ -311,9 +314,6 @@ sizes_ = attribute_ "sizes"
 slot_ :: String -> Attribute
 slot_ = attribute_ "slot"
 
-span_ :: Int -> Attribute
-span_ = attribute_ "span"
-
 spellcheck_ :: Boolean -> Attribute
 spellcheck_ = attribute_ "spellcheck"
 
@@ -365,3 +365,5 @@ width_ = attribute_ "width"
 wrap_ :: String -> Attribute
 wrap_ = attribute_ "wrap"
 
+style_ :: forall a . IsValue a => a -> Attribute
+style_ = attribute_ "style"

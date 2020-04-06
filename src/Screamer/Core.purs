@@ -113,6 +113,10 @@ instance intIsValue :: IsValue Int where
 instance numberIsValue :: IsValue Number where
   value = pure <<< unsafeCoerce
 
+-- Just for style tag...
+instance recordIsValue :: IsValue (Record a) where
+  value = pure <<< unsafeCoerce
+
 instance effectfulIsValue :: IsValue v => IsValue (Signal (Effect v)) where
   value = _effectfulSignal
 

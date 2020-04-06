@@ -232,6 +232,8 @@ instance isMouseMouse :: IsMouse Mouse
 
 instance isUiMouse :: IsUi Mouse
 
+instance isEventMouse :: IsEvent Mouse
+
 toMouse :: forall a. a -> Maybe Mouse
 toMouse = Nullable.toMaybe <<< eventCast "Mouse"
 

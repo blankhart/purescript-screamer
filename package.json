@@ -8,8 +8,10 @@
     "build:examples": "cd examples",
     "codegen:dom": "ts-node codegen/dom.ts",
     "hello": "tsc && spago bundle-app --main Screamer.Examples.HelloWorld --to examples/output/HelloWorld.js",
+    "rainbow": "tsc && spago bundle-app --main Screamer.Examples.RainbowSpiral --to examples/output/RainbowSpiral.js",
     "postinstall": "spago install",
-    "serve": "parcel examples/output/HelloWorld.html"
+    "serve": "parcel examples/output/HelloWorld.html",
+    "serve:rainbow": "parcel examples/output/RainbowSpiral.html"
   },
   "dependencies": {
     "sinuous": "0.26.1"

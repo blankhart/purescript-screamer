@@ -42,9 +42,11 @@ subscribe = unsafeCoerce
 --  Never appropriate to depend on the observable in the sinuous sense.  The only way to generate dependencies (signals) is through other combinators.
 --  When is it appropriate to depend on the signal?  This is effectful and should only run in a computed, which generally should be run in the FFI.
 --  So users of the library arguably should only need one of o() or sample(o) and the result would have the semantics of sample(o).
--- foreign import get :: forall a . Signal a -> Effect a
+foreign import get :: forall a . Signal a -> Effect a
 
-foreign import sample :: forall a . Signal a -> Effect a
+foreign import sampleOn :: forall a b . Signal a -> Signal b -> Signal b
+
+-- foreign import sampleWith :: forall a b . Signal a -> Signal b -> (a -> b -> c) -> Signal c
 
 foreign import emit :: forall a . Signal (Effect a) -> Effect a
 

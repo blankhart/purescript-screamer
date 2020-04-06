@@ -19,12 +19,12 @@ export const modify = <T>(f: (_: T) => T) => (o: Observable<T>) => () => {
 /////////////////////////////////
 // Signal
 
-// export const get = <T>(o: Observable<T>) => () => {
-//  return o();
-// }
-
-export const sample = <T>(o: Observable<T>) => () => {
+export const get = <T>(o: Observable<T>) => () => {
   return sinuous.sample(o);
+}
+
+export const sampleOn = <S>(a: Observable<S>) => <T>(b: Observable<T>) => {
+  return sinuous.computed(() => { a(); return sinuous.sample(b); });
 }
 
 export const emit = <T>(e: Observable<() => T>) => () => {

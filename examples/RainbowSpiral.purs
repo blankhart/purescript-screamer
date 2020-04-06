@@ -2,141 +2,115 @@
 
 module Screamer.Examples.RainbowSpiral where
 
-import Data.Array as A
-import Effect (Effect)
-import Math (pi, round, cos, sin)
 import Prelude
+
+import Data.Array as A
+import Data.Int as Int
+import Effect (Effect)
+import Math (pi, cos, sin)
 import Screamer.Core (Element)
 import Screamer.Core as S
-import Screamer.Observable (Signal)
-import Screamer.Observable as S
+import Screamer.DOM.Attribute as S
 import Screamer.DOM.Element as S
 import Screamer.DOM.Event as S
 import Screamer.DOM.EventHandler as S
+import Screamer.Observable (Signal)
+import Screamer.Observable as S
 import Web.HTML as HTML
+import Web.HTML.Window as HTML
 
 counts :: Array Int
 counts = [200, 500, 1000, 2000]
 
-loops :: Int
-loops = 6
+loops :: Number
+loops = 6.0
 
-type Dot = { x :: Effect Number, y :: Effect Number, color :: Effect String }
+type Dot = { x :: Signal Number, y :: Signal Number, color :: Signal String }
 
 main :: Effect Unit
 main = S.mount "main" =<< do
 
-  window <- HTML.window
+  -- NOTE: Allow channels to be the same type as signals
+  -- with a phantom parameter
+  nmr <- S.channel 200
+  let numerosity = S.subscribe nmr
 
-  numerosity <- S.channel 200
-  heartbeat <- S.channel 0
+  hb <- S.channel 0
+  let heartbeat = S.subscribe hb
 
-  pos <- S.channel { x: 0, y: 0 }
-  isBig <- S.channel false
+  pos <- S.channel { x: 0.0, y: 0.0 }
+  let position = S.subscribe pos
+  let positionHb = S.sampleOn heartbeat position
 
-  -- optimize
-  let range n hb = 0..(n + round (sin (2.0 * pi * hb / 90.0) * n * 0.5))
-  let array = range <$> numerosity <*> heartbeat -- Signal (Array Int)
+  bigness <- S.channel false
+  let isBig = S.subscribe bigness
+
+  -- optimize; use builder; use STArray
+  let
+    maxFn n b = n + Int.round (sin (2.0 * pi * (Int.toNumber b) / 90.0) * Int.toNumber n * 0.5)
+    maxHb = maxFn <$> numerosity <*> heartbeat
 
   let
-    makeDot max i =
-      let m = 20 + i * 2
-      in
-        { x:
-          let
-            f = i / max * loops
-            theta = f * 2 * pi
-          in sample pos >>= \{ x } -> pure (x + sin theta * m)
-        , y:
-          let
-            f = i / max * loops
-            theta = f * 2 * pi
-          in sample pos >>= \{ y } -> pure (y + cos theta * m)
+    mkDot max i =
+      let
+        m = 20.0 + Int.toNumber i * 2.0
+        f = Int.toNumber i / Int.toNumber max * loops
+        theta = f * 2.0 * pi
+      in -- These should update together so could all be one signal on the hb
+        { x: (\{ x } -> x + sin theta * m) <$> positionHb
+        , y: (\{ y } -> y + cos theta * m) <$> positionHb
         , color:
-          let
-            f = i / max * loops
-            hue c = (f * 255 + c * 10) % 255
-          in sample counter >>= \c -> pure ("hsl('" + hue c + ",100%,50%)'")
+            let hue c =
+                  show (Int.round (f * 255.0 + Int.toNumber c * 10.0) `mod` 255)
+            in (\c -> "hsl('" <> hue c <> ",100%,50%)'") <$> heartbeat
         }
+    mkDotArray max = mkDot max <$> A.range 0 max
+    -- Signal (Array (Signal Dot))
+    -- The position changes on each mouse move,
+    -- But the style changes on each heartbeat.
+    dots = mkDotArray <$> maxHb
 
-  dots <- map makeDot <$> array -- Effect (Signal Array Dot)
+  let -- Ensure this is MagicDo'd
+    runHeartbeat = do
+      S.modify (_ + 1) hb
+      HTML.window >>= void <<< HTML.requestAnimationFrame runHeartbeat
+
+  runHeartbeat
 
   pure $
     S.div_
       [ S.id_ "main"
-      -- Ensure full width
-      , S.onMouseMove_ \e -> S.send { x: S.pageX e, y: S.pageY e } pos
-      , S.onMouseDown_ \e -> S.preventDefault e >> S.send true isBig
-      , S.onMouseUp_ \e -> S.send false isBig
+      -- Ensure full width or use window events
+      , S.onMouseMove_ \e -> S.send pos { x: S.pageX_ e, y: S.pageY_ e }
+      , S.onMouseDown_ \e -> S.preventDefault_ e *> S.send bigness true
+      , S.onMouseUp_ \e -> S.send bigness false
       ]
-      [ animationPicker,
-
-        dot (S.subscribe isBig) (S.subscribe pos) "red" [coords { x, y }],
-        S.elements_ dots \{ x, y, color } ->
-          dot (S.subscribe isBig) { x, y, color } []
+      [ animationPicker
+      , S.element $ position <#> \p ->
+          dot isBig { x: pure p.x, y: pure p.y, color: pure "red" } [coords p]
+      , S.elements_ dots \attrs ->
+          dot isBig attrs []
       ]
 
 coords :: { x :: Number, y :: Number } -> Element
-coords {x, y} = S.span_ [S.class_ "label"] [S.element $ show x <> "," <> show y]
+coords {x,y} =
+  S.span_
+    [S.class_ "label"]
+    [S.element $ show x <> ", " <> show y]
 
 -- | Represents a single colored dot.
 dot :: Signal Boolean -> Dot -> Array Element -> Element
-dot isBig {x, y, color } = do
-  x' <- x
-  y' <- y
-  c' <- color
+dot isBig d =
   S.div_
-  -- CSS classes concat with " "
-  -- missing "label" class in original example
-  [ S.class_ ((\big -> if big then "big cursor" else "cursor") <$> isBig)
-  , S.style_
-    { left: show x' <> "px"
-    , top: show y' <> "px"
-    , borderColor: c'
-    }
-  ]
+    -- CSS classes concat with " "
+    -- missing "label" class in original example
+    [ S.class_ ((\big -> if big then "big cursor" else "cursor") <$> isBig)
+    , S.style_ $
+      { left: d.x <#> \x -> show x <> "px"
+      , top: d.y <#> \y -> show y <> "px"
+      , borderColor: d.color
+      }
+    ]
 
 animationPicker :: Element
-animationPicker = S.element "Picker"
-
-{-
-  increment();
-
-  function increment() {
-    counter(counter() + 1);
-    debounceRendering(increment);
-  }
-
-  const cache = [];
-  const cursors = computed(() =>
-    Array(max()).fill(0).map((_, i) => cache[i] || (cache[i] = makeCursor(i))));
-
-  function makeCursor(i) {
-    // `sample` gets the observable value without making itself a dependency.
-    // The only observable dependency in these functions is `max()` which is
-    // derived from `counter()`. In other words only when `counter()` is
-    // updated with a new value does the element's style get updated.
-    return {
-      x() {
-        let f = i / max() * LOOPS,
-          θ = f * 2 * Math.PI,
-          m = 20 + i * 2;
-        return (sample(x) + Math.sin(θ) * m) | 0;
-      },
-      y() {
-        let f = i / max() * LOOPS,
-          θ = f * 2 * Math.PI,
-          m = 20 + i * 2;
-        return (sample(y) + Math.cos(θ) * m) | 0;
-      },
-      color() {
-        let f = i / max() * LOOPS,
-          hue = (f * 255 + sample(counter) * 10) % 255;
-        return 'hsl(' + hue + ',100%,50%)';
-      }
-    };
-  }
-
-}
-
--}
+animationPicker = S.element "Picker goes here"
