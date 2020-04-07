@@ -63,6 +63,8 @@ foreign import svgElement_ :: String -> Array Attribute -> Array Element -> Elem
 
 foreign import elements_ :: forall a. Signal (Array a) -> (a -> Element) -> Element
 
+foreign import fragment_ :: forall a . Array Element -> Element
+
 attribute_ :: forall v . IsValue v => String -> v -> Attribute
 attribute_ key v = Attribute { key, value: value v }
 

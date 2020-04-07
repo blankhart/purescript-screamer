@@ -3,6 +3,8 @@
 module Screamer.Examples.RainbowSpiral where
 
 import Prelude
+import Debug.Trace
+import Effect.Console (log)
 
 import Data.Array as A
 import Data.Int as Int
@@ -25,64 +27,77 @@ counts = [200, 500, 1000, 2000]
 loops :: Number
 loops = 6.0
 
+type Color = String
+
 type Dot =
-  { x :: Signal Number
-  , y :: Signal Number
-  , color :: Signal String
-  --, isActive :: Signal Boolean
+  { position :: Position
+  , color :: Color
+  , isActive :: Boolean
   }
 
--- New strategy: Allocate a single array of signals
--- The array depends on numerosity (assuming sin x is maximum value)
--- and so may be reallocated from time to time.
--- But then within that, dots render only if they are "active" which
--- is determined by max.
--- Additionally, with this change (and even on the current version) it
--- should be possible to ditch map mini.  But we do still need a way to
--- render a Signal (Array Element) without mapping.
+dotColor :: Int -> Int -> Number -> Color
+dotColor i hb max = "hsl(" <> hue <> ",100%,50%)"
+  where
+    hue = show (Int.round (f * 255.0 + Int.toNumber hb * 10.0) `mod` 255)
+    f = Int.toNumber i / max * loops
+
+dotPosition :: Int -> Position -> Number -> Position
+dotPosition i {x,y} max = { x: x + m * sin theta, y: y + m * cos theta }
+  where
+    m = 20.0 + Int.toNumber i * 2.0
+    theta = 2.0 * pi * Int.toNumber i / max * loops
+
+type Position = { x :: Number, y :: Number }
 
 main :: Effect Unit
 main = S.mount "main" =<< do
 
-  -- NOTE: Allow channels to be the same type as signals
-  -- with a phantom parameter
-  numerosity <- S.channel 200
+  { signal: numerosity, put: putNumerosity } <- S.channel 200
 
-  heartbeat <- S.channel 0
-  
-  position <- S.channel { x: 0.0, y: 0.0 }
-  let positionHb = S.sampleOn heartbeat position
+  { signal: heartbeat, modify: modifyHeartbeat } <- S.channel 0
 
-  isBig <- S.channel false
+  { signal: position, put: putPosition } <- S.channel { x: 0.0, y: 0.0 }
 
-  -- optimize; use builder; use STArray
+  { signal: isBig, put: putBig } <- S.channel false
+
   let
-    maxFn n b = n + Int.round (sin (2.0 * pi * (Int.toNumber b) / 90.0) * Int.toNumber n * 0.5)
+
     maxHb = maxFn <$> numerosity <*> heartbeat
+      where
+        maxFn n hb = -- trace "Running maxFn..." \_ ->
+          Int.toNumber n + sin (2.0 * pi * (Int.toNumber hb) / 90.0) * Int.toNumber n * 0.5
 
-  let
-    mkDot max i =
-      let
-        m = 20.0 + Int.toNumber i * 2.0
-        f = Int.toNumber i / Int.toNumber max * loops
-        theta = f * 2.0 * pi
-      in -- These should update together so could all be one signal on the heartbeat
-        { x: (\{ x } -> x + sin theta * m) <$> positionHb
-        , y: (\{ y } -> y + cos theta * m) <$> positionHb
-        , color:
-            let hue c =
-                  show (Int.round (f * 255.0 + Int.toNumber c * 10.0) `mod` 255)
-            in (\c -> "hsl(" <> hue c <> ",100%,50%)") <$> S.subscribe heartbeat
-        }
-    mkDotArray max = mkDot max <$> A.range 0 max
-    -- Signal (Array (Signal Dot))
-    -- The position changes on each mouse move,
-    -- But the style changes on each heartbeat.
-    dots = mkDotArray <$> maxHb
+    dotAttrs = -- trace "Running dotAttrs..." \_ ->
+      attrs <$> maxHb <*> heartbeat <*> S.sampleOn heartbeat position
+        where
+          attrs max hb pos = -- trace "Running attrs..." \_ ->
+            { hb, pos, max } -- inner loop, once per frame
 
-  let
+    mkDot i = -- trace "Running mkDot..." \_ ->
+      dotAttrs <#> \{ hb, pos, max } -> -- inner loop, once per dot per frame
+        let x =
+              { position: dotPosition i pos max
+              , color: dotColor i hb max
+              , isActive: Int.toNumber i < max
+              }
+        in
+    --        if hb < 10
+    --          then
+    --            trace ("Updating dot " <> show i <> "...") \_ -> x
+    --          else
+                  x
+
+    dots =
+      trace "Running dots..." \_ ->
+        numerosity <#> \n -> map mkDot (A.range 0 (n * 3 / 2))
+
     runHeartbeat = do
-      S.modify (_ + 1) heartbeat
+      -- hb <- S.get heartbeat
+      -- when (hb < 10) do
+        -- log "Starting update..."
+      modifyHeartbeat (_ + 1)
+      -- when (hb < 10) do
+        -- log "Requesting animation frame..."
       HTML.window >>= void <<< HTML.requestAnimationFrame runHeartbeat
 
   runHeartbeat
@@ -91,36 +106,45 @@ main = S.mount "main" =<< do
     S.div_
       [ S.id_ "main"
       -- Ensure full width or use window events
-      , S.onMouseMove_ \e -> S.send position { x: S.pageX_ e, y: S.pageY_ e }
-      , S.onMouseDown_ \e -> S.preventDefault_ e *> S.send isBig true
-      , S.onMouseUp_ \e -> S.send isBig false
+      , S.onMouseMove_ \e -> putPosition { x: S.pageX_ e, y: S.pageY_ e }
+      , S.onMouseDown_ \e -> S.preventDefault_ e *> putBig true
+      , S.onMouseUp_ \e -> putBig false
       ]
       [ animationPicker
+      -- Move position dependency inside the dot call
       , S.element $ position <#> \p ->
-          dot (S.subscribe isBig) { x: pure p.x, y: pure p.y, color: pure "red" } [coords p]
-      , S.elements_ dots \attrs ->
-          dot (S.subscribe isBig) attrs []
+          dot isBig (pure { position: p, color: "red", isActive: true }) [coords p]
+      , S.element $ (S.fragment_ <<< map (\attrs -> dot isBig attrs [])) <$> dots
       ]
 
-coords :: { x :: Number, y :: Number } -> Element
+coords :: Position -> Element
 coords {x,y} =
   S.span_
     [S.class_ "label"]
     [S.element $ show x <> ", " <> show y]
 
 -- | Represents a single colored dot.
-dot :: Signal Boolean -> Dot -> Array Element -> Element
-dot isBig d =
+dot :: Signal Boolean -> Signal Dot -> Array Element -> Element
+dot isBig theDot =
+  -- Runs on every mouse move as to the cursor dot
+  -- but for every numerosity reset as to the spiral dots
+  trace "Running dot..." \_ ->
   S.div_
     -- CSS classes concat with " "
     -- missing "label" class in original example
     -- the style x and y objects could just be directly built
     [ S.class_ ((\big -> if big then "big cursor" else "cursor") <$> isBig)
-    , S.style_ $
-      { left: d.x <#> \x -> show x <> "px"
-      , top: d.y <#> \y -> show y <> "px"
-      , "border-color": d.color
-      }
+    , S.style_ $ theDot <#> \d ->
+      -- inner loop, once per dot per frame
+      -- possibly try static style shapes
+      -- trace "Updating styles..." \_ ->
+        { -- transform is slower; have not set "will-change"
+          -- "transform": "translate(" <> show d.position.x <> "px," <> show d.position.y <> "px)"
+          "left": show d.position.x <> "px"
+        , "top": show d.position.y <> "px"
+        , "border-color": d.color
+        , "visibility": if d.isActive then "visible" else "hidden"
+        }
     ]
 
 animationPicker :: Element

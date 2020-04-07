@@ -5,16 +5,23 @@ import { Observable } from 'sinuous/observable';
 // Channel
 
 export const channel = <T>(t: T) => () => {
-  return sinuous.observable(t);
+  const signal = sinuous.observable(t);
+  return { 
+    signal: signal,
+    put: (t: T) => () => signal(t),
+    modify: (f: (_: T) => T) => () => signal(f(sinuous.sample(signal))),
+  };
 }
 
-export const send = <T>(o: Observable<T>) => (t: T) => () => {
+/*
+const put = <T>(o: Observable<T>) => (t: T) => () => {
   return o(t);
 }
 
-export const modify = <T>(f: (_: T) => T) => (o: Observable<T>) => () => {
-  return o(f(o()));
+const modify = <T>(f: (_: T) => T) => (o: Observable<T>) => () => {
+  return o(f(sinuous.sample(o)));
 }
+*/
 
 /////////////////////////////////
 // Signal

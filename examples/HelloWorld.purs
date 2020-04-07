@@ -14,10 +14,17 @@ import Screamer.DOM.EventHandler as S
 import Screamer.Internal as S
 import Unsafe.Coerce (unsafeCoerce)
 
+{-
 consolation :: Effect (S.Signal Int)
 consolation = do
   log "Ran effect"
   S.subscribe <$> S.channel 3
+-}
+
+main :: Effect Unit
+main = log "Hello world!"
+
+{-
 
 main :: Effect Unit
 main = S.mount "main" =<< do
@@ -46,11 +53,6 @@ main = S.mount "main" =<< do
       , S.br_ [] []
       , S.element $ map (_ + 5) count
       , S.element_ "br" [] []
-{-
-      , S.element "button"
-          [ S.on "click" \_ -> S.send ticker 0 ]
-          [ S.text "Reset" ]
--}
       , S.element_ "button"
           [ S.on_ "click" \_ -> do
               S.send jumper 1000
@@ -74,3 +76,5 @@ input s c = do
     , S.attribute_ "value" s
     ]
     []
+
+-}

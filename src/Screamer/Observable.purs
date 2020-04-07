@@ -21,23 +21,20 @@ import Prelude
 import Effect (Effect)
 import Unsafe.Coerce (unsafeCoerce)
 
---  A channel represents a writable memory cell and so resembles an IORef or STRef.  It is fully effectful because its value is time-varying.
-type Channel :: Type -> Type
+--  A channel represents a writable memory cell and so resembles an IORef or STRef.  
+-- It is fully effectful because its value is time-varying.
+type Channel a =
+  { signal :: Signal a
+  , put :: a -> Effect Unit
+  , modify :: (a -> a) -> Effect Unit 
+  }
 
 foreign import channel :: forall a . a -> Effect (Channel a)
-
-foreign import send :: forall a . Channel a -> a -> Effect Unit
-
-foreign import modify :: forall a . (a -> a) -> Channel a -> Effect Unit
 
 --------------------------------------------------------
 -- Signal
 
 foreign import data Signal :: Type -> Type
-
--- of?
-subscribe :: forall a . Channel a -> Signal a
-subscribe = unsafeCoerce
 
 --  Never appropriate to depend on the observable in the sinuous sense.  The only way to generate dependencies (signals) is through other combinators.
 --  When is it appropriate to depend on the signal?  This is effectful and should only run in a computed, which generally should be run in the FFI.

@@ -46,10 +46,14 @@ export const svgElement_ = (tag: string) => (attributes: ScreamerAttribute[]) =>
 };
 
 export const elements_ = <T>(items: Observable<T[]>) => (expr: (_: T) => ScreamerElement) => () => {
-  console.log(`Items to map: ${sample(items)}`);
-  //  console.log(`Example mapping: ${expr(items()[0])()}`);
+  // console.log(`Items to map: ${sample(items)}`);
+  // console.log(`Example mapping: ${expr(items()[0])()}`);
   return map(items, (item: T) => expr(item)());
 };
+
+export const fragment_ = <T>(items: ScreamerElement[]) => () => {
+  return h(items.map(item => item()));
+}
 
 export const on_ = (name: string) => (onEvent: (e: Event) => (() => void)) => {
   return {
