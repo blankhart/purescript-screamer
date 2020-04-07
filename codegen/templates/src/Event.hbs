@@ -36,6 +36,7 @@ to{{event_class}} = Nullable.toMaybe <<< eventCast "{{event_class}}"
 
 {{/each}}
 
+-- TODO: Integrations with Web.*** library types
 -- EventTarget should have a phantom type parameter preserving evidence about
 -- the event that generated it so that it can safely be unwrapped in some cases.
 -- For example, returning the value of the node on an InputEvent.

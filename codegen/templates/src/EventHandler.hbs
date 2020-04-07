@@ -10,7 +10,6 @@ import Screamer.DOM.Event as Event
 {{#each EventHandlers}}
 
 {{#each event_handlers as |event_handler|}}
-
 {{event_handler}}_ :: (Event.{{../event_class}} -> Effect Unit) -> Attribute
 {{event_handler}}_ = on_ "{{handlerize event_handler}}" <<< unsafeCoerce
 

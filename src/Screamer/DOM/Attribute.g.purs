@@ -2,368 +2,490 @@ module Screamer.DOM.Attribute where
 
 import Screamer.Core (Attribute, attribute_, class IsValue)
 
-abbr_ :: String -> Attribute
+-- TODO: abbr_ :: String -> Attribute
+abbr_ :: forall v . IsValue v => v -> Attribute
 abbr_ = attribute_ "abbr"
 
-accept_ :: String -> Attribute
+-- TODO: accept_ :: String -> Attribute
+accept_ :: forall v . IsValue v => v -> Attribute
 accept_ = attribute_ "accept"
 
-accept_charset_ :: String -> Attribute
+-- TODO: accept_charset_ :: String -> Attribute
+accept_charset_ :: forall v . IsValue v => v -> Attribute
 accept_charset_ = attribute_ "accept_charset"
 
-accesskey_ :: String -> Attribute
+-- TODO: accesskey_ :: String -> Attribute
+accesskey_ :: forall v . IsValue v => v -> Attribute
 accesskey_ = attribute_ "accesskey"
 
-action_ :: String -> Attribute
+-- TODO: action_ :: String -> Attribute
+action_ :: forall v . IsValue v => v -> Attribute
 action_ = attribute_ "action"
 
-allow_ :: String -> Attribute
+-- TODO: allow_ :: String -> Attribute
+allow_ :: forall v . IsValue v => v -> Attribute
 allow_ = attribute_ "allow"
 
-allowfullscreen_ :: Boolean -> Attribute
+-- TODO: allowfullscreen_ :: Boolean -> Attribute
+allowfullscreen_ :: forall v . IsValue v => v -> Attribute
 allowfullscreen_ = attribute_ "allowfullscreen"
 
-allowpaymentrequest_ :: Boolean -> Attribute
+-- TODO: allowpaymentrequest_ :: Boolean -> Attribute
+allowpaymentrequest_ :: forall v . IsValue v => v -> Attribute
 allowpaymentrequest_ = attribute_ "allowpaymentrequest"
 
-alt_ :: String -> Attribute
+-- TODO: alt_ :: String -> Attribute
+alt_ :: forall v . IsValue v => v -> Attribute
 alt_ = attribute_ "alt"
 
-as_ :: String -> Attribute
+-- TODO: as_ :: String -> Attribute
+as_ :: forall v . IsValue v => v -> Attribute
 as_ = attribute_ "as"
 
-async_ :: Boolean -> Attribute
+-- TODO: async_ :: Boolean -> Attribute
+async_ :: forall v . IsValue v => v -> Attribute
 async_ = attribute_ "async"
 
-autocapitalize_ :: String -> Attribute
+-- TODO: autocapitalize_ :: String -> Attribute
+autocapitalize_ :: forall v . IsValue v => v -> Attribute
 autocapitalize_ = attribute_ "autocapitalize"
 
-autocomplete_ :: Boolean -> Attribute
+-- TODO: autocomplete_ :: Boolean -> Attribute
+autocomplete_ :: forall v . IsValue v => v -> Attribute
 autocomplete_ = attribute_ "autocomplete"
 
-autofocus_ :: Boolean -> Attribute
+-- TODO: autofocus_ :: Boolean -> Attribute
+autofocus_ :: forall v . IsValue v => v -> Attribute
 autofocus_ = attribute_ "autofocus"
 
-autoplay_ :: Boolean -> Attribute
+-- TODO: autoplay_ :: Boolean -> Attribute
+autoplay_ :: forall v . IsValue v => v -> Attribute
 autoplay_ = attribute_ "autoplay"
 
-charset_ :: String -> Attribute
+-- TODO: charset_ :: String -> Attribute
+charset_ :: forall v . IsValue v => v -> Attribute
 charset_ = attribute_ "charset"
 
-checked_ :: Boolean -> Attribute
+-- TODO: checked_ :: Boolean -> Attribute
+checked_ :: forall v . IsValue v => v -> Attribute
 checked_ = attribute_ "checked"
 
-cite_ :: String -> Attribute
+-- TODO: cite_ :: String -> Attribute
+cite_ :: forall v . IsValue v => v -> Attribute
 cite_ = attribute_ "cite"
 
+-- TODO: class_ :: String -> Attribute
 class_ :: forall v . IsValue v => v -> Attribute
 class_ = attribute_ "class"
 
-color_ :: String -> Attribute
+-- TODO: color_ :: String -> Attribute
+color_ :: forall v . IsValue v => v -> Attribute
 color_ = attribute_ "color"
 
-cols_ :: Int -> Attribute
+-- TODO: cols_ :: Int -> Attribute
+cols_ :: forall v . IsValue v => v -> Attribute
 cols_ = attribute_ "cols"
 
-colspan_ :: Int -> Attribute
+-- TODO: colspan_ :: Int -> Attribute
+colspan_ :: forall v . IsValue v => v -> Attribute
 colspan_ = attribute_ "colspan"
 
-content_ :: String -> Attribute
+-- TODO: content_ :: String -> Attribute
+content_ :: forall v . IsValue v => v -> Attribute
 content_ = attribute_ "content"
 
-contenteditable_ :: Boolean -> Attribute
+-- TODO: contenteditable_ :: Boolean -> Attribute
+contenteditable_ :: forall v . IsValue v => v -> Attribute
 contenteditable_ = attribute_ "contenteditable"
 
-controls_ :: Boolean -> Attribute
+-- TODO: controls_ :: Boolean -> Attribute
+controls_ :: forall v . IsValue v => v -> Attribute
 controls_ = attribute_ "controls"
 
-coords_ :: String -> Attribute
+-- TODO: coords_ :: String -> Attribute
+coords_ :: forall v . IsValue v => v -> Attribute
 coords_ = attribute_ "coords"
 
-crossorigin_ :: String -> Attribute
+-- TODO: crossorigin_ :: String -> Attribute
+crossorigin_ :: forall v . IsValue v => v -> Attribute
 crossorigin_ = attribute_ "crossorigin"
 
-data_ :: String -> Attribute
+-- TODO: data_ :: String -> Attribute
+data_ :: forall v . IsValue v => v -> Attribute
 data_ = attribute_ "data"
 
-datetime_ :: String -> Attribute
+-- TODO: datetime_ :: String -> Attribute
+datetime_ :: forall v . IsValue v => v -> Attribute
 datetime_ = attribute_ "datetime"
 
-decoding_ :: String -> Attribute
+-- TODO: decoding_ :: String -> Attribute
+decoding_ :: forall v . IsValue v => v -> Attribute
 decoding_ = attribute_ "decoding"
 
-default_ :: Boolean -> Attribute
+-- TODO: default_ :: Boolean -> Attribute
+default_ :: forall v . IsValue v => v -> Attribute
 default_ = attribute_ "default"
 
-defer_ :: Boolean -> Attribute
+-- TODO: defer_ :: Boolean -> Attribute
+defer_ :: forall v . IsValue v => v -> Attribute
 defer_ = attribute_ "defer"
 
-dir_ :: String -> Attribute
+-- TODO: dir_ :: String -> Attribute
+dir_ :: forall v . IsValue v => v -> Attribute
 dir_ = attribute_ "dir"
 
-dirname_ :: String -> Attribute
+-- TODO: dirname_ :: String -> Attribute
+dirname_ :: forall v . IsValue v => v -> Attribute
 dirname_ = attribute_ "dirname"
 
-disabled_ :: Boolean -> Attribute
+-- TODO: disabled_ :: Boolean -> Attribute
+disabled_ :: forall v . IsValue v => v -> Attribute
 disabled_ = attribute_ "disabled"
 
-download_ :: String -> Attribute
+-- TODO: download_ :: String -> Attribute
+download_ :: forall v . IsValue v => v -> Attribute
 download_ = attribute_ "download"
 
-draggable_ :: Boolean -> Attribute
+-- TODO: draggable_ :: Boolean -> Attribute
+draggable_ :: forall v . IsValue v => v -> Attribute
 draggable_ = attribute_ "draggable"
 
-enctype_ :: String -> Attribute
+-- TODO: enctype_ :: String -> Attribute
+enctype_ :: forall v . IsValue v => v -> Attribute
 enctype_ = attribute_ "enctype"
 
-enterkeyhint_ :: String -> Attribute
+-- TODO: enterkeyhint_ :: String -> Attribute
+enterkeyhint_ :: forall v . IsValue v => v -> Attribute
 enterkeyhint_ = attribute_ "enterkeyhint"
 
-for_ :: String -> Attribute
+-- TODO: for_ :: String -> Attribute
+for_ :: forall v . IsValue v => v -> Attribute
 for_ = attribute_ "for"
 
-form_ :: String -> Attribute
+-- TODO: form_ :: String -> Attribute
+form_ :: forall v . IsValue v => v -> Attribute
 form_ = attribute_ "form"
 
-formaction_ :: String -> Attribute
+-- TODO: formaction_ :: String -> Attribute
+formaction_ :: forall v . IsValue v => v -> Attribute
 formaction_ = attribute_ "formaction"
 
-formenctype_ :: String -> Attribute
+-- TODO: formenctype_ :: String -> Attribute
+formenctype_ :: forall v . IsValue v => v -> Attribute
 formenctype_ = attribute_ "formenctype"
 
-formmethod_ :: String -> Attribute
+-- TODO: formmethod_ :: String -> Attribute
+formmethod_ :: forall v . IsValue v => v -> Attribute
 formmethod_ = attribute_ "formmethod"
 
-formnovalidate_ :: Boolean -> Attribute
+-- TODO: formnovalidate_ :: Boolean -> Attribute
+formnovalidate_ :: forall v . IsValue v => v -> Attribute
 formnovalidate_ = attribute_ "formnovalidate"
 
-formtarget_ :: String -> Attribute
+-- TODO: formtarget_ :: String -> Attribute
+formtarget_ :: forall v . IsValue v => v -> Attribute
 formtarget_ = attribute_ "formtarget"
 
-headers_ :: String -> Attribute
+-- TODO: headers_ :: String -> Attribute
+headers_ :: forall v . IsValue v => v -> Attribute
 headers_ = attribute_ "headers"
 
-height_ :: String -> Attribute
+-- TODO: height_ :: String -> Attribute
+height_ :: forall v . IsValue v => v -> Attribute
 height_ = attribute_ "height"
 
-hidden_ :: Boolean -> Attribute
+-- TODO: hidden_ :: Boolean -> Attribute
+hidden_ :: forall v . IsValue v => v -> Attribute
 hidden_ = attribute_ "hidden"
 
-high_ :: Number -> Attribute
+-- TODO: high_ :: Number -> Attribute
+high_ :: forall v . IsValue v => v -> Attribute
 high_ = attribute_ "high"
 
-href_ :: String -> Attribute
+-- TODO: href_ :: String -> Attribute
+href_ :: forall v . IsValue v => v -> Attribute
 href_ = attribute_ "href"
 
-hreflang_ :: String -> Attribute
+-- TODO: hreflang_ :: String -> Attribute
+hreflang_ :: forall v . IsValue v => v -> Attribute
 hreflang_ = attribute_ "hreflang"
 
-http_equiv_ :: String -> Attribute
+-- TODO: http_equiv_ :: String -> Attribute
+http_equiv_ :: forall v . IsValue v => v -> Attribute
 http_equiv_ = attribute_ "http_equiv"
 
-id_ :: String -> Attribute
+-- TODO: id_ :: String -> Attribute
+id_ :: forall v . IsValue v => v -> Attribute
 id_ = attribute_ "id"
 
-inputmode_ :: String -> Attribute
+-- TODO: inputmode_ :: String -> Attribute
+inputmode_ :: forall v . IsValue v => v -> Attribute
 inputmode_ = attribute_ "inputmode"
 
-integrity_ :: String -> Attribute
+-- TODO: integrity_ :: String -> Attribute
+integrity_ :: forall v . IsValue v => v -> Attribute
 integrity_ = attribute_ "integrity"
 
-is_ :: String -> Attribute
+-- TODO: is_ :: String -> Attribute
+is_ :: forall v . IsValue v => v -> Attribute
 is_ = attribute_ "is"
 
-ismap_ :: Boolean -> Attribute
+-- TODO: ismap_ :: Boolean -> Attribute
+ismap_ :: forall v . IsValue v => v -> Attribute
 ismap_ = attribute_ "ismap"
 
-itemid_ :: String -> Attribute
+-- TODO: itemid_ :: String -> Attribute
+itemid_ :: forall v . IsValue v => v -> Attribute
 itemid_ = attribute_ "itemid"
 
-itemprop_ :: String -> Attribute
+-- TODO: itemprop_ :: String -> Attribute
+itemprop_ :: forall v . IsValue v => v -> Attribute
 itemprop_ = attribute_ "itemprop"
 
-itemref_ :: String -> Attribute
+-- TODO: itemref_ :: String -> Attribute
+itemref_ :: forall v . IsValue v => v -> Attribute
 itemref_ = attribute_ "itemref"
 
-itemscope_ :: Boolean -> Attribute
+-- TODO: itemscope_ :: Boolean -> Attribute
+itemscope_ :: forall v . IsValue v => v -> Attribute
 itemscope_ = attribute_ "itemscope"
 
-itemtype_ :: String -> Attribute
+-- TODO: itemtype_ :: String -> Attribute
+itemtype_ :: forall v . IsValue v => v -> Attribute
 itemtype_ = attribute_ "itemtype"
 
-kind_ :: String -> Attribute
+-- TODO: kind_ :: String -> Attribute
+kind_ :: forall v . IsValue v => v -> Attribute
 kind_ = attribute_ "kind"
 
-label_ :: String -> Attribute
+-- TODO: label_ :: String -> Attribute
+label_ :: forall v . IsValue v => v -> Attribute
 label_ = attribute_ "label"
 
-lang_ :: String -> Attribute
+-- TODO: lang_ :: String -> Attribute
+lang_ :: forall v . IsValue v => v -> Attribute
 lang_ = attribute_ "lang"
 
-list_ :: String -> Attribute
+-- TODO: list_ :: String -> Attribute
+list_ :: forall v . IsValue v => v -> Attribute
 list_ = attribute_ "list"
 
-loop_ :: Boolean -> Attribute
+-- TODO: loop_ :: Boolean -> Attribute
+loop_ :: forall v . IsValue v => v -> Attribute
 loop_ = attribute_ "loop"
 
-low_ :: Number -> Attribute
+-- TODO: low_ :: Number -> Attribute
+low_ :: forall v . IsValue v => v -> Attribute
 low_ = attribute_ "low"
 
-manifest_ :: String -> Attribute
+-- TODO: manifest_ :: String -> Attribute
+manifest_ :: forall v . IsValue v => v -> Attribute
 manifest_ = attribute_ "manifest"
 
-max_ :: Number -> Attribute
+-- TODO: max_ :: Number -> Attribute
+max_ :: forall v . IsValue v => v -> Attribute
 max_ = attribute_ "max"
 
-maxlength_ :: String -> Attribute
+-- TODO: maxlength_ :: String -> Attribute
+maxlength_ :: forall v . IsValue v => v -> Attribute
 maxlength_ = attribute_ "maxlength"
 
-media_ :: String -> Attribute
+-- TODO: media_ :: String -> Attribute
+media_ :: forall v . IsValue v => v -> Attribute
 media_ = attribute_ "media"
 
-method_ :: String -> Attribute
+-- TODO: method_ :: String -> Attribute
+method_ :: forall v . IsValue v => v -> Attribute
 method_ = attribute_ "method"
 
-min_ :: Number -> Attribute
+-- TODO: min_ :: Number -> Attribute
+min_ :: forall v . IsValue v => v -> Attribute
 min_ = attribute_ "min"
 
-minlength_ :: Int -> Attribute
+-- TODO: minlength_ :: Int -> Attribute
+minlength_ :: forall v . IsValue v => v -> Attribute
 minlength_ = attribute_ "minlength"
 
-multiple_ :: Boolean -> Attribute
+-- TODO: multiple_ :: Boolean -> Attribute
+multiple_ :: forall v . IsValue v => v -> Attribute
 multiple_ = attribute_ "multiple"
 
-muted_ :: Boolean -> Attribute
+-- TODO: muted_ :: Boolean -> Attribute
+muted_ :: forall v . IsValue v => v -> Attribute
 muted_ = attribute_ "muted"
 
-name_ :: String -> Attribute
+-- TODO: name_ :: String -> Attribute
+name_ :: forall v . IsValue v => v -> Attribute
 name_ = attribute_ "name"
 
-nomodule_ :: Boolean -> Attribute
+-- TODO: nomodule_ :: Boolean -> Attribute
+nomodule_ :: forall v . IsValue v => v -> Attribute
 nomodule_ = attribute_ "nomodule"
 
-nonce_ :: String -> Attribute
+-- TODO: nonce_ :: String -> Attribute
+nonce_ :: forall v . IsValue v => v -> Attribute
 nonce_ = attribute_ "nonce"
 
-novalidate_ :: Boolean -> Attribute
+-- TODO: novalidate_ :: Boolean -> Attribute
+novalidate_ :: forall v . IsValue v => v -> Attribute
 novalidate_ = attribute_ "novalidate"
 
-open_ :: Boolean -> Attribute
+-- TODO: open_ :: Boolean -> Attribute
+open_ :: forall v . IsValue v => v -> Attribute
 open_ = attribute_ "open"
 
-optimum_ :: Number -> Attribute
+-- TODO: optimum_ :: Number -> Attribute
+optimum_ :: forall v . IsValue v => v -> Attribute
 optimum_ = attribute_ "optimum"
 
-pattern_ :: String -> Attribute
+-- TODO: pattern_ :: String -> Attribute
+pattern_ :: forall v . IsValue v => v -> Attribute
 pattern_ = attribute_ "pattern"
 
-ping_ :: String -> Attribute
+-- TODO: ping_ :: String -> Attribute
+ping_ :: forall v . IsValue v => v -> Attribute
 ping_ = attribute_ "ping"
 
-placeholder_ :: String -> Attribute
+-- TODO: placeholder_ :: String -> Attribute
+placeholder_ :: forall v . IsValue v => v -> Attribute
 placeholder_ = attribute_ "placeholder"
 
-playsinline_ :: Boolean -> Attribute
+-- TODO: playsinline_ :: Boolean -> Attribute
+playsinline_ :: forall v . IsValue v => v -> Attribute
 playsinline_ = attribute_ "playsinline"
 
-poster_ :: String -> Attribute
+-- TODO: poster_ :: String -> Attribute
+poster_ :: forall v . IsValue v => v -> Attribute
 poster_ = attribute_ "poster"
 
-preload_ :: String -> Attribute
+-- TODO: preload_ :: String -> Attribute
+preload_ :: forall v . IsValue v => v -> Attribute
 preload_ = attribute_ "preload"
 
-readonly_ :: Boolean -> Attribute
+-- TODO: readonly_ :: Boolean -> Attribute
+readonly_ :: forall v . IsValue v => v -> Attribute
 readonly_ = attribute_ "readonly"
 
-referrerpolicy_ :: String -> Attribute
+-- TODO: referrerpolicy_ :: String -> Attribute
+referrerpolicy_ :: forall v . IsValue v => v -> Attribute
 referrerpolicy_ = attribute_ "referrerpolicy"
 
-rel_ :: String -> Attribute
+-- TODO: rel_ :: String -> Attribute
+rel_ :: forall v . IsValue v => v -> Attribute
 rel_ = attribute_ "rel"
 
-required_ :: Boolean -> Attribute
+-- TODO: required_ :: Boolean -> Attribute
+required_ :: forall v . IsValue v => v -> Attribute
 required_ = attribute_ "required"
 
-reversed_ :: Boolean -> Attribute
+-- TODO: reversed_ :: Boolean -> Attribute
+reversed_ :: forall v . IsValue v => v -> Attribute
 reversed_ = attribute_ "reversed"
 
-rows_ :: Int -> Attribute
+-- TODO: rows_ :: Int -> Attribute
+rows_ :: forall v . IsValue v => v -> Attribute
 rows_ = attribute_ "rows"
 
-rowspan_ :: Int -> Attribute
+-- TODO: rowspan_ :: Int -> Attribute
+rowspan_ :: forall v . IsValue v => v -> Attribute
 rowspan_ = attribute_ "rowspan"
 
-sandbox_ :: String -> Attribute
+-- TODO: sandbox_ :: String -> Attribute
+sandbox_ :: forall v . IsValue v => v -> Attribute
 sandbox_ = attribute_ "sandbox"
 
-scope_ :: String -> Attribute
+-- TODO: scope_ :: String -> Attribute
+scope_ :: forall v . IsValue v => v -> Attribute
 scope_ = attribute_ "scope"
 
-selected_ :: Boolean -> Attribute
+-- TODO: selected_ :: Boolean -> Attribute
+selected_ :: forall v . IsValue v => v -> Attribute
 selected_ = attribute_ "selected"
 
-shape_ :: String -> Attribute
+-- TODO: shape_ :: String -> Attribute
+shape_ :: forall v . IsValue v => v -> Attribute
 shape_ = attribute_ "shape"
 
-size_ :: Int -> Attribute
+-- TODO: size_ :: Int -> Attribute
+size_ :: forall v . IsValue v => v -> Attribute
 size_ = attribute_ "size"
 
-sizes_ :: String -> Attribute
+-- TODO: sizes_ :: String -> Attribute
+sizes_ :: forall v . IsValue v => v -> Attribute
 sizes_ = attribute_ "sizes"
 
-slot_ :: String -> Attribute
+-- TODO: slot_ :: String -> Attribute
+slot_ :: forall v . IsValue v => v -> Attribute
 slot_ = attribute_ "slot"
 
-spellcheck_ :: Boolean -> Attribute
+-- TODO: spellcheck_ :: Boolean -> Attribute
+spellcheck_ :: forall v . IsValue v => v -> Attribute
 spellcheck_ = attribute_ "spellcheck"
 
-src_ :: String -> Attribute
+-- TODO: src_ :: String -> Attribute
+src_ :: forall v . IsValue v => v -> Attribute
 src_ = attribute_ "src"
 
-srcdoc_ :: String -> Attribute
+-- TODO: srcdoc_ :: String -> Attribute
+srcdoc_ :: forall v . IsValue v => v -> Attribute
 srcdoc_ = attribute_ "srcdoc"
 
-srclang_ :: String -> Attribute
+-- TODO: srclang_ :: String -> Attribute
+srclang_ :: forall v . IsValue v => v -> Attribute
 srclang_ = attribute_ "srclang"
 
-srcset_ :: String -> Attribute
+-- TODO: srcset_ :: String -> Attribute
+srcset_ :: forall v . IsValue v => v -> Attribute
 srcset_ = attribute_ "srcset"
 
-start_ :: Int -> Attribute
+-- TODO: start_ :: Int -> Attribute
+start_ :: forall v . IsValue v => v -> Attribute
 start_ = attribute_ "start"
 
-step_ :: Number -> Attribute
+-- TODO: step_ :: Number -> Attribute
+step_ :: forall v . IsValue v => v -> Attribute
 step_ = attribute_ "step"
 
-tabindex_ :: Int -> Attribute
+-- TODO: tabindex_ :: Int -> Attribute
+tabindex_ :: forall v . IsValue v => v -> Attribute
 tabindex_ = attribute_ "tabindex"
 
-target_ :: String -> Attribute
+-- TODO: target_ :: String -> Attribute
+target_ :: forall v . IsValue v => v -> Attribute
 target_ = attribute_ "target"
 
-title_ :: String -> Attribute
+-- TODO: title_ :: String -> Attribute
+title_ :: forall v . IsValue v => v -> Attribute
 title_ = attribute_ "title"
 
-translate_ :: Boolean -> Attribute
+-- TODO: translate_ :: Boolean -> Attribute
+translate_ :: forall v . IsValue v => v -> Attribute
 translate_ = attribute_ "translate"
 
-type_ :: String -> Attribute
+-- TODO: type_ :: String -> Attribute
+type_ :: forall v . IsValue v => v -> Attribute
 type_ = attribute_ "type"
 
-typemustmatch_ :: Boolean -> Attribute
+-- TODO: typemustmatch_ :: Boolean -> Attribute
+typemustmatch_ :: forall v . IsValue v => v -> Attribute
 typemustmatch_ = attribute_ "typemustmatch"
 
-usemap_ :: String -> Attribute
+-- TODO: usemap_ :: String -> Attribute
+usemap_ :: forall v . IsValue v => v -> Attribute
 usemap_ = attribute_ "usemap"
 
-value_ :: String -> Attribute
+-- TODO: value_ :: String -> Attribute
+value_ :: forall v . IsValue v => v -> Attribute
 value_ = attribute_ "value"
 
-width_ :: Int -> Attribute
+-- TODO: width_ :: Int -> Attribute
+width_ :: forall v . IsValue v => v -> Attribute
 width_ = attribute_ "width"
 
-wrap_ :: String -> Attribute
+-- TODO: wrap_ :: String -> Attribute
+wrap_ :: forall v . IsValue v => v -> Attribute
 wrap_ = attribute_ "wrap"
 
-style_ :: forall a . IsValue a => a -> Attribute
+-- TODO: style_ :: forall a . {|a} -> Attribute
+style_ :: forall v . IsValue v => v -> Attribute
 style_ = attribute_ "style"

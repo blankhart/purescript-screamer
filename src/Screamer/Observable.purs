@@ -22,7 +22,7 @@ import Effect (Effect)
 import Unsafe.Coerce (unsafeCoerce)
 
 --  A channel represents a writable memory cell and so resembles an IORef or STRef.  It is fully effectful because its value is time-varying.
-foreign import data Channel :: Type -> Type
+type Channel :: Type -> Type
 
 foreign import channel :: forall a . a -> Effect (Channel a)
 

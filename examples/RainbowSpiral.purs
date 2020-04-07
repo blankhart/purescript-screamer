@@ -46,18 +46,14 @@ main = S.mount "main" =<< do
 
   -- NOTE: Allow channels to be the same type as signals
   -- with a phantom parameter
-  nmr <- S.channel 200
-  let numerosity = S.subscribe nmr
+  numerosity <- S.channel 200
 
-  hb <- S.channel 0
-  let heartbeat = S.subscribe hb
-
-  pos <- S.channel { x: 0.0, y: 0.0 }
-  let position = S.subscribe pos
+  heartbeat <- S.channel 0
+  
+  position <- S.channel { x: 0.0, y: 0.0 }
   let positionHb = S.sampleOn heartbeat position
 
-  bigness <- S.channel false
-  let isBig = S.subscribe bigness
+  isBig <- S.channel false
 
   -- optimize; use builder; use STArray
   let
@@ -70,13 +66,13 @@ main = S.mount "main" =<< do
         m = 20.0 + Int.toNumber i * 2.0
         f = Int.toNumber i / Int.toNumber max * loops
         theta = f * 2.0 * pi
-      in -- These should update together so could all be one signal on the hb
+      in -- These should update together so could all be one signal on the heartbeat
         { x: (\{ x } -> x + sin theta * m) <$> positionHb
         , y: (\{ y } -> y + cos theta * m) <$> positionHb
         , color:
             let hue c =
                   show (Int.round (f * 255.0 + Int.toNumber c * 10.0) `mod` 255)
-            in (\c -> "hsl(" <> hue c <> ",100%,50%)") <$> heartbeat
+            in (\c -> "hsl(" <> hue c <> ",100%,50%)") <$> S.subscribe heartbeat
         }
     mkDotArray max = mkDot max <$> A.range 0 max
     -- Signal (Array (Signal Dot))
@@ -86,7 +82,7 @@ main = S.mount "main" =<< do
 
   let
     runHeartbeat = do
-      S.modify (_ + 1) hb
+      S.modify (_ + 1) heartbeat
       HTML.window >>= void <<< HTML.requestAnimationFrame runHeartbeat
 
   runHeartbeat
@@ -95,15 +91,15 @@ main = S.mount "main" =<< do
     S.div_
       [ S.id_ "main"
       -- Ensure full width or use window events
-      , S.onMouseMove_ \e -> S.send pos { x: S.pageX_ e, y: S.pageY_ e }
-      , S.onMouseDown_ \e -> S.preventDefault_ e *> S.send bigness true
-      , S.onMouseUp_ \e -> S.send bigness false
+      , S.onMouseMove_ \e -> S.send position { x: S.pageX_ e, y: S.pageY_ e }
+      , S.onMouseDown_ \e -> S.preventDefault_ e *> S.send isBig true
+      , S.onMouseUp_ \e -> S.send isBig false
       ]
       [ animationPicker
       , S.element $ position <#> \p ->
-          dot isBig { x: pure p.x, y: pure p.y, color: pure "red" } [coords p]
+          dot (S.subscribe isBig) { x: pure p.x, y: pure p.y, color: pure "red" } [coords p]
       , S.elements_ dots \attrs ->
-          dot isBig attrs []
+          dot (S.subscribe isBig) attrs []
       ]
 
 coords :: { x :: Number, y :: Number } -> Element

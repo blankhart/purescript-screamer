@@ -231,11 +231,9 @@ export namespace codegen {
 
   function* superclasses(e: EventClass) {
     let s = EventClassImplies[e];
-    if (s) {
+    while (s) {
       yield s;
-      e = s;
-    } else {
-      return;
+      s = EventClassImplies[s];
     }
   };
 

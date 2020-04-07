@@ -1,11 +1,13 @@
 module Screamer.DOM.Attribute where
 
-import Screamer.Core (Attribute, attribute_)
+import Screamer.Core (Attribute, attribute_, class IsValue)
 
 {{#each Attributes as |value key|}}
-{{key}}_ :: {{capitalize value}} -> Attribute
+-- TODO: {{key}}_ :: {{capitalize value}} -> Attribute
+{{key}}_ :: forall v . IsValue v => v -> Attribute
 {{key}}_ = attribute_ "{{key}}"
 
 {{/each}}
-style_ :: forall a . {|a} -> Attribute
+-- TODO: style_ :: forall a . {|a} -> Attribute
+style_ :: forall v . IsValue v => v -> Attribute
 style_ = attribute_ "style"

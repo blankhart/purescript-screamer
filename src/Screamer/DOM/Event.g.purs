@@ -48,6 +48,8 @@ instance isCompositionComposition :: IsComposition Composition
 
 instance isUiComposition :: IsUi Composition
 
+instance isEventComposition :: IsEvent Composition
+
 toComposition :: forall a. a -> Maybe Composition
 toComposition = Nullable.toMaybe <<< eventCast "Composition"
 
@@ -59,6 +61,10 @@ class IsDrag a
 instance isDragDrag :: IsDrag Drag
 
 instance isMouseDrag :: IsMouse Drag
+
+instance isUiDrag :: IsUi Drag
+
+instance isEventDrag :: IsEvent Drag
 
 toDrag :: forall a. a -> Maybe Drag
 toDrag = Nullable.toMaybe <<< eventCast "Drag"
@@ -106,6 +112,8 @@ instance isFocusFocus :: IsFocus Focus
 
 instance isUiFocus :: IsUi Focus
 
+instance isEventFocus :: IsEvent Focus
+
 toFocus :: forall a. a -> Maybe Focus
 toFocus = Nullable.toMaybe <<< eventCast "Focus"
 
@@ -126,6 +134,8 @@ isComposing_ = property "isComposing"
 instance isInputInput :: IsInput Input
 
 instance isUiInput :: IsUi Input
+
+instance isEventInput :: IsEvent Input
 
 toInput :: forall a. a -> Maybe Input
 toInput = Nullable.toMaybe <<< eventCast "Input"
@@ -168,6 +178,8 @@ shiftKey_ = property "shiftKey"
 instance isKeyboardKeyboard :: IsKeyboard Keyboard
 
 instance isUiKeyboard :: IsUi Keyboard
+
+instance isEventKeyboard :: IsEvent Keyboard
 
 toKeyboard :: forall a. a -> Maybe Keyboard
 toKeyboard = Nullable.toMaybe <<< eventCast "Keyboard"
@@ -276,6 +288,10 @@ instance isPointerPointer :: IsPointer Pointer
 
 instance isMousePointer :: IsMouse Pointer
 
+instance isUiPointer :: IsUi Pointer
+
+instance isEventPointer :: IsEvent Pointer
+
 toPointer :: forall a. a -> Maybe Pointer
 toPointer = Nullable.toMaybe <<< eventCast "Pointer"
 
@@ -287,6 +303,8 @@ class IsTouch a
 instance isTouchTouch :: IsTouch Touch
 
 instance isUiTouch :: IsUi Touch
+
+instance isEventTouch :: IsEvent Touch
 
 toTouch :: forall a. a -> Maybe Touch
 toTouch = Nullable.toMaybe <<< eventCast "Touch"
@@ -345,10 +363,15 @@ instance isWheelWheel :: IsWheel Wheel
 
 instance isMouseWheel :: IsMouse Wheel
 
+instance isUiWheel :: IsUi Wheel
+
+instance isEventWheel :: IsEvent Wheel
+
 toWheel :: forall a. a -> Maybe Wheel
 toWheel = Nullable.toMaybe <<< eventCast "Wheel"
 
 
+-- TODO: Integrations with Web.*** library types
 -- EventTarget should have a phantom type parameter preserving evidence about
 -- the event that generated it so that it can safely be unwrapped in some cases.
 -- For example, returning the value of the node on an InputEvent.
