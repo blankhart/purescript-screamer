@@ -67,8 +67,10 @@ main = S.mount "main" =<< do
         maxFn n hb = -- trace "Running maxFn..." \_ ->
           Int.toNumber n + sin (2.0 * pi * (Int.toNumber hb) / 90.0) * Int.toNumber n * 0.5
 
+    posHb = S.sampleOn heartbeat position
+
     dotAttrs = -- trace "Running dotAttrs..." \_ ->
-      attrs <$> maxHb <*> heartbeat <*> S.sampleOn heartbeat position
+      attrs <$> maxHb <*> heartbeat <*> posHb
         where
           attrs max hb pos = -- trace "Running attrs..." \_ ->
             { hb, pos, max } -- inner loop, once per frame
@@ -111,7 +113,6 @@ main = S.mount "main" =<< do
       , S.onMouseUp_ \e -> putBig false
       ]
       [ animationPicker
-      -- Move position dependency inside the dot call
       , S.element $ position <#> \p ->
           dot isBig (pure { position: p, color: "red", isActive: true }) [coords p]
       , S.element $ (S.fragment_ <<< map (\attrs -> dot isBig attrs [])) <$> dots

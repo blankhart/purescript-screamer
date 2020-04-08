@@ -6,7 +6,7 @@ import { Observable } from 'sinuous/observable';
 
 export const channel = <T>(t: T) => () => {
   const signal = sinuous.observable(t);
-  return { 
+  return {
     signal: signal,
     put: (t: T) => () => signal(t),
     modify: (f: (_: T) => T) => () => signal(f(sinuous.sample(signal))),
@@ -38,8 +38,9 @@ export const emit = <T>(e: Observable<() => T>) => () => {
   return e()();
 }
 
+// Since this is constant, no need to return observable(t)
 export const pure_ = <T>(t: T) => {
-  return sinuous.observable(t);
+  return () => t;
 }
 
 export const map_ = <S, T>(f: (_: S) => T) => (o: Observable<S>) => {
