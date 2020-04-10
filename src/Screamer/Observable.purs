@@ -21,12 +21,12 @@ import Prelude
 import Effect (Effect)
 import Unsafe.Coerce (unsafeCoerce)
 
---  A channel represents a writable memory cell and so resembles an IORef or STRef.  
+--  A channel represents a writable memory cell and so resembles an IORef or STRef.
 -- It is fully effectful because its value is time-varying.
 type Channel a =
   { signal :: Signal a
   , put :: a -> Effect Unit
-  , modify :: (a -> a) -> Effect Unit 
+  , modify :: (a -> a) -> Effect Unit
   }
 
 foreign import channel :: forall a . a -> Effect (Channel a)
@@ -77,6 +77,15 @@ foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b
 
 foreign import filter :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
 
+foreign import filterOn :: forall a. Signal Boolean -> a -> Signal a -> Signal a
+
+foreign import nonequal :: forall a. Eq a => Signal a -> Signal a
+
+-- Just avoids projecting then calling nonequal
+-- foreign import nonequalBy :: forall a b . Eq b => (a -> b) -> Signal a -> Signal a
+
+foreign import distinct :: forall a. Signal a -> Signal a
+
 -- foreign import filterMap -- catMaybes?
 
 -- catMaybes :: Signal (Maybe a) -> Signal a
@@ -92,8 +101,6 @@ foreign import filter :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
 -- zipWith
 
 -- race
-
--- foreign import distinct :: forall a. (Eq a) => Signal a -> Signal a
 
 -- every (emit timestamp every X milliseconds)
 

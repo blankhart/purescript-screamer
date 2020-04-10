@@ -24,8 +24,11 @@ import Web.DOM.Node as Node
 import Web.Event.Event (Event)
 import Web.Event.Event as Event
 
+-- NOTE: A strategy would be to allocate an array of Signal Row
+-- and then have each signal update based on the related array.
+
 main :: Effect Unit
-main = S.mount "main" =<< doJsBenchmark 
+main = S.mount "main" =<< doJsBenchmark
 
 ---------------------------------------------------
 -- Row operations
@@ -67,35 +70,35 @@ nouns =
 -- Application
 
 doJsBenchmark :: Effect Element
-doJsBenchmark = do 
+doJsBenchmark = do
 
   table <- S.channel []
 
   selected <- S.channel Nothing
 
   nextId <- S.channel 1
-  
-  let 
 
-    clear = do 
+  let
+
+    clear = do
       table.put []
-      selected.put Nothing 
-    
-    create n = do 
+      selected.put Nothing
+
+    create n = do
       append n
       selected.put Nothing
 
-    append n = do 
+    append n = do
       id <- S.get nextId.signal
       nextId.modify (_ + n)
       rows <- randomRows id n
       table.modify (_ <> rows)
 
-    remove id = do 
+    remove id = do
       table.modify (Array.filter (\row -> row.id /= id))
 
     -- 'danger'
-    select id = do 
+    select id = do
       table.modify \rows -> rows <#> case _ of
         row | row.id == id -> row { selected = true }
             | row.selected -> row { selected = false }
@@ -105,8 +108,8 @@ doJsBenchmark = do
       where
         f index row | index `mod` nth == 0 = row { label = row.label <> " !!!" }
         f _ row = row
- 
-    swap = table.modify \rows -> 
+
+    swap = table.modify \rows ->
       case Array.index rows 1, Array.index rows 998 of
         Just a, Just b ->
           let
@@ -148,13 +151,13 @@ doJsBenchmark = do
 -}
 
   pure $
-    S.div_ 
+    S.div_
     [ S.class_ "container" ]
-    [ S.div_ 
+    [ S.div_
       [ S.class_ "jumbotron" ]
       [ S.div_
         [ S.class_ "row" ]
-        [ S.div_ 
+        [ S.div_
           [ S.class_ "col-md-6" ]
           [ S.h1_ [] [ S.element "Screamer" ] ]
         , S.div_ [ S.class_ "col-md-6" ] buttons
@@ -186,20 +189,20 @@ button' { id, text, handler } =
 
 row' :: Row -> Element
 row' { id, label, selected } =
-  S.tr_ 
+  S.tr_
     [ S.class_ "danger" ] -- FIXME
-    [ S.td_ 
-      [ S.class_ "col-md-1" ] 
+    [ S.td_
+      [ S.class_ "col-md-1" ]
       [ S.element id ]
-    , S.td_ 
+    , S.td_
       [ S.class_ "col-md-4" ]
-      [ S.a_ 
+      [ S.a_
         [ S.href_ "#", S.attribute_ "data-action" "Select", S.attribute_ "data-id" (show id)  ]
         [ S.element label ]
       ]
-    , S.td_ 
+    , S.td_
       [ S.class_ "col-md-1" ]
-      [ S.a_ 
+      [ S.a_
         [ S.href_ "#" ]
         [ S.span_
           [ S.class_ "glyphicon glyphicon-remove"

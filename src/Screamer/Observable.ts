@@ -68,12 +68,50 @@ export const filter = <S>(f: (_: S) => boolean) => (seed: S) => (sig: Observable
   return o;
 };
 
+export const filterOn = <S>(cond: Observable<boolean>) => (seed: S) => (sig: Observable<S>) => {
+  let c = sinuous.sample(cond);
+  let s = sinuous.sample(sig);
+  const o = sinuous.observable(c ? s : seed);
+  sinuous.subscribe(() => {
+    s = sig();
+    c = sinuous.sample(cond);
+    if (c) o(s);
+  });
+  return o;
+};
+
 export const fold = <S, T>(f: (_: S) => (_: T) => T) => (seed: T) => (sig: Observable<S>) => {
   var acc = seed;
   return sinuous.computed(() => {
     acc = f(sig())(acc);
     return acc;
   });
+};
+
+export const distinct = <T>(sig: Observable<T>) => {
+  let s = sinuous.sample(sig);
+  const o = sinuous.observable(s);
+  sinuous.subscribe(() => {
+    const v = sig();
+    if (v !== s) {
+      s = v;
+      o(s);
+    }
+  });
+  return o;
+};
+
+export const nonequal = <T>(eq: (_: T) => (_: T) => Boolean) => (sig: Observable<T>) => {
+  let s = sinuous.sample(sig);
+  const o = sinuous.observable(s);
+  sinuous.subscribe(() => {
+    const v = sig();
+    if (!eq(v)(s)) {
+      s = v;
+      o(s);
+    }
+  });
+  return o;
 };
 
 // IGNORE
