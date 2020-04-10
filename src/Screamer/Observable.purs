@@ -19,6 +19,8 @@ module Screamer.Observable where
 import Prelude
 
 import Effect (Effect)
+import Prim.Row (class Nub, class Union)
+import Type.RowList (kind RowList, class RowToList, Cons, Nil, class ListToRow)
 import Unsafe.Coerce (unsafeCoerce)
 
 --  A channel represents a writable memory cell and so resembles an IORef or STRef.
@@ -85,6 +87,70 @@ foreign import nonequal :: forall a. Eq a => Signal a -> Signal a
 -- foreign import nonequalBy :: forall a b . Eq b => (a -> b) -> Signal a -> Signal a
 
 foreign import distinct :: forall a. Signal a -> Signal a
+
+-- a, b, union
+-- sampleMany :: {} -> {} -> Signal {union}
+
+-- a, b, union
+-- no Signal fields in function argument
+-- a and b must have disjoint fields
+-- The foreign implementation constructs a new record by
+-- sampling the samplers and observing the dependencies
+-- and then calls the given function.
+-- sampleManyWith :: {} -> {} -> ({ union } -> b) -> Signal b
+
+-- | Evidence that a record `sa` has the same fields and types as the record `a`, except that each value in `sa` is a `Signal`.
+class SignalRecord (a :: #Type) (sa :: #Type) | a -> sa
+
+instance signalRecord
+  ::  ( RowToList a rla
+      , ListToRow srla sa
+      , SignalRowList rla srla
+      )
+  => SignalRecord a sa
+
+class UnsignalRecord (sa :: #Type) (a :: #Type) | sa -> a
+
+instance unsignalRecord
+  ::  ( RowToList sa srla
+      , SignalRowList rla srla
+      , ListToRow rla a
+      )
+  => UnsignalRecord sa a
+
+class SignalRowList (rla :: RowList) (srla :: RowList) | rla -> srla, srla -> rla
+
+instance consSignalRowList
+  ::  ( SignalRowList t st )
+  => SignalRowList (Cons s f t) (Cons s (Signal f) st)
+
+instance nilSignalRowList
+  :: SignalRowList Nil Nil
+
+{-
+class UnsignalRowList (srla :: RowList) (rla :: RowList) | srla -> rla
+
+instance consUnsignalRowList
+  ::  ( UnsignalRowList t st )
+  => UnsignalRowList (Cons s f t) (Cons s (Signal f) st)
+
+instance nilUnsignalRowList
+  :: UnsignalRowList Nil Nil
+-}
+
+sampleX :: forall a sa . SignalRecord a sa => Record a -> Record sa
+sampleX = unsafeCoerce
+
+unsampleX :: forall a sa . UnsignalRecord sa a => Record sa -> Record a
+unsampleX = unsafeCoerce
+
+sampleMany :: forall a sa b sb ab . UnsignalRecord sa a => UnsignalRecord sb b => Union a b ab => Nub ab ab => Record sa -> Record sb -> Signal (Record ab)
+sampleMany a b = _sampleManyWith a b identity
+
+sampleManyWith :: forall a b ab c . Union a b ab => Nub ab ab => Record a -> Record b -> (Record ab -> c) -> c
+sampleManyWith a b f = _sampleManyWith a b f
+
+foreign import _sampleManyWith :: forall a b c d . a -> b -> (c -> d) -> d
 
 -- foreign import filterMap -- catMaybes?
 

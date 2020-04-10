@@ -114,6 +114,24 @@ export const nonequal = <T>(eq: (_: T) => (_: T) => Boolean) => (sig: Observable
   return o;
 };
 
+// sampled is a record of sampled values
+// depended is a record of depended-on values
+export const _sampleManyWith = (sampled: any) => (tracked: any) => (f: (_: any) => any) => {
+  return sinuous.computed(() => {
+    let obj = {};
+    for (let [k, v] of Object.entries(sampled)) {
+      //      console.log(`sampling ${k}: ${sinuous.sample(v as any)}`);
+      obj[k] = sinuous.sample(v as any);
+    }
+    for (let [k, v] of Object.entries(tracked)) {
+      //      console.log(`tracking ${k}: ${v()}`);
+      obj[k] = (v as any)();
+    }
+    console.log(`calling ${f} on ${obj}`);
+    return f(obj);
+  });
+}
+
 // IGNORE
 
 export const trial = <T>(action: () => T) => (cleanups: () => {}) => () => {

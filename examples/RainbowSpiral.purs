@@ -76,18 +76,26 @@ main = S.mount "main" =<< do
     -- a given frame.
     maxHb = maxFn <$> numerosity <*> heartbeat
       where
-        maxFn n hb = -- trace "Running maxFn..." \_ ->
+        maxFn n hb =
           let n' = Int.toNumber n
               hb' = Int.toNumber hb
           in  n' + sin (2.0 * pi * hb' / 90.0) * n' * 0.5
 
     posHb = S.sampleOn heartbeat position
 
-    dotAttrs = -- trace "Running dotAttrs..." \_ ->
+    -- These are all triggered on heartbeat - consider a combinator
+    -- that will build an observable in one step that samples some
+    -- and depends on other combinators.
+    dotAttrs = S.sampleMany { pos: position, max: maxHb } { hb: heartbeat }
+    {-
       attrs <$> maxHb <*> heartbeat <*> posHb
         where
-          attrs max hb pos = -- trace "Running attrs..." \_ ->
-            { hb, pos, max } -- inner loop, once per frame
+          attrs max hb pos = { hb, pos, max }
+    -}
+
+    -- xsample = S.sampleX { pos: 2 }
+
+    -- xunsample = S.unsampleX { n: numerosity }
 
     mkDot i =
       { "left": activeAttrs <#> \{pos, max} ->
@@ -104,10 +112,9 @@ main = S.mount "main" =<< do
         activeAttrs = S.filterOn isActive seedAttrs dotAttrs
         seedAttrs = { hb: 0, pos: origin, max: 0.0 }
 
-
-    dots =
-    --  trace "Running dots..." \_ ->
-        numerosity <#> \n -> map mkDot (A.range 0 (n * 3 / 2))
+    -- Instead of reallocating the dot array once per frame,
+    -- just turn off the display property for the invisible dots.
+    dots = numerosity <#> \n -> map mkDot (A.range 0 (n * 3 / 2))
 
     runHeartbeat = do
       -- hb <- S.get heartbeat
@@ -148,9 +155,6 @@ coords {x,y} =
 -- | Represents a single colored dot.
 dot :: Signal Boolean -> DotStyle -> Array Element -> Element
 dot isBig dotStyle =
-  -- Runs on every mouse move as to the cursor dot
-  -- but for every numerosity reset as to the spiral dots
-  -- trace "Running dot..." \_ ->
   S.div_
     -- CSS classes concat with " "
     -- missing "label" class in original example
