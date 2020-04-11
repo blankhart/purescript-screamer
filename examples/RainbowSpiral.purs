@@ -21,11 +21,9 @@ import Screamer.Observable as S
 import Web.HTML as HTML
 import Web.HTML.Window as HTML
 
--- Strategy:
--- Eliminate unnecessary work.
--- Implement distinct.
--- Update conditional on visibility.
-
+-- These are not actually the number of dots in the spiral,
+-- which vary from frame to frame.  The maximum number of
+-- dots is 150% of these numbers.
 counts :: Array Int
 counts = [200, 500, 1000, 2000]
 
@@ -58,9 +56,17 @@ type Position = { x :: Number, y :: Number }
 origin :: Position
 origin = { x: 0.0, y: 0.0 }
 
+-- What if you want to close a websocket, say?
+-- Then the websocket channel would depend on the other variable.
+-- What if you have dependent channels? Difficult to have in same record.
+-- But should a separate component be enforced?
+
 main :: Effect Unit
 main = S.mount "main" =<< do
 
+  -- Props...
+
+  -- State/inputs (Props -> Channels)
   { signal: numerosity, put: putNumerosity } <- S.channel 200
 
   { signal: heartbeat, modify: modifyHeartbeat } <- S.channel 0
@@ -71,31 +77,21 @@ main = S.mount "main" =<< do
 
   let
 
-    -- It's not entirely clear what this is the "max" of, but it
-    -- controls the number of dots pictured in the spiral for
-    -- a given frame.
-    maxHb = maxFn <$> numerosity <*> heartbeat
-      where
-        maxFn n hb =
-          let n' = Int.toNumber n
-              hb' = Int.toNumber hb
-          in  n' + sin (2.0 * pi * hb' / 90.0) * n' * 0.5
+    -- A difficulty with components is that there is a lot of computed
+    -- state that may need to be shared between initialization and view,
+    -- which would need access to the same channel.
 
-    posHb = S.sampleOn heartbeat position
-
-    -- These are all triggered on heartbeat - consider a combinator
-    -- that will build an observable in one step that samples some
-    -- and depends on other combinators.
-    dotAttrs = S.sampleMany { pos: position, max: maxHb } { hb: heartbeat }
-    {-
-      attrs <$> maxHb <*> heartbeat <*> posHb
-        where
-          attrs max hb pos = { hb, pos, max }
-    -}
-
-    -- xsample = S.sampleX { pos: 2 }
-
-    -- xunsample = S.unsampleX { n: numerosity }
+    dotAttrs = S.sampleManyWith
+      { pos: position, n: numerosity } -- sampled
+      { hb: heartbeat } -- tracked
+      \{ pos, n, hb } ->
+        let n' = Int.toNumber n
+            hb' = Int.toNumber hb
+            -- It's not entirely clear what this is the "max" of, but it
+            -- controls the number of dots pictured in the spiral for
+            -- a given frame.
+            max = n' + sin (2.0 * pi * hb' / 90.0) * n' * 0.5
+        in  { hb, max, pos }
 
     mkDot i =
       { "left": activeAttrs <#> \{pos, max} ->
@@ -109,24 +105,25 @@ main = S.mount "main" =<< do
       }
       where
         isActive = S.distinct $ dotAttrs <#> \{max} -> Int.toNumber i < max
-        activeAttrs = S.filterOn isActive seedAttrs dotAttrs
-        seedAttrs = { hb: 0, pos: origin, max: 0.0 }
+        activeAttrs = S.filterOn isActive nullAttrs dotAttrs
+        nullAttrs = { hb: 0, pos: origin, max: 0.0 }
 
     -- Instead of reallocating the dot array once per frame,
-    -- just turn off the display property for the invisible dots.
-    dots = numerosity <#> \n -> map mkDot (A.range 0 (n * 3 / 2))
+    -- just turn off the display property for unused dots.
+    dots = numerosity <#> \n ->
+      map mkDot (A.range 0 (n * 3 / 2))
 
     runHeartbeat = do
-      -- hb <- S.get heartbeat
-      -- when (hb < 10) do
-        -- log "Starting update..."
       modifyHeartbeat (_ + 1)
-      -- when (hb < 10) do
-        -- log "Requesting animation frame..."
       HTML.window >>= void <<< HTML.requestAnimationFrame runHeartbeat
 
+  -- Initialize/run (Props -> Channels -> Effect Unit)
   runHeartbeat
 
+  -- Destroy...
+  -- Passed to the component computed's cleanup function
+
+  -- View :: Props -> Channels -> Element
   pure $
     S.div_
       [ S.id_ "main"
@@ -136,12 +133,13 @@ main = S.mount "main" =<< do
       ]
       [ animationPicker
       , S.element $
-          dot isBig
-            { "left": posHb <#> \{x} -> show x <> "px"
-            , "top": posHb <#> \{y} -> show y <> "px"
-            , "border-color": pure "red"
-            , "display": pure "inline"
-            } [] -- coords p
+          let pos = S.sampleOn heartbeat position
+          in dot isBig
+              { "left": pos <#> \{x} -> show x <> "px"
+              , "top": pos <#> \{y} -> show y <> "px"
+              , "border-color": pure "red"
+              , "display": pure "inline"
+              } [] -- coords p
       , S.element $
           (S.fragment_ <<< map (\attrs -> dot isBig attrs [])) <$> dots
       ]

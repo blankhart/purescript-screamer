@@ -2,22 +2,30 @@ module Screamer.Examples.JsFrameworksBenchmark where
 
 -- https://github.com/krausest/js-framework-benchmark
 
+-- https://gist.githubusercontent.com/utkarshkukreti/ad83e5a0eb7e6f456e20be0778aae843/raw/2d5ca8641f267aef08d7d658e0fa4ab24b997c21/Screen%2520Shot%25202018-08-24%2520at%25202.04.20%2520PM.png
+
+-- http://localhost:8080/webdriver-ts-results/table.html
+
+-- https://github.com/krausest/js-framework-benchmark/blob/master/frameworks/keyed/sinuous/src/main.js
+
 import Prelude
 
 import Data.Array (mapWithIndex)
 import Data.Array as Array
+import Data.Array.ST as STArray
 import Data.Int as Int
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Maybe as Maybe
 import Data.Unfoldable (replicateA)
 import Effect (Effect)
 import Effect.Random as Random
-import Screamer.Core as S
 import Screamer.Core (Element)
+import Screamer.Core as S
 import Screamer.DOM.Attribute as S
 import Screamer.DOM.Element as S
-import Screamer.DOM.Event (Mouse)
+import Screamer.DOM.Event (Mouse, target)
 import Screamer.DOM.EventHandler as S
+import Screamer.Observable (Signal)
 import Screamer.Observable as S
 import Web.DOM.Element as Element
 import Web.DOM.Node as Node
@@ -33,11 +41,11 @@ main = S.mount "main" =<< doJsBenchmark
 ---------------------------------------------------
 -- Row operations
 
--- TODO: Implement a distinct combinator, so that updates only occur when attributes change
-type Row = { id :: Int, label :: String, selected :: Boolean }
+-- TODO: Implement a distinct combinator, so that updates occur only when attributes change
+type Row = { id :: Int, label :: String, selected :: Signal String }
 
-randomRows :: Int -> Int -> Effect (Array Row)
-randomRows nextId length = Array.mapWithIndex f <$> replicateA length row
+randomRows :: Signal (Maybe Int) -> Int -> Int -> Effect (Array Row)
+randomRows sel nextId length = Array.mapWithIndex f <$> replicateA length row
   where
     choose array = do
       index <- Random.randomInt 0 (Array.length array)
@@ -47,7 +55,14 @@ randomRows nextId length = Array.mapWithIndex f <$> replicateA length row
       color <- choose colors
       noun <- choose nouns
       pure $ adjective <> " " <> color <> " " <> noun
-    f index label = { id: nextId + index, label, selected: false }
+    f index label =
+      let
+        id = nextId + index
+      in
+        { id: nextId + index
+        , label
+        , selected: sel <#> \sid -> if sid == Just id then "danger" else ""
+        }
 
 adjectives :: Array String
 adjectives =
@@ -69,56 +84,73 @@ nouns =
 ---------------------------------------------------
 -- Application
 
+-- NOTE: STArray creates an interesting question for the Screamer interface.
+-- The STRef itself does not change, so the question is how to create an
+-- observable from it.
+
 doJsBenchmark :: Effect Element
 doJsBenchmark = do
 
   table <- S.channel []
 
-  selected <- S.channel Nothing
+  selected <- S.channel Nothing -- maybe -1
 
   nextId <- S.channel 1
 
   let
+
+    new n = do
+      id <- S.get nextId.signal
+      nextId.modify (_ + n)
+      randomRows selected.signal id n
 
     clear = do
       table.put []
       selected.put Nothing
 
     create n = do
-      append n
-      selected.put Nothing
+      table.put =<< new n
 
     append n = do
-      id <- S.get nextId.signal
-      nextId.modify (_ + n)
-      rows <- randomRows id n
+      rows <- new n
       table.modify (_ <> rows)
 
     remove id = do
-      table.modify (Array.filter (\row -> row.id /= id))
+      let dummy = { id, label: "", selected: pure "" }
+      table.modify (Array.deleteBy (\a b -> a.id == b.id) dummy)
 
-    -- 'danger'
     select id = do
-      table.modify \rows -> rows <#> case _ of
-        row | row.id == id -> row { selected = true }
-            | row.selected -> row { selected = false }
-            | otherwise -> row
+      selected.put (Just id)
 
-    updateEvery nth = table.modify (mapWithIndex f)
+    updateEvery nth = table.modify (mapWithIndex updateLabel)
       where
+        updateLabel ix row =
+          if ix `mod` nth == 0 then row { label = row.label <> " !!!" } else row
+        {-
         f index row | index `mod` nth == 0 = row { label = row.label <> " !!!" }
         f _ row = row
+        -}
 
-    swap = table.modify \rows ->
-      case Array.index rows 1, Array.index rows 998 of
-        Just a, Just b ->
-          let
-            f 1 _ = b
-            f 998 _ = a
-            f _ row = row
-          in
-            mapWithIndex f rows
-        _, _ -> rows
+    swap = table.modify $ \arr -> fromMaybe arr do
+      rowA <- arr Array.!! 1
+      rowB <- arr Array.!! 998
+      arrA <- Array.updateAt 1 rowB arr
+      arrB <- Array.updateAt 998 rowA arrA
+      pure arrB
+
+    {-
+      \array -> STArray.run do
+      rows <- STArray.thaw array
+      a' <- STArray.peek 1 rows
+      b' <- STArray.peek 998 rows
+      case a', b' of
+        Just a, Just b -> do
+          _ <- STArray.poke 998 a rows
+          _ <- STArray.poke 1 b rows
+          pure unit
+        _, _ -> pure unit
+      pure rows
+    -}
 
     -- const removeOrSelect = (e) => e.target.matches('.remove') ? remove(e) : select(e);
     -- const select = (e) => selected(getParentId(e.target));
@@ -134,21 +166,17 @@ doJsBenchmark = do
       , { id: "swaprows", text: "Swap Rows", handler: swap }
       ]
 
-
     handleTableClick :: Mouse -> Effect Unit
-    handleTableClick event = pure unit -- FIXME
-{-
-      let maybeElement = event # Event.target >>= Node.fromEventTarget >>= Element.fromNode
-      case maybeElement of
+    handleTableClick event =
+      case Just (target event) >>= Node.fromEventTarget >>= Element.fromNode of
         Just element -> do
           action <- Element.getAttribute "data-action" element
           id <- map Int.fromString <$> Element.getAttribute "data-id" element
           case action, id of
-            Just "Select", Just (Just id') -> pure $ Select id'
-            Just "Remove", Just (Just id') -> pure $ Remove id'
-            _, _ -> pure NoOp
-        Nothing -> pure NoOp
--}
+            Just "Select", Just (Just id') -> select id'
+            Just "Remove", Just (Just id') -> remove id'
+            _, _ -> pure unit
+        Nothing -> pure unit
 
   pure $
     S.div_
@@ -190,7 +218,7 @@ button' { id, text, handler } =
 row' :: Row -> Element
 row' { id, label, selected } =
   S.tr_
-    [ S.class_ "danger" ] -- FIXME
+    [ S.class_ (S.distinct selected) ]
     [ S.td_
       [ S.class_ "col-md-1" ]
       [ S.element id ]

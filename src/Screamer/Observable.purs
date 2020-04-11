@@ -99,7 +99,7 @@ foreign import distinct :: forall a. Signal a -> Signal a
 -- and then calls the given function.
 -- sampleManyWith :: {} -> {} -> ({ union } -> b) -> Signal b
 
--- | Evidence that a record `sa` has the same fields and types as the record `a`, except that each value in `sa` is a `Signal`.
+-- | Forward evidence that a record `sa` has the same fields and types as the record `a`, except that each field in `sa` is wrapped in a `Signal`.
 class SignalRecord (a :: #Type) (sa :: #Type) | a -> sa
 
 instance signalRecord
@@ -109,6 +109,7 @@ instance signalRecord
       )
   => SignalRecord a sa
 
+-- | Backward evidence.
 class UnsignalRecord (sa :: #Type) (a :: #Type) | sa -> a
 
 instance unsignalRecord
@@ -118,6 +119,7 @@ instance unsignalRecord
       )
   => UnsignalRecord sa a
 
+-- Bidirectional evidence.
 class SignalRowList (rla :: RowList) (srla :: RowList) | rla -> srla, srla -> rla
 
 instance consSignalRowList
@@ -127,30 +129,13 @@ instance consSignalRowList
 instance nilSignalRowList
   :: SignalRowList Nil Nil
 
-{-
-class UnsignalRowList (srla :: RowList) (rla :: RowList) | srla -> rla
-
-instance consUnsignalRowList
-  ::  ( UnsignalRowList t st )
-  => UnsignalRowList (Cons s f t) (Cons s (Signal f) st)
-
-instance nilUnsignalRowList
-  :: UnsignalRowList Nil Nil
--}
-
-sampleX :: forall a sa . SignalRecord a sa => Record a -> Record sa
-sampleX = unsafeCoerce
-
-unsampleX :: forall a sa . UnsignalRecord sa a => Record sa -> Record a
-unsampleX = unsafeCoerce
-
 sampleMany :: forall a sa b sb ab . UnsignalRecord sa a => UnsignalRecord sb b => Union a b ab => Nub ab ab => Record sa -> Record sb -> Signal (Record ab)
 sampleMany a b = _sampleManyWith a b identity
 
-sampleManyWith :: forall a b ab c . Union a b ab => Nub ab ab => Record a -> Record b -> (Record ab -> c) -> c
+sampleManyWith :: forall sa a sb b ab c . UnsignalRecord sa a => UnsignalRecord sb b => Union a b ab => Nub ab ab => Record sa -> Record sb -> (Record ab -> c) -> Signal c
 sampleManyWith a b f = _sampleManyWith a b f
 
-foreign import _sampleManyWith :: forall a b c d . a -> b -> (c -> d) -> d
+foreign import _sampleManyWith :: forall a b c d . a -> b -> (c -> d) -> Signal d
 
 -- foreign import filterMap -- catMaybes?
 
