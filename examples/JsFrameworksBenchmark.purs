@@ -13,27 +13,30 @@ import Prelude
 import Data.Array (mapWithIndex)
 import Data.Array as Array
 import Data.Array.ST as STArray
+import Data.Foldable (for_)
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Maybe as Maybe
 import Data.Unfoldable (replicateA)
 import Effect (Effect)
 import Effect.Random as Random
+import Partial.Unsafe (unsafePartial)
 import Screamer.Core (Element)
 import Screamer.Core as S
 import Screamer.DOM.Attribute as S
 import Screamer.DOM.Element as S
 import Screamer.DOM.Event (Mouse, target)
 import Screamer.DOM.EventHandler as S
-import Screamer.Observable (Signal)
+import Screamer.Observable (Channel, Signal)
 import Screamer.Observable as S
 import Web.DOM.Element as Element
 import Web.DOM.Node as Node
 import Web.Event.Event (Event)
 import Web.Event.Event as Event
 
--- NOTE: A strategy would be to allocate an array of Signal Row
--- and then have each signal update based on the related array.
+---------------------------------------------------
+-- Main
 
 main :: Effect Unit
 main = S.mount "main" =<< doJsBenchmark
@@ -41,28 +44,23 @@ main = S.mount "main" =<< doJsBenchmark
 ---------------------------------------------------
 -- Row operations
 
--- TODO: Implement a distinct combinator, so that updates occur only when attributes change
-type Row = { id :: Int, label :: String, selected :: Signal String }
+type Row = { id :: Int, label :: Channel String, highlight :: Channel String }
 
-randomRows :: Signal (Maybe Int) -> Int -> Int -> Effect (Array Row)
-randomRows sel nextId length = Array.mapWithIndex f <$> replicateA length row
+randomRows :: Int -> Int -> Effect (Array Row)
+randomRows nextId length =
+  Array.mapWithIndex numbering <$> replicateA length row
   where
     choose array = do
       index <- Random.randomInt 0 (Array.length array)
-      pure $ Maybe.fromMaybe "" $ Array.index array index
+      pure $ unsafePartial $ Array.unsafeIndex array index
     row = do
       adjective <- choose adjectives
       color <- choose colors
       noun <- choose nouns
-      pure $ adjective <> " " <> color <> " " <> noun
-    f index label =
-      let
-        id = nextId + index
-      in
-        { id: nextId + index
-        , label
-        , selected: sel <#> \sid -> if sid == Just id then "danger" else ""
-        }
+      label <- S.channel (adjective <> " " <> color <> " " <> noun)
+      highlight <- S.channel ""
+      pure { label, highlight }
+    numbering index { label, highlight } = { id: nextId + index, label, highlight }
 
 adjectives :: Array String
 adjectives =
@@ -84,29 +82,24 @@ nouns =
 ---------------------------------------------------
 -- Application
 
--- NOTE: STArray creates an interesting question for the Screamer interface.
--- The STRef itself does not change, so the question is how to create an
--- observable from it.
-
 doJsBenchmark :: Effect Element
 doJsBenchmark = do
 
   table <- S.channel []
 
-  selected <- S.channel Nothing -- maybe -1
-
   nextId <- S.channel 1
+
+  deselect <- S.channel (pure unit)
 
   let
 
     new n = do
       id <- S.get nextId.signal
       nextId.modify (_ + n)
-      randomRows selected.signal id n
+      randomRows id n
 
     clear = do
       table.put []
-      selected.put Nothing
 
     create n = do
       table.put =<< new n
@@ -116,30 +109,20 @@ doJsBenchmark = do
       table.modify (_ <> rows)
 
     remove id = do
-      let dummy = { id, label: "", selected: pure "" }
-      table.modify (Array.deleteBy (\a b -> a.id == b.id) dummy)
+      table.modify (Array.filter (\a -> a.id /= id))
 
-    select id = do
-      selected.put (Just id)
+    select highlight = do
+      S.emit deselect.signal
+      highlight.put "danger"
+      deselect.put (highlight.put "")
 
-    updateEvery nth = table.modify (mapWithIndex updateLabel)
-      where
-        updateLabel ix row =
-          if ix `mod` nth == 0 then row { label = row.label <> " !!!" } else row
-        {-
-        f index row | index `mod` nth == 0 = row { label = row.label <> " !!!" }
-        f _ row = row
-        -}
+    updateEvery nth = do 
+      rows <- S.get table.signal
+      forWithIndex_ rows \ix row ->
+        when (ix `mod` nth == 0) $
+          row.label.modify (_ <> " !!!")
 
-    swap = table.modify $ \arr -> fromMaybe arr do
-      rowA <- arr Array.!! 1
-      rowB <- arr Array.!! 998
-      arrA <- Array.updateAt 1 rowB arr
-      arrB <- Array.updateAt 998 rowA arrA
-      pure arrB
-
-    {-
-      \array -> STArray.run do
+    swap = table.modify $ \array -> STArray.run do
       rows <- STArray.thaw array
       a' <- STArray.peek 1 rows
       b' <- STArray.peek 998 rows
@@ -150,10 +133,6 @@ doJsBenchmark = do
           pure unit
         _, _ -> pure unit
       pure rows
-    -}
-
-    -- const removeOrSelect = (e) => e.target.matches('.remove') ? remove(e) : select(e);
-    -- const select = (e) => selected(getParentId(e.target));
 
     buttons :: Array Element
     buttons =
@@ -165,18 +144,6 @@ doJsBenchmark = do
       , { id: "clear", text: "Clear", handler: clear }
       , { id: "swaprows", text: "Swap Rows", handler: swap }
       ]
-
-    handleTableClick :: Mouse -> Effect Unit
-    handleTableClick event =
-      case Just (target event) >>= Node.fromEventTarget >>= Element.fromNode of
-        Just element -> do
-          action <- Element.getAttribute "data-action" element
-          id <- map Int.fromString <$> Element.getAttribute "data-id" element
-          case action, id of
-            Just "Select", Just (Just id') -> select id'
-            Just "Remove", Just (Just id') -> remove id'
-            _, _ -> pure unit
-        Nothing -> pure unit
 
   pure $
     S.div_
@@ -193,9 +160,8 @@ doJsBenchmark = do
       ]
     , S.table_
       [ S.class_ "table table-hover table-striped test-data"
-      , S.onClick_ handleTableClick
       ]
-      [ S.tbody_ [] [S.elements_ table.signal row'] ]
+      [ S.tbody_ [] [S.elements_ table.signal (row' select remove)] ]
     , S.span_
       [ S.class_ "preloadicon glyphicon glyphicon-remove"
       , S.attribute_ "aria-hidden" "true"
@@ -215,28 +181,21 @@ button' { id, text, handler } =
       [ S.element text ]
     ]
 
-row' :: Row -> Element
-row' { id, label, selected } =
+row' :: (Channel String -> Effect Unit) -> (Int -> Effect Unit) -> Row -> Element
+row' select remove { id, label, highlight } =
   S.tr_
-    [ S.class_ (S.distinct selected) ]
-    [ S.td_
-      [ S.class_ "col-md-1" ]
-      [ S.element id ]
-    , S.td_
-      [ S.class_ "col-md-4" ]
-      [ S.a_
-        [ S.href_ "#", S.attribute_ "data-action" "Select", S.attribute_ "data-id" (show id)  ]
-        [ S.element label ]
-      ]
+    [ S.class_ highlight.signal
+    , S.onClick_ \_ -> select highlight ]
+    [ S.td_ [ S.class_ "col-md-1" ] [ S.element id ]
+    , S.td_ [ S.class_ "col-md-4" ] [ S.a_ [] [ S.element label.signal ] ]
     , S.td_
       [ S.class_ "col-md-1" ]
-      [ S.a_
-        [ S.href_ "#" ]
+      [ S.a_ 
+        []
         [ S.span_
           [ S.class_ "glyphicon glyphicon-remove"
           , S.attribute_ "aria-hidden" "true"
-          , S.attribute_ "data-action" "Remove"
-          , S.attribute_ "data-id" (show id)
+          , S.onClick_ \_ -> remove id
           ]
           []
         ]

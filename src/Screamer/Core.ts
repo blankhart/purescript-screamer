@@ -1,6 +1,6 @@
 import { h, hs } from 'sinuous';
 import { computed, observable, sample, subscribe, Observable } from 'sinuous/observable';
-import { map } from 'sinuous/map/mini';
+import { map } from 'sinuous/map'; // /mini has no fast paths
 
 export const documentImpl: Document = document;
 
