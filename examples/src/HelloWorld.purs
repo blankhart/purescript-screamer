@@ -8,10 +8,10 @@ import Effect.Console (log)
 import Prelude
 import Screamer.Core.Sinuous as S
 import Screamer.Observable as S
-import Screamer.DOM.Element as S
-import Screamer.DOM.Event as S
-import Screamer.DOM.EventHandler as S
-import Screamer.Internal as S
+import Screamer.Core.Sinuous.DOM.Element as S
+import Screamer.Core.Sinuous.DOM.Event as S
+import Screamer.Core.Sinuous.DOM.EventHandler as S
+import Screamer.Core.Sinuous.Internal as S
 import Unsafe.Coerce (unsafeCoerce)
 
 {-

@@ -15,6 +15,7 @@ import Test.Spec.Summary (successful)
 import Test.Dom as Dom
 import Test.Owned as Owned
 import Test.Signal as Signal
+import Test.TypedDom as TypedDom
 
 foreign import exit :: Int -> Effect Unit
 
@@ -31,3 +32,4 @@ spec = do
   Signal.spec
   Owned.spec
   Dom.spec
+  TypedDom.spec

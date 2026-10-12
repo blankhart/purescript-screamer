@@ -11,10 +11,10 @@ import Effect (Effect)
 import Data.Number (pi, cos, sin)
 import Screamer.Core.Sinuous (Element)
 import Screamer.Core.Sinuous as S
-import Screamer.DOM.Attribute as S
-import Screamer.DOM.Element as S
-import Screamer.DOM.Event as S
-import Screamer.DOM.EventHandler as S
+import Screamer.Core.Sinuous.DOM.Attribute as S
+import Screamer.Core.Sinuous.DOM.Element as S
+import Screamer.Core.Sinuous.DOM.Event as S
+import Screamer.Core.Sinuous.DOM.EventHandler as S
 import Screamer.Observable (Signal)
 import Screamer.Observable as S
 import Web.HTML as HTML

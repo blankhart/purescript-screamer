@@ -51,3 +51,5 @@ export const rowNodes = (sel) => () =>
 export const sameNode = (a) => (b) => a === b;
 
 export const textsOf = (sel) => () => Array.from(document.querySelectorAll(sel)).map((n) => n.textContent);
+
+export const propertyOf = (sel) => (name) => () => String(document.querySelector(sel)[name]);

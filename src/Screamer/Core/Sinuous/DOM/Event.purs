@@ -1,12 +1,13 @@
+-- | Legacy sinuous DOM module, a frozen copy of the stage 5 generated code. Removed in stage 8.
 -- | Event types
-module Screamer.DOM.Event where
+module Screamer.Core.Sinuous.DOM.Event where
 
 import Prelude
 
 import Effect (Effect)
 import Data.Maybe (Maybe)
 import Data.Nullable as Nullable
-import Screamer.Internal (property, eventEffect, eventCast)
+import Screamer.Core.Sinuous.Internal (property, eventEffect, eventCast)
 import Web.Event.EventTarget (EventTarget)
 
 

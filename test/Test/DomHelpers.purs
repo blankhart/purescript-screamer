@@ -8,6 +8,7 @@ module Test.DomHelpers
   , rowNodes
   , sameNode
   , textsOf
+  , propertyOf
   ) where
 
 import Prelude
@@ -36,3 +37,6 @@ foreign import sameNode :: Node -> Node -> Boolean
 
 -- | The text content of each element matching the selector.
 foreign import textsOf :: String -> Effect (Array String)
+
+-- | A string property of the first element matching the selector.
+foreign import propertyOf :: String -> String -> Effect String

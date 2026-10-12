@@ -7,10 +7,16 @@ package:
     - maybe
     - nullable
     - prelude
+    - record
     - typelevel-prelude
     - unsafe-coerce
+    - web-clipboard
     - web-dom
     - web-events
+    - web-html
+    - web-pointerevents
+    - web-touchevents
+    - web-uievents
   test:
     main: Test.Main
     dependencies:
@@ -29,6 +35,7 @@ package:
       - spec
       - strings
       - web-dom
+      - web-uievents
 workspace:
   packageSet:
     registry: 81.4.0
