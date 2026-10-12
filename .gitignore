@@ -13,3 +13,4 @@
 src/**/*.js
 **/.vscode
 **/yarn-error.log
+.compile-fail-output/
