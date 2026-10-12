@@ -10,57 +10,51 @@ module Screamer.Examples.JsFrameworksBenchmark where
 
 import Prelude
 
-import Data.Array (mapWithIndex)
 import Data.Array as Array
 import Data.Array.ST as STArray
-import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Int as Int
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Maybe as Maybe
+import Data.Maybe (Maybe(..))
 import Data.Unfoldable (replicateA)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Random as Random
+import Effect.Ref as Ref
 import Partial.Unsafe (unsafePartial)
-import Screamer.Core.Sinuous (Element)
-import Screamer.Core.Sinuous as S
-import Screamer.Core.Sinuous.DOM.Attribute as S
-import Screamer.Core.Sinuous.DOM.Element as S
-import Screamer.Core.Sinuous.DOM.Event (Mouse, target)
-import Screamer.Core.Sinuous.DOM.EventHandler as S
-import Screamer.Observable (Channel, Signal)
-import Screamer.Observable as S
-import Web.DOM.Element as Element
-import Web.DOM.Node as Node
-import Web.Event.Event (Event)
-import Web.Event.Event as Event
+import Screamer.Channel (Channel, batch, channel)
+import Screamer.Core (Element, component, each, element)
+import Screamer.DOM.Attribute (InputType(..))
+import Screamer.DOM.Attribute as A
+import Screamer.DOM.Element as E
+import Screamer.DOM.EventHandler as H
+import Screamer.Examples.Harness as Harness
+import Screamer.Signal (Signal, read)
 
 ---------------------------------------------------
 -- Main
 
 main :: Effect Unit
-main = S.mount "main" =<< doJsBenchmark
+main = Harness.run "main" benchmark
 
 ---------------------------------------------------
 -- Row operations
 
-type Row = { id :: Int, label :: Channel String, highlight :: Channel String }
+type TableRow = { id :: Int, label :: Channel String, highlight :: Channel String }
 
-randomRows :: Int -> Int -> Effect (Array Row)
+randomRows :: Int -> Int -> Effect (Array TableRow)
 randomRows nextId length =
   Array.mapWithIndex numbering <$> replicateA length row
   where
-    choose array = do
-      index <- Random.randomInt 0 (Array.length array)
-      pure $ unsafePartial $ Array.unsafeIndex array index
-    row = do
-      adjective <- choose adjectives
-      color <- choose colors
-      noun <- choose nouns
-      label <- S.channel (adjective <> " " <> color <> " " <> noun)
-      highlight <- S.channel ""
-      pure { label, highlight }
-    numbering index { label, highlight } = { id: nextId + index, label, highlight }
+  choose array = do
+    index <- Random.randomInt 0 (Array.length array - 1)
+    pure $ unsafePartial $ Array.unsafeIndex array index
+  row = do
+    adjective <- choose adjectives
+    color <- choose colors
+    noun <- choose nouns
+    label <- channel (adjective <> " " <> color <> " " <> noun)
+    highlight <- channel ""
+    pure { label, highlight }
+  numbering index { label, highlight } = { id: nextId + index, label, highlight }
 
 adjectives :: Array String
 adjectives =
@@ -82,42 +76,37 @@ nouns =
 ---------------------------------------------------
 -- Application
 
-doJsBenchmark :: Effect Element
-doJsBenchmark = do
-
-  table <- S.channel []
-
-  nextId <- S.channel 1
-
-  deselect <- S.channel (pure unit)
+benchmark :: Element
+benchmark = component do
+  table <- liftEffect $ channel []
+  nextId <- liftEffect $ Ref.new 1
+  -- The highlight of the selected row, cleared when another is selected.
+  selected <- liftEffect $ Ref.new Nothing
 
   let
-
     new n = do
-      id <- S.get nextId.signal
-      nextId.modify (_ + n)
+      id <- Ref.modify' (\i -> { state: i + n, value: i }) nextId
       randomRows id n
 
-    clear = do
-      table.put []
+    clear = table.put []
 
-    create n = do
-      table.put =<< new n
+    create n = table.put =<< new n
 
     append n = do
       rows <- new n
       table.modify (_ <> rows)
 
-    remove id = do
-      table.modify (Array.filter (\a -> a.id /= id))
+    remove id = table.modify (Array.filter (\a -> a.id /= id))
 
-    select highlight = do
-      S.emit deselect.signal
+    select highlight = batch do
+      Ref.read selected >>= case _ of
+        Just previous -> previous.put ""
+        Nothing -> pure unit
       highlight.put "danger"
-      deselect.put (highlight.put "")
+      Ref.write (Just highlight) selected
 
-    updateEvery nth = do 
-      rows <- S.get table.signal
+    updateEvery nth = batch do
+      rows <- read table.signal
       forWithIndex_ rows \ix row ->
         when (ix `mod` nth == 0) $
           row.label.modify (_ <> " !!!")
@@ -137,68 +126,70 @@ doJsBenchmark = do
     buttons :: Array Element
     buttons =
       button' <$>
-      [ { id: "run", text: "Create 1,000 rows", handler: create 1000 }
-      , { id: "runlots", text: "Create 10,000 rows", handler: create 10000 }
-      , { id: "add", text: "Append 1,000 rows", handler: append 1000 }
-      , { id: "update", text: "Update every 10th row", handler: updateEvery 10 }
-      , { id: "clear", text: "Clear", handler: clear }
-      , { id: "swaprows", text: "Swap Rows", handler: swap }
-      ]
+        [ { id: "run", text: "Create 1,000 rows", handler: create 1000 }
+        , { id: "runlots", text: "Create 10,000 rows", handler: create 10000 }
+        , { id: "add", text: "Append 1,000 rows", handler: append 1000 }
+        , { id: "update", text: "Update every 10th row", handler: updateEvery 10 }
+        , { id: "clear", text: "Clear", handler: clear }
+        , { id: "swaprows", text: "Swap Rows", handler: swap }
+        ]
 
   pure $
-    S.div_
-    [ S.class_ "container" ]
-    [ S.div_
-      [ S.class_ "jumbotron" ]
-      [ S.div_
-        [ S.class_ "row" ]
-        [ S.div_
-          [ S.class_ "col-md-6" ]
-          [ S.h1_ [] [ S.element "Screamer" ] ]
-        , S.div_ [ S.class_ "col-md-6" ] buttons
-        ]
+    E.div_
+      [ A.class_ "container" ]
+      [ E.div_
+          [ A.class_ "jumbotron" ]
+          [ E.div_
+              [ A.class_ "row" ]
+              [ E.div_
+                  [ A.class_ "col-md-6" ]
+                  [ E.h1_ [] [ element "Screamer" ] ]
+              , E.div_ [ A.class_ "col-md-6" ] buttons
+              ]
+          ]
+      , E.table_
+          [ A.class_ "table table-hover table-striped test-data" ]
+          [ E.tbody_ [] [ each _.id table.signal (row' select remove) ] ]
+      , E.span_
+          [ A.class_ "preloadicon glyphicon glyphicon-remove"
+          , A.ariaHidden_ "true"
+          ]
+          []
       ]
-    , S.table_
-      [ S.class_ "table table-hover table-striped test-data"
-      ]
-      [ S.tbody_ [] [S.elements_ table.signal (row' select remove)] ]
-    , S.span_
-      [ S.class_ "preloadicon glyphicon glyphicon-remove"
-      , S.attribute_ "aria-hidden" "true"
-      ]
-      []
-    ]
 
 button' :: { id :: String, text :: String, handler :: Effect Unit } -> Element
 button' { id, text, handler } =
-  S.div_ [ S.class_ "col-sm-6 smallpad" ]
-    [ S.button_
-      [ S.type_ "button"
-      , S.class_ "btn btn-primary btn-block"
-      , S.id_ id
-      , S.onClick_ \_ -> handler
-      ]
-      [ S.element text ]
+  E.div_ [ A.class_ "col-sm-6 smallpad" ]
+    [ E.button_
+        [ A.type_ InputButton
+        , A.class_ "btn btn-primary btn-block"
+        , A.id_ id
+        , H.onClick_ \_ -> handler
+        ]
+        [ element text ]
     ]
 
-row' :: (Channel String -> Effect Unit) -> (Int -> Effect Unit) -> Row -> Element
-row' select remove { id, label, highlight } =
-  S.tr_
-    [ S.class_ highlight.signal
-    , S.onClick_ \_ -> select highlight ]
-    [ S.td_ [ S.class_ "col-md-1" ] [ S.element id ]
-    , S.td_ [ S.class_ "col-md-4" ] [ S.a_ [] [ S.element label.signal ] ]
-    , S.td_
-      [ S.class_ "col-md-1" ]
-      [ S.a_ 
-        []
-        [ S.span_
-          [ S.class_ "glyphicon glyphicon-remove"
-          , S.attribute_ "aria-hidden" "true"
-          , S.onClick_ \_ -> remove id
-          ]
-          []
+-- | A row's fields never change for a given key, so the row reads them once.
+row' :: (Channel String -> Effect Unit) -> (Int -> Effect Unit) -> Signal TableRow -> Element
+row' select remove rowSignal = component do
+  { id, label, highlight } <- liftEffect $ read rowSignal
+  pure $ E.tr_
+    [ A.class_ highlight.signal
+    , H.onClick_ \_ -> select highlight
+    ]
+    [ E.td_ [ A.class_ "col-md-1" ] [ element id ]
+    , E.td_ [ A.class_ "col-md-4" ] [ E.a_ [] [ element label.signal ] ]
+    , E.td_
+        [ A.class_ "col-md-1" ]
+        [ E.a_
+            []
+            [ E.span_
+                [ A.class_ "glyphicon glyphicon-remove"
+                , A.ariaHidden_ "true"
+                , H.onClick_ \_ -> remove id
+                ]
+                []
+            ]
         ]
-      ]
-    , S.td_ [ S.class_ "col-md-6" ] []
+    , E.td_ [ A.class_ "col-md-6" ] []
     ]

@@ -14,10 +14,11 @@ import Screamer.Channel (channel)
 import Screamer.Core (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, fragment_, mount, on_, property, styleProperty, text)
 import Screamer.Owned (onCleanup, subscribe)
 import Screamer.Reactive.Core (readStats)
-import Screamer.Signal (Signal, fold)
+import Screamer.Signal (Signal, fold, read)
 import Screamer.Signal as Signal
-import Test.DomHelpers (click, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
+import Test.DomHelpers (click, currentTag, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
 import Test.QuickCheck.Gen (randomSample', shuffle, chooseInt, Gen)
+import Web.Event.Event (stopPropagation)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -74,25 +75,45 @@ spec = describe "Screamer.Core" do
     n `shouldEqual` 1
     liftEffect (textsOf "#root p") >>= shouldEqual [ "a", "B", "c" ]
 
-  it "leaves zero live effects and zero listeners after unmount" do
+  it "leaves zero live effects and zero element listeners after unmount" do
     liftEffect resetBody
     before <- liftEffect readStats
-    listenersBefore <- liftEffect liveListeners
     count <- liftEffect $ channel 0
     unmount <- liftEffect $ mount "#root" $
       div' [ on_ "click" \_ -> count.modify (_ + 1) ]
         [ text (show <$> count.signal)
-        , dyn $ count.signal <#> \n -> element_ "span" [ on_ "mouseover" \_ -> pure unit ] [ element n ]
-        , each identity (pure [ 1, 2, 3 ]) \s -> element_ "i" [ on_ "click" \_ -> pure unit ] [ text (show <$> s) ]
+        , dyn $ count.signal <#> \n -> element_ "span" [ on_ "mouseover" \_ -> pure unit, on_ "toggle" \_ -> pure unit ] [ element n ]
+        , each identity (pure [ 1, 2, 3 ]) \s -> element_ "i" [ on_ "click" \_ -> pure unit, on_ "toggle" \_ -> pure unit ] [ text (show <$> s) ]
         ]
     liftEffect $ click "#root div"
-    liftEffect (liveListeners) >>= \l -> (l - listenersBefore) `shouldEqual` 5
+    -- Bubbling events ("click", "mouseover") are delegated to one document
+    -- listener per type, installed once; others ("toggle") get a listener
+    -- per element, removed with it.
+    listenersMounted <- liftEffect liveListeners
     liftEffect unmount
     after <- liftEffect readStats
     listenersAfter <- liftEffect liveListeners
-    { effects: after.liveEffects - before.liveEffects, scopes: after.liveScopes - before.liveScopes, links: after.links - before.links, listeners: listenersAfter - listenersBefore }
-      `shouldEqual` { effects: 0, scopes: 0, links: 0, listeners: 0 }
+    { effects: after.liveEffects - before.liveEffects, scopes: after.liveScopes - before.liveScopes, links: after.links - before.links, listeners: listenersMounted - listenersAfter }
+      `shouldEqual` { effects: 0, scopes: 0, links: 0, listeners: 4 }
     liftEffect (innerHTML "#root") >>= shouldEqual ""
+
+  it "delegated handlers see currentTarget, honour stopPropagation and stop after disposal" do
+    liftEffect resetBody
+    log <- liftEffect $ channel []
+    shown <- liftEffect $ channel true
+    let record x = log.modify (_ <> [ x ])
+    _ <- liftEffect $ mount "#root" $
+      element_ "section" [ on_ "click" \_ -> record "section" ]
+        [ div' [ on_ "click" \e -> record ("div " <> currentTag e) ]
+            [ dyn $ shown.signal <#> if _ then element_ "b" [ on_ "click" \_ -> record "b" ] [] else text (pure "") ]
+        , element_ "u" [ on_ "click" \e -> record "u" *> stopPropagation e ] []
+        ]
+    liftEffect $ click "#root b"
+    liftEffect $ click "#root u"
+    liftEffect (read log.signal) >>= shouldEqual [ "b", "div DIV", "section", "u" ]
+    liftEffect $ log.put []
+    liftEffect $ shown.put false
+    liftEffect (read log.signal) >>= shouldEqual []
 
   it "dyn disposes its previous branch's effects" do
     liftEffect resetBody
@@ -135,6 +156,10 @@ spec = describe "Screamer.Core" do
       step [ 5, 3, 6, 4, 1 ]
       step []
       step [ 7, 8 ]
+      step [ 7, 8, 9, 10 ]
+      step [ 0, 7, 8, 9, 10 ]
+      step [ 0, 8, 10 ]
+      step [ 8, 10 ]
       perms <- liftEffect $ randomSample' 100 genList
       for_ perms step
 

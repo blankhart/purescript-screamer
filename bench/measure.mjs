@@ -21,7 +21,7 @@ const runs = Number(opt('--runs', '7'));
 const out = opt('--out', path.join(here, 'results.json'));
 const page_url = pathToFileURL(path.join(here, 'index.html')).href;
 
-const bundle = path.join(here, '..', 'examples', 'output', 'JsFrameworksBenchmark.js');
+const bundle = path.join(here, '..', 'examples', 'output', 'JsFrameworksBenchmark.bench.js');
 if (!fs.existsSync(bundle)) {
   console.error(`missing ${bundle}; run \`npm run bench\` first`);
   process.exit(1);

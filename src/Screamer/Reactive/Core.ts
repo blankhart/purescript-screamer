@@ -645,15 +645,17 @@ export class Scope {
     this.disposed = true;
     if (DEV) stats.liveScopes--;
     if (this.parent !== null) this.parent.children.delete(this);
-    const children = [...this.children].reverse();
-    this.children.clear();
     let error: unknown = null;
     let failed = false;
-    for (const c of children) {
-      try {
-        c.dispose();
-      } catch (e) {
-        if (!failed) { error = e; failed = true; }
+    if (this.children.size > 0) {
+      const children = Array.from(this.children);
+      this.children.clear();
+      for (let i = children.length - 1; i >= 0; i--) {
+        try {
+          children[i].dispose();
+        } catch (e) {
+          if (!failed) { error = e; failed = true; }
+        }
       }
     }
     const cleanups = this.cleanups;
