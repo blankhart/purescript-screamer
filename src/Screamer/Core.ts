@@ -102,6 +102,6 @@ export const tutorial = () => {
   setInterval(() => counter(counter() + 1), 100);
 }
 
-export const component = () => <T>(c: () => Observable<T>) => () => {
-  return h('div', computed(c));
+export const componentImpl = <T>(c: () => Observable<T>) => () => {
+  return h('div', computed(c) as any);
 }

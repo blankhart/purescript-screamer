@@ -13,6 +13,7 @@ import Web.Event.EventTarget (EventTarget)
 
 foreign import data {{event_class}} :: Type
 
+class Is{{event_class}} :: Type -> Constraint
 class Is{{event_class}} a
 
 {{#each event_fields}}
