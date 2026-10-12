@@ -24,6 +24,7 @@ const ATTRIBUTE = 1;
 const BOOLEAN = 2;
 const STYLE = 3;
 const EVENT = 4;
+const GROUP = 5;
 
 interface Attr {
   kind: number;
@@ -40,6 +41,10 @@ export const booleanAttribute = (name: string) => (value: Sig<boolean>): Attr =>
 export const styleProperty = (name: string) => (value: Sig<string>): Attr => ({ kind: STYLE, name, value });
 
 export const on_ = (name: string) => (handler: (e: Event) => () => void): Attr => ({ kind: EVENT, name, value: handler });
+
+export const unsafeOn_ = on_;
+
+export const attributes = (list: Attr[]): Attr => ({ kind: GROUP, name: '', value: list });
 
 /** Set once for a constant, or with one owned effect for a signal. */
 function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
@@ -72,6 +77,11 @@ function bindAttr(s: Scope, el: Element, a: Attr): void {
       const listener = (e: Event) => R.batch(() => handler(e)());
       el.addEventListener(name, listener);
       s.cleanups.push(() => el.removeEventListener(name, listener));
+      break;
+    }
+    case GROUP: {
+      const list = a.value as Attr[];
+      for (let i = 0; i < list.length; i++) bindAttr(s, el, list[i]);
       break;
     }
   }

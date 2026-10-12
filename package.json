@@ -17,9 +17,10 @@
     "serve:rainbow": "parcel examples/output/RainbowSpiral.html",
     "serve:bench": "parcel examples/output/JsFrameworksBenchmark.html",
     "bench:measure": "npm run bench && node bench/measure.mjs",
-    "test": "npm run test:core && npm run test:purs",
+    "test": "npm run test:core && npm run test:purs && npm run test:compile-fail",
     "test:core": "node --import tsx --expose-gc --test \"test/core/**/*.test.ts\"",
-    "test:purs": "tsc && NODE_OPTIONS=\"--import ./test/setup-dom.mjs\" spago test"
+    "test:purs": "tsc && NODE_OPTIONS=\"--import ./test/setup-dom.mjs\" spago test",
+    "test:compile-fail": "node compile-fail/run.mjs"
   },
   "dependencies": {
     "sinuous": "0.32.1"

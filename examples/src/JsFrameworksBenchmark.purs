@@ -24,10 +24,10 @@ import Effect.Random as Random
 import Partial.Unsafe (unsafePartial)
 import Screamer.Core.Sinuous (Element)
 import Screamer.Core.Sinuous as S
-import Screamer.DOM.Attribute as S
-import Screamer.DOM.Element as S
-import Screamer.DOM.Event (Mouse, target)
-import Screamer.DOM.EventHandler as S
+import Screamer.Core.Sinuous.DOM.Attribute as S
+import Screamer.Core.Sinuous.DOM.Element as S
+import Screamer.Core.Sinuous.DOM.Event (Mouse, target)
+import Screamer.Core.Sinuous.DOM.EventHandler as S
 import Screamer.Observable (Channel, Signal)
 import Screamer.Observable as S
 import Web.DOM.Element as Element

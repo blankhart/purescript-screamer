@@ -18,7 +18,11 @@ module Screamer.Core
   , attribute
   , booleanAttribute
   , styleProperty
+  , attributes
   , on_
+  , unsafeOn_
+  , class AttrValue
+  , toSignal
   , mount
   , instantiate
   , class IsElement
@@ -106,9 +110,26 @@ foreign import booleanAttribute :: String -> Signal Boolean -> Attribute
 -- | Set one CSS property, by its CSS name.
 foreign import styleProperty :: String -> Signal String -> Attribute
 
+-- | Several attributes as one.
+foreign import attributes :: Array Attribute -> Attribute
+
 -- | Listen for an event. The handler runs inside `batch`, and the listener
 -- | is removed when the element's scope is disposed.
 foreign import on_ :: String -> (Event -> Effect Unit) -> Attribute
+
+-- | `on_` for a handler that expects a more specific event type. The caller
+-- | asserts that events of this name have that type; the generated handlers
+-- | in `Screamer.DOM.EventHandler` are the intended users.
+foreign import unsafeOn_ :: forall e. String -> (e -> Effect Unit) -> Attribute
+
+-- | Attribute values: a constant of type `a`, or a `Signal a`.
+class AttrValue v a | v -> a where
+  toSignal :: v -> Signal a
+
+instance AttrValue (Signal a) a where
+  toSignal = identity
+else instance AttrValue a a where
+  toSignal = pure
 
 -- | The element's nodes, built in the current scope.
 instantiate :: Element -> Owned Node
