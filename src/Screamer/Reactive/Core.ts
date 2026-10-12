@@ -6,8 +6,7 @@
 // - Derived nodes are lazy: they link to their sources only while something
 //   observes them, so allocating one has no effect on the graph and an
 //   unobserved derived node can be garbage-collected.
-// - Stateful nodes (stage 2) keep state in the node and step only while
-//   observed.
+// - Stateful nodes keep state in the node and step only while observed.
 // - Effects are always linked while alive and belong to a scope, which
 //   disposes them.
 //
@@ -49,6 +48,12 @@ let nextEffectId = 0;
 let nextMark = 0;
 /** Errors from effects with no error handler, rethrown when the flush completes. */
 let pendingErrors: unknown[] = [];
+/**
+ * Nodes that lost their last target during a batch. They unlink when the
+ * batch ends unless something observes them again first, so a node that
+ * changes observers within one batch neither pauses nor resynchronizes.
+ */
+let pendingUnobserved: Source[] = [];
 
 // ---------------------------------------------------------------------------
 // Node interfaces
@@ -118,7 +123,21 @@ export function linkTo(target: Target, dep: Source): void {
 export function unlinkFrom(target: Target, dep: Source): void {
   if (!dep.targets.delete(target)) return;
   if (DEV) stats.links--;
-  if (dep.targets.size === 0 && dep.onLastTarget) dep.onLastTarget();
+  if (dep.targets.size === 0 && dep.onLastTarget) {
+    if (batchDepth > 0) pendingUnobserved.push(dep);
+    else dep.onLastTarget();
+  }
+}
+
+function releaseUnobserved(): void {
+  while (pendingUnobserved.length > 0) {
+    const ps = pendingUnobserved;
+    pendingUnobserved = [];
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i];
+      if (p.targets.size === 0) p.onLastTarget!();
+    }
+  }
 }
 
 /**
@@ -253,6 +272,7 @@ export class Derived<T> implements Source<T>, Target, Computation {
   }
 
   onFirstTarget(): void {
+    if (this.linked) return; // still linked: its release was deferred
     let ok = false;
     try {
       this.refresh();
@@ -266,6 +286,7 @@ export class Derived<T> implements Source<T>, Target, Computation {
   }
 
   onLastTarget(): void {
+    if (!this.linked) return;
     this.linked = false;
     for (let i = 0; i < this.deps.length; i++) unlinkFrom(this, this.deps[i]);
     this.dirty = true;
@@ -341,6 +362,187 @@ export class Derived<T> implements Source<T>, Target, Computation {
 
 export function derived<T>(fn: () => T, eq?: Eq<T>): Derived<T> {
   return new Derived(fn, eq);
+}
+
+// ---------------------------------------------------------------------------
+// Stateful nodes
+//
+// Stateful signals advance only while observed.
+//
+// - Start. State begins at the seed (for `merge`, the left input's current
+//   value). Values the input held before observation are not stepped over.
+// - Step. One step per propagation in which an input changed. Writes inside
+//   one batch coalesce, so two writes in one handler step a `fold` once.
+// - Pause. When the last observer goes, the node unlinks and keeps its state.
+//   `read` returns that state. When observed again it resynchronizes with its
+//   inputs without stepping, then continues.
+// - Simultaneity. When both inputs of `merge` change in one batch, the left
+//   wins (like Reflex's `leftmost`).
+//
+// Guarantee: two evaluations of the same stateful expression produce the
+// same values whenever they are observed over the same interval. Where a
+// program needs one state regardless of who observes it, `hold` observes the
+// signal for the lifetime of the current scope and returns the same node.
+
+export type Step<S> = (changed: boolean[], values: any[], state: S) => S;
+
+export class Stateful<S> implements Source<S>, Target {
+  value: S = UNSET;
+  version = 0;
+  targets: Set<Target> = new Set();
+  _track = 0;
+  _diff = 0;
+  started = false;
+  linked = false;
+  dirty = true;
+  failed = false;
+  /** Input versions at the last step or resynchronization. */
+  last: number[];
+
+  constructor(
+    public inputs: Readable<any>[],
+    private initial: () => S,
+    private step: Step<S>,
+    private eq: Eq<S> = Object.is,
+  ) {
+    this.last = inputs.map(() => -1);
+  }
+
+  notify(): void {
+    if (this.dirty && !this.failed) return;
+    this.dirty = true;
+    for (const t of this.targets) t.notify();
+  }
+
+  private start(): void {
+    this.value = pure(this.initial);
+    this.started = true;
+    this.version++;
+  }
+
+  onFirstTarget(): void {
+    if (this.linked) return; // still linked: its release was deferred
+    let ok = false;
+    try {
+      if (!this.started) this.start();
+      // Resynchronize: record input versions without stepping.
+      for (let i = 0; i < this.inputs.length; i++) {
+        const d = this.inputs[i];
+        d.refresh();
+        this.last[i] = d.version;
+      }
+      ok = true;
+    } catch {
+      // Rethrown to whoever reads the node.
+    }
+    for (let i = 0; i < this.inputs.length; i++) linkTo(this, this.inputs[i]);
+    this.linked = true;
+    this.dirty = !ok;
+    this.failed = !ok;
+  }
+
+  onLastTarget(): void {
+    if (!this.linked) return;
+    this.linked = false;
+    for (let i = 0; i < this.inputs.length; i++) unlinkFrom(this, this.inputs[i]);
+    this.dirty = true;
+  }
+
+  refresh(): void {
+    if (!this.linked) {
+      // Paused: keep the state.
+      if (!this.started) this.start();
+      return;
+    }
+    if (!this.dirty) return;
+    try {
+      if (!this.started) this.start();
+      const n = this.inputs.length;
+      const changed: boolean[] = new Array(n);
+      const versions: number[] = new Array(n);
+      let any = false;
+      for (let i = 0; i < n; i++) {
+        const d = this.inputs[i];
+        d.refresh();
+        versions[i] = d.version;
+        changed[i] = d.version !== this.last[i];
+        if (changed[i]) any = true;
+      }
+      if (any) {
+        if (DEV) stats.steps++;
+        const values = this.inputs.map((d) => d.value);
+        const state = this.value;
+        const v = pure(() => this.step(changed, values, state));
+        if (!this.eq(v, this.value)) {
+          this.value = v;
+          this.version++;
+        }
+      }
+      this.last = versions;
+      this.dirty = false;
+      this.failed = false;
+    } catch (e) {
+      this.dirty = true;
+      this.failed = true;
+      throw e;
+    }
+  }
+
+  read(): S {
+    try {
+      this.refresh();
+    } finally {
+      track(this);
+    }
+    return this.value;
+  }
+}
+
+/** Run a pure function: untracked, with no owner, and with writes rejected. */
+function pure<T>(fn: () => T): T {
+  const prev = current;
+  const prevOwner = owner;
+  current = null;
+  owner = null;
+  inDerived++;
+  try {
+    return fn();
+  } finally {
+    current = prev;
+    owner = prevOwner;
+    inDerived--;
+  }
+}
+
+export function stateful<S>(inputs: Readable<any>[], initial: () => S, step: Step<S>, eq?: Eq<S>): Stateful<S> {
+  return new Stateful(inputs, initial, step, eq);
+}
+
+/** Accumulate `s` from `seed`, one step per batch in which `s` changed, while observed. */
+export function fold<A, B>(f: (a: A, b: B) => B, seed: B, s: Readable<A>): Readable<B> {
+  return stateful([s], () => seed, (_, values, b) => f(values[0], b));
+}
+
+/** The latest of `a` and `b`, starting at `a`'s current value; `a` wins when both change in one batch. */
+export function merge<A>(a: Readable<A>, b: Readable<A>): Readable<A> {
+  return stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]));
+}
+
+/** Values of `s` that satisfy `p`, starting at `seed` unless `s` satisfies `p` at the start. */
+export function filter<A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readable<A> {
+  return stateful([s], () => {
+    const v = s.read();
+    return p(v) ? v : seed;
+  }, (_, values, prev) => (p(values[0]) ? values[0] : prev));
+}
+
+/**
+ * Follows `s` while `cond` is true and holds its last value while `cond` is
+ * false. When `cond` becomes true, it takes `s`'s current value. Starts at
+ * `s` if `cond` is true at the start, otherwise at `seed`.
+ */
+export function filterOn<A>(cond: Readable<boolean>, seed: A, s: Readable<A>): Readable<A> {
+  return stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev));
 }
 
 // ---------------------------------------------------------------------------
@@ -601,6 +803,12 @@ export function effect(fn: () => void): EffectNode {
   return e;
 }
 
+/** Keep `s` observed for the lifetime of the current scope, and return it. */
+export function hold<T>(s: Readable<T>): Readable<T> {
+  effect(() => { s.read(); });
+  return s;
+}
+
 // ---------------------------------------------------------------------------
 // Batching
 
@@ -620,13 +828,15 @@ export function isBatching(): boolean {
 
 function flush(): void {
   let rounds = 0;
+  let loopError: unknown = null;
   batchDepth++;
   try {
     while (queue.length > 0) {
       if (++rounds > LOOP_LIMIT) {
         for (const e of queue) e.queued = false;
         queue = [];
-        throw new Error('effect loop');
+        loopError = new Error('effect loop');
+        break;
       }
       const es = queue;
       queue = [];
@@ -639,6 +849,11 @@ function flush(): void {
     }
   } finally {
     batchDepth--;
+  }
+  releaseUnobserved();
+  if (loopError !== null) {
+    pendingErrors = [];
+    throw loopError;
   }
   if (pendingErrors.length > 0) {
     const errors = pendingErrors;
