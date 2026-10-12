@@ -3,13 +3,13 @@
 module Screamer.Examples.RainbowSpiral where
 
 import Prelude
-import Debug.Trace
+import Debug
 import Effect.Console (log)
 
 import Data.Array as A
 import Data.Int as Int
 import Effect (Effect)
-import Math (pi, cos, sin)
+import Data.Number (pi, cos, sin)
 import Screamer.Core (Element)
 import Screamer.Core as S
 import Screamer.DOM.Attribute as S
