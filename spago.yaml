@@ -3,6 +3,7 @@ package:
   dependencies:
     - control
     - effect
+    - exceptions
     - maybe
     - nullable
     - prelude
@@ -14,13 +15,18 @@ package:
     dependencies:
       - aff
       - arrays
+      - effect
+      - either
+      - exceptions
       - foldable-traversable
       - identity
       - integers
       - maybe
       - newtype
       - quickcheck
+      - refs
       - spec
+      - strings
 workspace:
   packageSet:
     registry: 81.4.0
