@@ -7,7 +7,7 @@
   "scripts": {
     "bench": "tsc && spago bundle -p screamer-examples --module Screamer.Examples.JsFrameworksBenchmark --outfile output/JsFrameworksBenchmark.js",
     "build": "tsc && spago build",
-    "build:examples": "cd examples",
+    "build:examples": "tsc && node examples/build.mjs",
     "codegen:dom": "tsx codegen/dom.ts",
     "format": "purs-tidy format-in-place \"src/**/*.purs\" \"examples/**/*.purs\"",
     "hello": "tsc && spago bundle -p screamer-examples --module Screamer.Examples.HelloWorld --outfile output/HelloWorld.js",
@@ -16,7 +16,10 @@
     "serve": "parcel examples/output/HelloWorld.html",
     "serve:rainbow": "parcel examples/output/RainbowSpiral.html",
     "serve:bench": "parcel examples/output/JsFrameworksBenchmark.html",
-    "bench:measure": "npm run bench && node bench/measure.mjs"
+    "bench:measure": "npm run bench && node bench/measure.mjs",
+    "test": "npm run test:core && npm run test:purs",
+    "test:core": "node --import tsx --expose-gc --test \"test/core/**/*.test.ts\"",
+    "test:purs": "tsc && NODE_OPTIONS=\"--import ./test/setup-dom.mjs\" spago test"
   },
   "dependencies": {
     "sinuous": "0.32.1"
@@ -25,6 +28,7 @@
     "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
     "handlebars": "^4.7.10",
+    "jsdom": "^26.1.0",
     "parcel": "^2.16.4",
     "playwright": "^1.56.1",
     "purescript": "^0.15.16",

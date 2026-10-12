@@ -3,7 +3,6 @@
 module Screamer.Examples.RainbowSpiral where
 
 import Prelude
-import Debug
 import Effect.Console (log)
 
 import Data.Array as A
