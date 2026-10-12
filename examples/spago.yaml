@@ -3,6 +3,7 @@ package:
   dependencies:
     - arrays
     - console
+    - either
     - effect
     - foldable-traversable
     - integers
