@@ -30,7 +30,7 @@ export const resetBody = () => {
 export const innerHTML = (sel) => () => document.querySelector(sel).innerHTML;
 
 export const click = (sel) => () => {
-  document.querySelector(sel).dispatchEvent(new window.MouseEvent('click', { bubbles: true, clientX: 12, clientY: 34 }));
+  document.querySelector(sel).dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 12, clientY: 34 }));
 };
 
 export const liveListeners = () => live;

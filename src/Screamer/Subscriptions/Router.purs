@@ -1,56 +1,62 @@
-module Screamer.Subscriptions.Router where
+-- | The browser location as a signal, through the History API.
+module Screamer.Subscriptions.Router
+  ( Location
+  , location
+  , navigate
+  , redirect
+  , link
+  ) where
 
-{-
+import Prelude
 
-foreign import onClick :: Event -> Effect Unit
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Screamer.Channel (channel)
+import Screamer.Core (Attribute, Element)
+import Screamer.DOM.Attribute (href_)
+import Screamer.DOM.Element (a_)
+import Screamer.DOM.EventHandler (onClick_)
+import Screamer.Owned (Owned, onCleanup)
+import Screamer.Signal (Signal)
+import Web.Event.Event (preventDefault)
+import Web.UIEvent.MouseEvent (MouseEvent, altKey, button, ctrlKey, metaKey, shiftKey, toEvent)
 
-data Mode = Hash | History
+type Location = { pathname :: String, search :: String, hash :: String }
 
-type Link a = a -> Array H.Property -> Array H.VirtualNode -> H.VirtualNode
+foreign import currentLocation :: Effect Location
 
-prefixed :: Mode -> String -> String
-prefixed mode url = case mode of
-  Hash -> "#" <> url
-  History -> url
+-- | Call the action on every `popstate`, until the returned action runs.
+foreign import onPopState :: Effect Unit -> Effect (Effect Unit)
 
-link :: Mode -> Link String
-link mode url props children =
-  let props' = [H.on "click" onClick, H.property "href" $ prefixed mode url] <> props
-  in H.element "a" props' children
+foreign import pushState :: String -> Effect Unit
 
-foreign import push_ :: String -> Effect Unit
-foreign import replace_ :: String -> Effect Unit
+foreign import replaceState :: String -> Effect Unit
 
-push :: Mode -> String -> Effect Unit
-push mode url = push_ $ prefixed mode url
+-- | The current location, updated on `popstate` (back and forward) and by
+-- | `navigate` and `redirect`.
+location :: Owned (Signal Location)
+location = do
+  loc <- liftEffect $ channel =<< currentLocation
+  stop <- liftEffect $ onPopState (loc.put =<< currentLocation)
+  onCleanup stop
+  pure loc.signal
 
-replace :: Mode -> String -> Effect Unit
-replace mode url = replace_ $ prefixed mode url
+-- | Push a new history entry and update every `location` signal.
+navigate :: String -> Effect Unit
+navigate = pushState
 
-foreign import data Token :: Type
+-- | Replace the current history entry and update every `location` signal.
+redirect :: String -> Effect Unit
+redirect = replaceState
 
-foreign import addListener :: { mode :: String, handler :: (String -> Effect Unit) } -> Effect Token
-foreign import removeListener :: Token -> Effect Unit
-
-type Spec action = {
-  handler :: Url -> action,
-  mode :: Mode
-}
-
-subscription :: forall action. H.SubscriptionSpec (Spec action) Token action
-subscription = { initialize, update, destroy }
+-- | An anchor that navigates without reloading the page. Clicks with a
+-- | modifier key or a button other than the main one are left to the
+-- | browser, so opening in a new tab still works.
+link :: String -> Array Attribute -> Array Element -> Element
+link url attrs = a_ ([ href_ url, onClick_ follow ] <> attrs)
   where
-    initialize {props: {mode, handler}, send} = do
-      let
-        mode' = case mode of
-          Hash -> "hash"
-          History -> "history"
-      token <- addListener { mode: mode', handler: send <<< handler <<< parse }
-      pure token
-    update {state} = pure state
-    destroy {state: token} = removeListener token
-
-subscribe :: forall action. Mode -> (Url -> action) -> H.Subscription action
-subscribe mode handler = H.subscribe subscription { mode, handler }
-
--}
+  follow :: MouseEvent -> Effect Unit
+  follow e =
+    unless (button e /= 0 || altKey e || ctrlKey e || metaKey e || shiftKey e) do
+      preventDefault (toEvent e)
+      navigate url
