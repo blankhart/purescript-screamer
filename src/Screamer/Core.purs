@@ -2,7 +2,7 @@
 
 module Screamer.Core where
 
-import Debug.Trace
+import Debug
 
 import Prelude
 import Screamer.Observable
@@ -134,4 +134,7 @@ foreign import tutorial :: Effect Unit
 
 foreign import tick :: Channel Int -> Effect Unit
 
-foreign import component :: forall a . IsElement a => Effect (Signal a) -> Element
+foreign import componentImpl :: forall a . Effect (Signal a) -> Element
+
+component :: forall a . IsElement a => Effect (Signal a) -> Element
+component = componentImpl

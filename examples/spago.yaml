@@ -1,0 +1,22 @@
+package:
+  name: screamer-examples
+  dependencies:
+    - arrays
+    - console
+    - debug
+    - effect
+    - foldable-traversable
+    - integers
+    - maybe
+    - numbers
+    - partial
+    - prelude
+    - random
+    - screamer
+    - st
+    - strings
+    - unfoldable
+    - unsafe-coerce
+    - web-dom
+    - web-events
+    - web-html
