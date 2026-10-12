@@ -6,8 +6,6 @@ module Screamer.Examples.JsFrameworksBenchmark where
 
 -- http://localhost:8080/webdriver-ts-results/table.html
 
--- https://github.com/krausest/js-framework-benchmark/blob/master/frameworks/keyed/sinuous/src/main.js
-
 import Prelude
 
 import Data.Array as Array

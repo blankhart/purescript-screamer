@@ -124,7 +124,7 @@ describe('prototype checks', () => {
   });
 });
 
-describe('sinuous regressions', () => {
+describe('regressions from the previous runtime', () => {
   test('a derived signal does not go stale after its creator re-runs', () => {
     const src = cell(1);
     const trigger = cell(0);

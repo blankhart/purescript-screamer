@@ -23,9 +23,6 @@
     "test:compile-fail": "node compile-fail/run.mjs",
     "test:smoke": "node examples/smoke.mjs"
   },
-  "dependencies": {
-    "sinuous": "0.32.1"
-  },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",

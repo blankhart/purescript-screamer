@@ -1,4 +1,4 @@
--- https://github.com/luwes/sinuous-rainbow-spiral/blob/master/src/main.js
+-- A port of the rainbow spiral demo (see "History" in the README).
 
 module Screamer.Examples.RainbowSpiral where
 
