@@ -7,6 +7,7 @@
           "dependencies": [
             "control",
             "effect",
+            "exceptions",
             "maybe",
             "nullable",
             "prelude",
@@ -19,13 +20,18 @@
           "dependencies": [
             "aff",
             "arrays",
+            "effect",
+            "either",
+            "exceptions",
             "foldable-traversable",
             "identity",
             "integers",
             "maybe",
             "newtype",
             "quickcheck",
-            "spec"
+            "refs",
+            "spec",
+            "strings"
           ]
         }
       },
