@@ -38,6 +38,15 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test examples in Chromium
+        run: npm run test:smoke
+
+      - name: Bundle the benchmark
+        run: npm run bench
+
       - name: Generated DOM modules are up to date
         run: |
           npm run codegen:dom

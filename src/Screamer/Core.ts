@@ -46,6 +46,57 @@ export const unsafeOn_ = on_;
 
 export const attributes = (list: Attr[]): Attr => ({ kind: GROUP, name: '', value: list });
 
+type Handler = (e: Event) => () => void;
+
+// Bubbling events are delegated: one listener per event type on the document
+// dispatches to the handlers stored on the elements between the target and
+// the document. Elements need no listener of their own, so creating and
+// disposing them adds and removes none. A handler stops firing once the scope
+// that bound it is disposed.
+const DELEGATED = new Set([
+  'beforeinput', 'click', 'contextmenu', 'dblclick', 'focusin', 'focusout', 'input',
+  'keydown', 'keyup', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup',
+  'pointerdown', 'pointermove', 'pointerout', 'pointerover', 'pointerup',
+  'touchend', 'touchmove', 'touchstart',
+]);
+
+const HANDLERS = '$$screamer';
+
+interface Delegating extends Element {
+  [HANDLERS]?: { scope: Scope; on: Record<string, Handler> };
+}
+
+const delegated = new Set<string>();
+
+function delegate(name: string): void {
+  if (delegated.has(name)) return;
+  delegated.add(name);
+  document.addEventListener(name, dispatch);
+}
+
+function dispatch(e: Event): void {
+  const name = e.type;
+  let node = e.target as Node | null;
+  Object.defineProperty(e, 'currentTarget', { configurable: true, get: () => node });
+  try {
+    R.batch(() => {
+      while (node !== null) {
+        const h = (node as Delegating)[HANDLERS];
+        if (h !== undefined && !h.scope.disposed) {
+          const handler = h.on[name];
+          if (handler !== undefined) {
+            handler(e)();
+            if (e.cancelBubble) return;
+          }
+        }
+        node = node.parentNode ?? ((node as ShadowRoot).host || null);
+      }
+    });
+  } finally {
+    delete (e as any).currentTarget;
+  }
+}
+
 /** Set once for a constant, or with one owned effect for a signal. */
 function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
   if (sig instanceof R.Constant) set(sig.value);
@@ -73,10 +124,17 @@ function bindAttr(s: Scope, el: Element, a: Attr): void {
       break;
     }
     case EVENT: {
-      const handler = a.value as (e: Event) => () => void;
-      const listener = (e: Event) => R.batch(() => handler(e)());
-      el.addEventListener(name, listener);
-      s.cleanups.push(() => el.removeEventListener(name, listener));
+      const handler = a.value as Handler;
+      if (DELEGATED.has(name)) {
+        delegate(name);
+        let h = (el as Delegating)[HANDLERS];
+        if (h === undefined) h = (el as Delegating)[HANDLERS] = { scope: s, on: Object.create(null) };
+        h.on[name] = handler;
+      } else {
+        const listener = (e: Event) => R.batch(() => handler(e)());
+        el.addEventListener(name, listener);
+        s.cleanups.push(() => el.removeEventListener(name, listener));
+      }
       break;
     }
     case GROUP: {
@@ -312,6 +370,39 @@ export const eachImpl =
         return;
       }
       const parent = end.parentNode!;
+      // Common prefix and suffix: rows that stay in place.
+      const m = rows.length;
+      let head = 0;
+      while (head < n && head < m && compare(keyOf(list[head]))(rows[head].key) === 0) {
+        rows[head].cell.write(list[head]);
+        head++;
+      }
+      let tailNew = n;
+      let tailOld = m;
+      while (tailNew > head && tailOld > head && compare(keyOf(list[tailNew - 1]))(rows[tailOld - 1].key) === 0) {
+        rows[tailOld - 1].cell.write(list[tailNew - 1]);
+        tailNew--;
+        tailOld--;
+      }
+      if (head === tailNew) {
+        // Only removals in the middle.
+        for (let j = head; j < tailOld; j++) {
+          rows[j].scope.dispose();
+          removeRow(parent, rows[j]);
+        }
+        if (tailOld > head) rows.splice(head, tailOld - head);
+        return;
+      }
+      if (head === tailOld) {
+        // Only insertions in the middle.
+        const anchor = tailOld < m ? rows[tailOld].first : end;
+        const frag = document.createDocumentFragment();
+        const made = new Array<Row<A>>(tailNew - head);
+        for (let i = head; i < tailNew; i++) made[i - head] = makeRow(keyOf(list[i]), list[i], frag, null);
+        parent.insertBefore(frag, anchor);
+        rows = rows.slice(0, head).concat(made, rows.slice(head));
+        return;
+      }
       const lookup = keyLookup(rows, compare as any);
       const used = new Uint8Array(rows.length);
       const oldIndex = new Int32Array(n);

@@ -3,6 +3,7 @@ module Test.DomHelpers
   ( resetBody
   , innerHTML
   , click
+  , currentTag
   , liveListeners
   , mutationsDuring
   , rowNodes
@@ -15,6 +16,7 @@ import Prelude
 
 import Effect (Effect)
 import Web.DOM.Node (Node)
+import Web.Event.Event (Event)
 
 -- | Replace the body with `<main id="root"></main>`.
 foreign import resetBody :: Effect Unit
@@ -40,3 +42,6 @@ foreign import textsOf :: String -> Effect (Array String)
 
 -- | A string property of the first element matching the selector.
 foreign import propertyOf :: String -> String -> Effect String
+
+-- | The tag name of the event's current target.
+foreign import currentTag :: Event -> String

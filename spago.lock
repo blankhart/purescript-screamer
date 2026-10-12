@@ -40,6 +40,7 @@
             "spec",
             "strings",
             "web-dom",
+            "web-events",
             "web-uievents"
           ]
         }
