@@ -193,8 +193,8 @@ describe('stateful nodes in the graph', () => {
 // The reference recomputes every value from scratch after each batch,
 // starting from the observed roots, so it also knows which nodes are
 // observed. A stateful node steps in a batch when it was observed before and
-// after the batch and an input's value changed; a newly observed node
-// resynchronizes without stepping.
+// after the batch and an input changed; a newly observed node resynchronizes
+// without stepping.
 
 type Spec =
   | { kind: 'sum'; ins: number[]; mod: boolean }
@@ -259,49 +259,68 @@ function oracleFuzz(seed: number, graphs = 100): { checks: number; bad: number; 
       }
     }
 
-    // Reference state for stateful nodes.
+    // Reference state. Versions follow the real nodes' rules: cells, derived
+    // nodes and folds bump when their value changes; a merge bumps on every
+    // step.
     const state: Record<number, number> = {};
     const lastIn: Record<number, number[]> = {};
+    const refValue: Record<number, number> = {};
+    const refVersion: Record<number, number> = {};
     let observedPrev = new Set<number>();
 
     const evaluate = (vals: number[]) => {
       const memo = new Map<number, number>();
       const observed = new Set<number>();
+      const setValue = (k: number, v: number, always = false) => {
+        if (always || !(k in refValue) || !Object.is(refValue[k], v)) {
+          refValue[k] = v;
+          refVersion[k] = (refVersion[k] || 0) + 1;
+        }
+      };
       const ev = (k: number): number => {
         if (memo.has(k)) return memo.get(k)!;
         observed.add(k);
         let v: number;
         if (k < nCells) {
           v = vals[k];
+          setValue(k, v);
         } else {
           const spec = specs[k - nCells];
           switch (spec.kind) {
             case 'sum': {
               const s = spec.ins.reduce((a, j) => a + ev(j), 0);
               v = spec.mod ? s % 3 : s;
+              setValue(k, v);
               break;
             }
             case 'bind':
               v = ev(spec.branches[ev(spec.outer) % 2]);
+              setValue(k, v);
               break;
             case 'fold': {
               const x = ev(spec.input);
-              if (!(k in state)) state[k] = 0;
-              if (observedPrev.has(k) && !Object.is(x, lastIn[k][0])) state[k] = foldStep(x, state[k]);
-              lastIn[k] = [x];
+              const xv = refVersion[spec.input];
+              if (!(k in state)) { state[k] = 0; setValue(k, 0); }
+              if (observedPrev.has(k) && xv !== lastIn[k][0]) {
+                state[k] = foldStep(x, state[k]);
+                setValue(k, state[k]);
+              }
+              lastIn[k] = [xv];
               v = state[k];
               break;
             }
             case 'merge': {
               const a = ev(spec.left);
               const b = ev(spec.right);
-              if (!(k in state)) state[k] = a;
+              const av = refVersion[spec.left];
+              const bv = refVersion[spec.right];
+              if (!(k in state)) { state[k] = a; setValue(k, a); }
               if (observedPrev.has(k)) {
                 const [la, lb] = lastIn[k];
-                if (!Object.is(a, la)) state[k] = a;
-                else if (!Object.is(b, lb)) state[k] = b;
+                if (av !== la) { state[k] = a; setValue(k, a, true); }
+                else if (bv !== lb) { state[k] = b; setValue(k, b, true); }
               }
-              lastIn[k] = [a, b];
+              lastIn[k] = [av, bv];
               v = state[k];
               break;
             }

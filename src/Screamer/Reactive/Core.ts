@@ -523,10 +523,17 @@ export function fold<A, B>(f: (a: A, b: B) => B, seed: B, s: Readable<A>): Reada
   return stateful([s], () => seed, (_, values, b) => f(values[0], b));
 }
 
-/** The latest of `a` and `b`, starting at `a`'s current value; `a` wins when both change in one batch. */
+/**
+ * The latest of `a` and `b`, starting at `a`'s current value; `a` wins when
+ * both change in one batch. A merge reports every step, even one that repeats
+ * its value, so nested merges agree on which input changed and `<|>` stays
+ * associative.
+ */
 export function merge<A>(a: Readable<A>, b: Readable<A>): Readable<A> {
-  return stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]));
+  return stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), never);
 }
+
+const never = () => false;
 
 /** Values of `s` that satisfy `p`, starting at `seed` unless `s` satisfies `p` at the start. */
 export function filter<A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readable<A> {
@@ -862,3 +869,9 @@ function flush(): void {
     throw errors[0];
   }
 }
+
+// ---------------------------------------------------------------------------
+// PureScript entry points of `Screamer.Reactive.Core`
+
+/** A copy of the introspection counters, as an `Effect`. */
+export const readStats = () => ({ ...stats });
