@@ -9,8 +9,8 @@ import Data.Array as A
 import Data.Int as Int
 import Effect (Effect)
 import Data.Number (pi, cos, sin)
-import Screamer.Core (Element)
-import Screamer.Core as S
+import Screamer.Core.Sinuous (Element)
+import Screamer.Core.Sinuous as S
 import Screamer.DOM.Attribute as S
 import Screamer.DOM.Element as S
 import Screamer.DOM.Event as S

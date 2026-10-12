@@ -4,7 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Unsafe.Coerce (unsafeCoerce)
-import Screamer.Core (Attribute, on_)
+import Screamer.Core.Sinuous (Attribute, on_)
 import Screamer.DOM.Event as Event
 
 

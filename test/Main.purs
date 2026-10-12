@@ -12,6 +12,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (defaultConfig, evalSpecT)
 import Test.Spec.Summary (successful)
+import Test.Dom as Dom
 import Test.Owned as Owned
 import Test.Signal as Signal
 
@@ -29,3 +30,4 @@ spec = do
       (1 + 1) `shouldEqual` 2
   Signal.spec
   Owned.spec
+  Dom.spec

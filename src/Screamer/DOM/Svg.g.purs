@@ -1,6 +1,6 @@
 module Screamer.DOM.Svg where
 
-import Screamer.Core (Attribute, Element, attribute_, svgElement_)
+import Screamer.Core.Sinuous (Attribute, Element, attribute_, svgElement_)
 
 a_ :: Array Attribute -> Array Element -> Element
 a_ = svgElement_ "a"

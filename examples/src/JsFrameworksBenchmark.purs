@@ -22,8 +22,8 @@ import Data.Unfoldable (replicateA)
 import Effect (Effect)
 import Effect.Random as Random
 import Partial.Unsafe (unsafePartial)
-import Screamer.Core (Element)
-import Screamer.Core as S
+import Screamer.Core.Sinuous (Element)
+import Screamer.Core.Sinuous as S
 import Screamer.DOM.Attribute as S
 import Screamer.DOM.Element as S
 import Screamer.DOM.Event (Mouse, target)

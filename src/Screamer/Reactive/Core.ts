@@ -623,8 +623,11 @@ export function dropRepeatsBy<A>(eq: Eq<A>, s: Readable<A>): Readable<A> {
 
 export type ErrorHandler = (error: unknown) => void;
 
+/** Something a scope disposes: a cleanup function or an object with `dispose`. */
+export type Cleanup = (() => void) | { dispose(): void };
+
 export class Scope {
-  cleanups: (() => void)[] = [];
+  cleanups: Cleanup[] = [];
   children: Set<Scope> = new Set();
   disposed = false;
   onError: ErrorHandler | null = null;
@@ -657,7 +660,9 @@ export class Scope {
     this.cleanups = [];
     for (let i = cleanups.length - 1; i >= 0; i--) {
       try {
-        cleanups[i]();
+        const c = cleanups[i];
+        if (typeof c === 'function') c();
+        else c.dispose();
       } catch (e) {
         if (!failed) { error = e; failed = true; }
       }
@@ -702,7 +707,7 @@ export function getOwner(): Scope | null {
   return owner;
 }
 
-export function onCleanup(f: () => void): void {
+export function onCleanup(f: Cleanup): void {
   if (owner === null) throw new Error('onCleanup outside a scope');
   owner.cleanups.push(f);
 }
@@ -797,10 +802,15 @@ export class EffectNode implements Target, Computation {
 export function effect(fn: () => void): EffectNode {
   const s = owner;
   if (s === null) throw new Error('effect outside a scope');
+  return effectIn(s, fn);
+}
+
+/** Create an effect owned by `s` and run it once. */
+export function effectIn(s: Scope, fn: () => void): EffectNode {
   if (s.disposed) throw new Error('effect created in a disposed scope');
   const e = new EffectNode(fn, s);
   if (DEV) stats.liveEffects++;
-  s.cleanups.push(() => e.dispose());
+  s.cleanups.push(e);
   batchDepth++;
   try {
     e.run();
