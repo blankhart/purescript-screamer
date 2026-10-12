@@ -1,6 +1,6 @@
 module Screamer.DOM.Element where
 
-import Screamer.Core (Attribute, Element, element_)
+import Screamer.Core.Sinuous (Attribute, Element, element_)
 
 a_ :: Array Attribute -> Array Element -> Element
 a_ = element_ "a"

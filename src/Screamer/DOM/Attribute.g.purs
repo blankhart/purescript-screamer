@@ -1,6 +1,6 @@
 module Screamer.DOM.Attribute where
 
-import Screamer.Core (Attribute, attribute_, class IsValue)
+import Screamer.Core.Sinuous (Attribute, attribute_, class IsValue)
 
 -- TODO: abbr_ :: String -> Attribute
 abbr_ :: forall v . IsValue v => v -> Attribute

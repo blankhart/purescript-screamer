@@ -6,7 +6,7 @@ import Data.String.CodeUnits (toCharArray)
 import Effect (Effect)
 import Effect.Console (log)
 import Prelude
-import Screamer.Core as S
+import Screamer.Core.Sinuous as S
 import Screamer.Observable as S
 import Screamer.DOM.Element as S
 import Screamer.DOM.Event as S
