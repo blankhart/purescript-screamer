@@ -19,3 +19,5 @@ package:
     - web-dom
     - web-events
     - web-html
+    - web-pointerevents
+    - web-uievents

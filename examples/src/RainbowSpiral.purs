@@ -6,22 +6,18 @@ import Prelude
 
 import Data.Array as Array
 import Data.Int as Int
-import Data.Maybe (Maybe(..))
 import Data.Number (cos, pi, sin)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Effect.Ref as Ref
 import Screamer.Channel (channel)
 import Screamer.Core (Element, component, dyn, element, fragment_)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
 import Screamer.DOM.EventHandler as H
 import Screamer.Examples.Harness as Harness
-import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal, filterOn, sampleManyWith, sampleOn)
+import Screamer.Subscriptions.AnimationFrame as AnimationFrame
 import Web.Event.Event (preventDefault)
-import Web.HTML (window)
-import Web.HTML.Window (cancelAnimationFrame, requestAnimationFrame)
 import Web.UIEvent.MouseEvent (pageX, pageY, toEvent)
 
 main :: Effect Unit
@@ -96,7 +92,7 @@ spiral = component do
   heartbeat <- liftEffect $ channel 0
   position <- liftEffect $ channel origin
   isBig <- liftEffect $ channel false
-  everyFrame (heartbeat.modify (_ + 1))
+  AnimationFrame.every (heartbeat.modify (_ + 1))
   let
     dotAttrs = sampleManyWith { pos: position.signal, n: numerosity.signal } { hb: heartbeat.signal } toDotAttrs
     cursor = sampleOn heartbeat.signal position.signal
@@ -128,20 +124,3 @@ dot isBig dotStyle =
 
 animationPicker :: Element
 animationPicker = element "Picker goes here"
-
--- | Run an action on every animation frame until the scope is disposed.
--- | Temporary, until `Screamer.Subscriptions.AnimationFrame` exists.
-everyFrame :: Effect Unit -> Owned Unit
-everyFrame action = do
-  pending <- liftEffect $ Ref.new Nothing
-  let
-    schedule = do
-      w <- window
-      id <- requestAnimationFrame (action *> schedule) w
-      Ref.write (Just id) pending
-  liftEffect schedule
-  onCleanup do
-    w <- window
-    Ref.read pending >>= case _ of
-      Just id -> cancelAnimationFrame id w
-      Nothing -> pure unit
