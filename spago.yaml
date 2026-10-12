@@ -2,17 +2,21 @@ package:
   name: screamer
   dependencies:
     - aff
+    - arrays
     - control
     - datetime
     - effect
+    - either
     - exceptions
     - foldable-traversable
     - maybe
     - now
     - nullable
+    - numbers
     - prelude
     - record
     - refs
+    - strings
     - typelevel-prelude
     - unsafe-coerce
     - web-clipboard

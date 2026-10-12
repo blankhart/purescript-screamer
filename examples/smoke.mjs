@@ -59,6 +59,48 @@ const examples = {
     if (!closed) throw new Error('socket still open after unmount');
   },
 
+  async Formlets(page) {
+    const field = (n, el) => `#signup .screamer-form > label:nth-child(${n}) ${el}`;
+    const errors = () => page.evaluate(() => Array.from(document.querySelectorAll('#signup .screamer-form-error')).filter((e) => !e.hidden).map((e) => e.textContent));
+    const expectErrors = async (want) => {
+      await page.waitForFunction((w) => JSON.stringify(Array.from(document.querySelectorAll('#signup .screamer-form-error')).filter((e) => !e.hidden).map((e) => e.textContent)) === w, JSON.stringify(want));
+    };
+    await expectText(page, '#status', '6 fields to fix');
+    await expectErrors([]);
+    // A message appears after an edit and clears when the value is fixed.
+    await page.fill(field(4, 'input'), '9');
+    await expectErrors(['You must be 13 or over']);
+    await page.fill(field(4, 'input'), '42');
+    await expectErrors([]);
+    // Submitting an invalid form reveals every message.
+    await page.click('#signup button[type=submit]');
+    await expectErrors(['Enter your name', 'Enter your email', 'Use at least 8 characters', 'Choose a plan', 'Accept the terms to continue']);
+    await page.fill(field(1, 'input'), 'Ada');
+    await page.fill(field(2, 'input'), 'ada@example.com');
+    await page.fill(field(3, 'input'), 'correct horse');
+    await page.selectOption(field(5, 'select'), { label: 'Pro' });
+    await page.check(field(6, 'input'));
+    await expectErrors([]);
+    await expectText(page, '#status', 'Ready');
+    await page.click('#signup button[type=submit]');
+    await expectText(page, '#submitted', 'Welcome, Ada (ada@example.com, 42, Pro)');
+    await expectText(page, '#status', '6 fields to fix');
+    if ((await errors()).length !== 0) throw new Error('messages shown after reset');
+    // The wizard's second step depends on the first answer.
+    await page.click('#trip .screamer-form-next');
+    await expectText(page, '#trip .screamer-form-error:not([hidden])', 'Choose a kind of trip');
+    await page.selectOption('#trip select', { label: 'Camping' });
+    await page.click('#trip .screamer-form-next');
+    await expectText(page, '#trip legend', 'Step 2: how long?');
+    await page.fill('#trip input', '3');
+    await expectText(page, '#plan', 'Camping for 3 nights');
+    await page.click('#trip .screamer-form-back');
+    await page.selectOption('#trip select', { label: 'City break' });
+    await page.click('#trip .screamer-form-next');
+    await page.fill('#trip input', 'Lisbon');
+    await expectText(page, '#plan', 'City break in Lisbon');
+  },
+
   async JsFrameworksBenchmark(page) {
     await page.click('#run');
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1000);
