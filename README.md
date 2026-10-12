@@ -1,106 +1,83 @@
 # Screamer
 
-Referential transparency problem?  The concern is that evaluating a putative `Component` to an `Effect` will not be referentially transparent.  If the `Component` produces effects other than modification of the signal graph,  `sinuous` will run those effects when the `Component` is evaluated to an `Element`.
+Screamer is a PureScript library for building DOM interfaces without a virtual DOM. Signals describe values that change over time. Elements bind those signals to the DOM nodes they affect, so an update touches only those nodes.
 
-Essentially, evaluating an `Effect Unit` computation will run an effect in the manner of `unsafePerformIO`.  This occurs when an `Effect` value is passed in as the thunk to the `subscribe` or `computed` functions directly rather than as a thunk on a thunk (`() => () => {}`).
+```purescript
+counter :: Element
+counter = component do
+  count <- liftEffect $ channel 0
+  pure $ E.div_ [ A.class_ "counter" ]
+    [ E.button_ [ H.onClick_ \_ -> count.modify (_ - 1) ] [ element "-" ]
+    , E.span_ [] [ text (show <$> count.signal) ]
+    , E.button_ [ H.onClick_ \_ -> count.modify (_ + 1) ] [ element "+" ]
+    ]
 
-The way to explore this would be to have an `x :: Effect Element` function, have it log to the console and construct an element, and then do `let y = x` within the main function and see if that produces side effects.  By limiting the statement to `let y = x` that would avoid executing the effect.  The compiler may optimize away the unused reference.
+main :: Effect Unit
+main = void $ mount "main" counter
+```
 
-The obvious solution is to require child component elements to be created effectfully and then inserted into a pure return value.  Essentially, faithful to the types, the conversion of a component into an element would require running the effect.
+The examples are in `examples/src`. Run `npm run build:examples` to bundle them, and `npm run test:smoke` to check them in headless Chromium.
 
-But what if the component is dynamic, or conditionally rendered?  It could render to a signal, but then there still would be a `Signal (Effect a)` value in the component tree.  The issue is dynamic effectful components; static effectful components.
+## How ownership works
 
-Is there a way to pull out a `Signal Element` representing effects that may run in the future?  What if all components returned `Signal Element`?
+**Signals are pure values.** `Signal a` is a value that changes over time. `map`, `apply`, `bind`, `sampleOn`, `sampleManyWith` and `dropRepeats` build new signals without touching the reactive graph. A derived signal connects to its sources only while something observes it, and it is garbage-collected like any other value when nothing refers to it. A signal propagates a change only when its value actually changes: by `Object.is`, or by `Eq` through `dropRepeats`.
 
-## Hmm.
+**Stateful signals advance only while observed.** `fold`, `merge`, `filter` and `filterOn` keep state. That state starts from the seed when the first observer arrives, and it pauses when the last observer leaves. On resuming it starts again from the inputs' current values, and changes made while it was paused are not replayed.
 
-A possible solution is to use a [free monad transformer](https://pursuit.purescript.org/packages/purescript-freet/5.0.0/docs/Control.Monad.Free.Trans).  This would allow suspended effectful computations to be rendered as pure markup and then interpreted to a single effect (`runFreeT`). Or really any monad transformer over effect.
+**Channels are where change comes from.** `channel x` (in `Effect`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
 
-An important thing would be that the thunks which are run are PureScript thunks so that the underlying `sinuous` implementation doesn't run up against thunks when things start to conditionally render.
+**Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `subscribe`, `hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
 
-But then what about a `Signal (Effect a)`?  Does that ever get to render in the DOM?
+**`component` runs setup once per instance.** `component :: Owned Element -> Element` runs its setup when the element is instantiated. Channels, timers and subscriptions created there belong to that instance, and they are released when the instance is removed: by `dyn` switching branches, by `each` dropping a row, or by unmounting.
 
-What about a dynamic list of components?  It doesn't have a static shape.  Not a dynamic list of elements, but of components each of which has some effect.  This potentially would be difficult to interoperate with the `sinuous` keyed `map/mini`.  That takes an observable array to (typically) a series of elements, presumably by observing changes in the array and returning a computed series of elements.  So this would result in an effect nested under a signal.
+**`mount` returns unmount.** `mount :: String -> Element -> Effect (Effect Unit)` renders into the first element matching the selector. The action it returns removes the nodes and disposes every effect the tree created.
 
-Another possibility may be suggested by [SDOM](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html).  The issue here is the signal has to be fine-grained to provide benefits. That would be effected in part by projecting the model to `Signal` values, but could be eliminated if there is a need for `model -> model`.  There is still no way to encode effects in the component tree. Also, this only allows text nodes, attribute values and event handlers to vary with the model.  Everything else must be static.  That forecloses the possibility of dynamic components.
+**Typed DOM.** `Screamer.DOM.Element`, `Attribute`, `EventHandler` and `Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
 
-## TODO
+The full specification, including the rules for ordering, errors and loops, is in `docs/ownership-design.md`.
 
-* Implement a component monad to ensure there is a uniform mechanism to run any cleanups arising from side effects when the component unmounts.  This should have a `MonadEffect` instance.
+## Migrating from the observable API
 
-* Rewrite signal dischargers with the same foreign implementations, but to run in `MonadEffect`.
+| Before | Now |
+|---|---|
+| `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.Channel` (`channel`, `batch`) |
+| `get` | `read` |
+| `elements_` | `each key` (keyed rows, each row receives a `Signal` of its item) |
+| `distinct`, `nonequal` | `dropRepeats` (or nothing: every signal already cuts off by `Object.is`) |
+| `a <> b` on signals, meaning "the latest of the two" | `a <|> b` (`<>` now combines the values: `append <$> a <*> b`) |
+| `Signal (Effect a)` for dynamic content | `dyn` over a signal of elements, with `component` for per-instance setup |
+| `emit` | keep the action in a `Ref`, or `put` to a channel |
+| `S.mount` returning `Unit` | `mount` returning the unmount action |
+| `Screamer.DOM.Event` | the `Web.*` event types, passed to handlers directly |
 
-* Find a type system encoding for the prohibition on setting data signals from within computations to avoid endless loops.
+## Background
 
-## Effects
+Efficient JS frameworks trace state changes to the view changes they cause, and then mutate only the affected sections of the DOM. Virtual DOM frameworks instead build a parallel representation of the DOM from the new state, diff it against the previous one, and apply the differences as patches. See [You Might Not Need The Virtual DOM](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html), and [`purescript-halogen-vdom`](https://github.com/purescript-halogen/purescript-halogen-vdom) and [`purescript-sdom`](https://github.com/paf31/purescript-sdom) for the two approaches in PureScript.
 
-Everything involving a `Signal a` is effectful.
+## History
 
-* Running a signal is effectful because it involves a time-varying quantity.
-
-* Creating a `computed` is morally pure, but actually effectful because `sinuous` modifies the signal graph under the hood.  Any effects referenced in the signal body will be run on creation, but if they are themselves thunked, that run will remain pure apart from modifications of the signal graph (an FFI call).  Differentiation is necessary between `Signal a` and `Signal (Effect a)`.  Ignoring the underlying mutation is an acceptable abstraction similar to the one in `purescript-signal`, which mutated variables under the hood.
-
-As a result, the return value of a component must be thunked, or a signal in order for the value to be deferred.  Creating that signal will result in the execution of any underlying effects.  This will require extreme care in order to maintain basic guarantees.
-
-The accumulation of unsubscribe functions is effectful, but not necessarily monadic because the cleanups can occur in any order.  Thus, an applicative instance should suffice.
-
-We distinguish between a `Channel` and a `Signal`.  When determining whether an action is represented as effectful through the type system, effects that only modify the `sinuous` observable graph are ignored, but all other effects are represented.
-
-A `Channel` can be created in pure fashion because it only modifies the signal graph.  A `Channel` can be reset only through an effectful function.  A `Channel` is never disposed of, other than via disposal of the parent computation.
-
-A `Signal` can be created in a pure fashion from a `Channel`.  A `Signal` ordinarily can be created in a pure function from another `Signal`, with exceptions.
-
-First, merging `Signal`s requires imperative management of the signal graph, and therefore is effectful to the extent that this management will be taken care of within a monad (but not otherwise).  For example, the framework could return an effect so that the operation has type `merge :: Signal a -> Signal a -> { result :: Signal a, cleanup :: Effect Unit }`.
-
-Second, if a `Signal` represents a quantity that depends on side effects (for example, a web socket) its creation will be effectful.  If the side effecting value is thunked, the operation will remain pure because the side effects will not be run.  In a typical case, though, the caller creating the observable will want the socket created, so this runs in effect.
-
-The `Signal` type can accumulate its own cleanup functions.  If the `Signal` is effectful beyond modification of the graph, creation of the signal via `computed` should have type `Effect (Signal a)`.  Running the signal will then also involve an effect and have type `Signal a -> Effect a`.
-
-This is going someplace where there is a `Component` type that everything runs in, and functions `render :: ComponentT Effect -> ComponentT Effect` and `mount :: Component -> Effect Unit`.  But any rendering to a particular `Element` has to run an effect rather than keeping it thunked in order to maintain a sane API.
-
-`Element` (and `Attribute`) then would be opaque types that embed effects, or really, ?.
-
-## Sinuous
-
-Efficient JS frameworks have a mechanism of tracing state changes to corresponding view changes, and then surgically mutating the affected sections of the DOM.
-
-Virtual DOM frameworks generally use the updated state to construct a parallel representation of the DOM (which is not displayed to the user) diff the parallel representation against the prior parallel representation, and use the differences to identify "patches" that must be made to the actual DOM.
-
-[Sinuous](https://github.com/luwes/sinuous) is a static DOM framework which requires state to be registered as an "observable," tracks references to the state in the rendering function, and computes the patch directly from those references and the updated state.
-
-See discussion of the difference between the `vdom` and the `sdom` at [this blog post](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html).  The differences are operationalized through [`purescript-halogen-vdom`](https://github.com/purescript-halogen/purescript-halogen-vdom) and [`purescript-sdom`](https://github.com/paf31/purescript-sdom).
-
-## Code Generation
-
-Ideally the DOM elements, attributes, and events would be generated from a Web IDL specification similar to the way TypeScript definitions are generated [here](https://github.com/microsoft/TSJS-lib-generator/blob/master/inputfiles/browser.webidl.preprocessed.json) and with a corresponding structure.  The benefit of having a typeclass-based representation is to increase type safety in accessing particular attributes without unsafe casts.
-
-## Alternative Designs
-
-The event handlers could be limited to changing primitive state variables (form content, mouse position, etc.) and the remainder of the component would consist of subscriptions to those state variables and handlers using Sinuous's `subscribe()` and external listeners through a uniform interface.
+Screamer first rendered through [sinuous](https://github.com/luwes/sinuous). There, a node's owner was whatever computation happened to be running when the node was created. Derived signals went stale, observers leaked, `merge` stopped listening, and nothing could be unmounted. The reactive core is now Screamer's own (`src/Screamer/Reactive/Core.ts`). `docs/ownership-design.md` records the redesign and the deviations from its specification. The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral), and `bench/` drives the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations.
 
 ## References
 
-### Component-Local State
+### Component-local state
 
 * [purescript-hertz]()
 * [purescript-halogen]()
 * [purescript-react-basic]()
 
-### Elm-Likes
+### Elm-likes
 
 * [purescript-hedwig]()
 * [miso]()
 
 ### Reactivity
 
-Sinuous allows plugging alternative reactive JS libraries ([wiki](https://github.com/luwes/sinuous/wiki/Choose-your-own-reactive-library)).
-
 * [purescript-flare](https://github.com/sharkdp/purescript-flare) ([tutorial](https://david-peter.de/articles/flare/))
 * [purescript-signal]() and [purescript-signal-loop](https://github.com/paf31/purescript-signal-loop/blob/master/src/Signal/Loop.purs)
 * [reflex-dom]()
 * [reactive-banana]()
 * [hyperactiv]()
-* [sinuous/observable]()
 * [S.js]()
 
 ### Markup
