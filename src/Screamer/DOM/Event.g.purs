@@ -12,6 +12,7 @@ import Web.Event.EventTarget (EventTarget)
 
 foreign import data Animation :: Type
 
+class IsAnimation :: Type -> Constraint
 class IsAnimation a
 
 animationName_ :: forall a. IsAnimation a => a -> String
@@ -30,6 +31,7 @@ toAnimation = Nullable.toMaybe <<< eventCast "Animation"
 
 foreign import data Clipboard :: Type
 
+class IsClipboard :: Type -> Constraint
 class IsClipboard a
 
 instance isClipboardClipboard :: IsClipboard Clipboard
@@ -42,6 +44,7 @@ toClipboard = Nullable.toMaybe <<< eventCast "Clipboard"
 
 foreign import data Composition :: Type
 
+class IsComposition :: Type -> Constraint
 class IsComposition a
 
 instance isCompositionComposition :: IsComposition Composition
@@ -56,6 +59,7 @@ toComposition = Nullable.toMaybe <<< eventCast "Composition"
 
 foreign import data Drag :: Type
 
+class IsDrag :: Type -> Constraint
 class IsDrag a
 
 instance isDragDrag :: IsDrag Drag
@@ -72,6 +76,7 @@ toDrag = Nullable.toMaybe <<< eventCast "Drag"
 
 foreign import data Event :: Type
 
+class IsEvent :: Type -> Constraint
 class IsEvent a
 
 bubbles_ :: forall a. IsEvent a => a -> Boolean
@@ -106,6 +111,7 @@ toEvent = Nullable.toMaybe <<< eventCast "Event"
 
 foreign import data Focus :: Type
 
+class IsFocus :: Type -> Constraint
 class IsFocus a
 
 instance isFocusFocus :: IsFocus Focus
@@ -120,6 +126,7 @@ toFocus = Nullable.toMaybe <<< eventCast "Focus"
 
 foreign import data Input :: Type
 
+class IsInput :: Type -> Constraint
 class IsInput a
 
 data_ :: forall a. IsInput a => a -> String
@@ -143,6 +150,7 @@ toInput = Nullable.toMaybe <<< eventCast "Input"
 
 foreign import data Keyboard :: Type
 
+class IsKeyboard :: Type -> Constraint
 class IsKeyboard a
 
 altKey_ :: forall a. IsKeyboard a => a -> Boolean
@@ -187,6 +195,7 @@ toKeyboard = Nullable.toMaybe <<< eventCast "Keyboard"
 
 foreign import data Mouse :: Type
 
+class IsMouse :: Type -> Constraint
 class IsMouse a
 
 button_ :: forall a. IsMouse a => a -> Number
@@ -252,6 +261,7 @@ toMouse = Nullable.toMaybe <<< eventCast "Mouse"
 
 foreign import data Pointer :: Type
 
+class IsPointer :: Type -> Constraint
 class IsPointer a
 
 height_ :: forall a. IsPointer a => a -> Number
@@ -298,6 +308,7 @@ toPointer = Nullable.toMaybe <<< eventCast "Pointer"
 
 foreign import data Touch :: Type
 
+class IsTouch :: Type -> Constraint
 class IsTouch a
 
 instance isTouchTouch :: IsTouch Touch
@@ -312,6 +323,7 @@ toTouch = Nullable.toMaybe <<< eventCast "Touch"
 
 foreign import data Transition :: Type
 
+class IsTransition :: Type -> Constraint
 class IsTransition a
 
 propertyName_ :: forall a. IsTransition a => a -> String
@@ -330,6 +342,7 @@ toTransition = Nullable.toMaybe <<< eventCast "Transition"
 
 foreign import data Ui :: Type
 
+class IsUi :: Type -> Constraint
 class IsUi a
 
 detail_ :: forall a. IsUi a => a -> Number
@@ -345,6 +358,7 @@ toUi = Nullable.toMaybe <<< eventCast "Ui"
 
 foreign import data Wheel :: Type
 
+class IsWheel :: Type -> Constraint
 class IsWheel a
 
 deltaMode_ :: forall a. IsWheel a => a -> Number

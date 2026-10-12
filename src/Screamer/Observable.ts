@@ -101,7 +101,7 @@ export const distinct = <T>(sig: Observable<T>) => {
   return o;
 };
 
-export const nonequal = <T>(eq: (_: T) => (_: T) => Boolean) => (sig: Observable<T>) => {
+export const nonequalImpl = <T>(eq: (_: T) => (_: T) => boolean) => (sig: Observable<T>) => {
   let s = sinuous.sample(sig);
   const o = sinuous.observable(s);
   sinuous.subscribe(() => {

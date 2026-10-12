@@ -20,7 +20,7 @@ import Prelude
 
 import Effect (Effect)
 import Prim.Row (class Nub, class Union)
-import Type.RowList (kind RowList, class RowToList, Cons, Nil, class ListToRow)
+import Type.RowList (RowList, class RowToList, Cons, Nil, class ListToRow)
 import Unsafe.Coerce (unsafeCoerce)
 
 --  A channel represents a writable memory cell and so resembles an IORef or STRef.
@@ -81,7 +81,10 @@ foreign import filter :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
 
 foreign import filterOn :: forall a. Signal Boolean -> a -> Signal a -> Signal a
 
-foreign import nonequal :: forall a. Eq a => Signal a -> Signal a
+foreign import nonequalImpl :: forall a. (a -> a -> Boolean) -> Signal a -> Signal a
+
+nonequal :: forall a. Eq a => Signal a -> Signal a
+nonequal = nonequalImpl eq
 
 -- Just avoids projecting then calling nonequal
 -- foreign import nonequalBy :: forall a b . Eq b => (a -> b) -> Signal a -> Signal a
@@ -100,7 +103,7 @@ foreign import distinct :: forall a. Signal a -> Signal a
 -- sampleManyWith :: {} -> {} -> ({ union } -> b) -> Signal b
 
 -- | Forward evidence that a record `sa` has the same fields and types as the record `a`, except that each field in `sa` is wrapped in a `Signal`.
-class SignalRecord (a :: #Type) (sa :: #Type) | a -> sa
+class SignalRecord (a :: Row Type) (sa :: Row Type) | a -> sa
 
 instance signalRecord
   ::  ( RowToList a rla
@@ -110,7 +113,7 @@ instance signalRecord
   => SignalRecord a sa
 
 -- | Backward evidence.
-class UnsignalRecord (sa :: #Type) (a :: #Type) | sa -> a
+class UnsignalRecord (sa :: Row Type) (a :: Row Type) | sa -> a
 
 instance unsignalRecord
   ::  ( RowToList sa srla
@@ -120,7 +123,7 @@ instance unsignalRecord
   => UnsignalRecord sa a
 
 -- Bidirectional evidence.
-class SignalRowList (rla :: RowList) (srla :: RowList) | rla -> srla, srla -> rla
+class SignalRowList (rla :: RowList Type) (srla :: RowList Type) | rla -> srla, srla -> rla
 
 instance consSignalRowList
   ::  ( SignalRowList t st )
