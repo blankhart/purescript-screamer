@@ -45,7 +45,7 @@ Guarantee: two evaluations of the same stateful expression produce the same valu
 
 ### Glitch freedom and equality cutoff
 
-Writes mark observed dependents dirty (push); reads recompute only nodes whose recorded dependency versions changed (pull). An effect runs at most once per batch and always sees a consistent graph. A derived node bumps its version only when its value changes under its equality (`Object.is` by default, PureScript `Eq` through `dropRepeats`), so unchanged results stop propagation.
+Writes mark observed dependents dirty (push); reads recompute only nodes whose recorded dependency versions changed (pull). An effect runs at most once per batch and always sees a consistent graph. A derived node bumps its version only when its value changes under its equality (`Object.is` by default, PureScript `Eq` through `dropRepeats`), so unchanged results stop propagation. The exception is `merge`, which reports every step even when it repeats its value, so nested merges agree on which input changed and `<|>` stays associative.
 
 ### Where writes may happen
 
@@ -119,6 +119,7 @@ Evaluating an `Element` runs nothing, including the setup inside `component`. In
 - **Scopes.** Cleanups run in reverse order; disposal is idempotent.
 - **Dev checks** behind `__DEV__`: write guard, cycle detection among derived nodes, counters for live effects, scopes and links.
 - **Exception safety.** A throwing derivation leaves its node dirty and the graph consistent; a throwing effect is reported to the nearest scope's error handler and does not stop the flush.
+- **One runtime.** The core is the foreign module of `Screamer.Reactive.Core`. Other foreign modules import it at run time as `../Screamer.Reactive.Core/foreign.js` (where `purs` puts it in `output/`) and take its types from `./Reactive/Core.js`, so every module shares one graph and the import also works when Screamer is a dependency.
 - **Release at batch end.** A node that loses its last target during a batch stays linked until the batch ends, and unlinks then only if nothing observes it again. A stateful node that moves from one observer to another within a batch therefore neither pauses nor resynchronizes.
 - **`filterOn`.** Follows its source while the condition is true and holds its last value while it is false; when the condition becomes true it takes the source's current value. It starts at the source if the condition holds at the start, otherwise at the seed.
 - **No owner inside computations.** Derivations and effect bodies run with no current scope, so they cannot create effects by accident. Code that builds a child scope from inside an effect (`dyn`, `each`) names the parent scope explicitly.
@@ -194,3 +195,4 @@ Recorded as they are made; each one is also commented on #2.
 |---|---|---|---|
 | 0 | Branch `ownership-replacement` from `main` | Branch `claude/project-thread-3k9qtz` from `master` | The repository's default branch is `master`, and the session carrying the stages is restricted to its designated branch. One agent carries all stages, so a shared branch name is not needed for coordination. |
 | 0 | `npm ci` in CI | The yarn lockfile is replaced by `package-lock.json` | `npm ci` requires an npm lockfile; keeping both lockfiles would let them drift. |
+| 3 | Every node cuts off by `Object.is` | `merge` reports every step, with no cutoff | With cutoff, `(a <|> b) <|> c` and `a <|> (b <|> c)` disagree when `b` changes to the value the inner merge already shows while `c` changes in the same batch. The law tests compare traces with consecutive repeats removed. |

@@ -12,6 +12,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (defaultConfig, evalSpecT)
 import Test.Spec.Summary (successful)
+import Test.Signal as Signal
 
 foreign import exit :: Int -> Effect Unit
 
@@ -25,3 +26,4 @@ spec = do
   describe "harness" do
     it "runs PureScript tests" do
       (1 + 1) `shouldEqual` 2
+  Signal.spec
