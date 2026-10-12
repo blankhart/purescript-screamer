@@ -119,6 +119,8 @@ Evaluating an `Element` runs nothing, including the setup inside `component`. In
 - **Scopes.** Cleanups run in reverse order; disposal is idempotent.
 - **Dev checks** behind `__DEV__`: write guard, cycle detection among derived nodes, counters for live effects, scopes and links.
 - **Exception safety.** A throwing derivation leaves its node dirty and the graph consistent; a throwing effect is reported to the nearest scope's error handler and does not stop the flush.
+- **No owner inside computations.** Derivations and effect bodies run with no current scope, so they cannot create effects by accident. Code that builds a child scope from inside an effect (`dyn`, `each`) names the parent scope explicitly.
+- **Libraries checked (stage 1).** `@preact/signals-core` 1.14.4 has `watched`/`unwatched` options on signals but keeps versions internal (`_version`); `alien-signals` 3.2.1 exposes an `unwatched` hook in `createReactiveSystem` but no first-observer hook and only per-link versions. Neither exposes both without patching, so the core is our own (`src/Screamer/Reactive/Core.ts`).
 
 A working prototype (153 lines, 23 checks, randomized glitch test) is attached to the stage 1 issue, #4.
 
