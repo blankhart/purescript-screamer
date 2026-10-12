@@ -3,7 +3,6 @@ package:
   dependencies:
     - arrays
     - console
-    - debug
     - effect
     - foldable-traversable
     - integers

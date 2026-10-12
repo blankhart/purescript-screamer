@@ -2,7 +2,6 @@
 
 module Screamer.Core where
 
-import Debug
 
 import Prelude
 import Screamer.Observable
