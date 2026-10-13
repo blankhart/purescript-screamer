@@ -107,7 +107,9 @@ function bindAttr(s: Scope, el: Element, a: Attr): void {
   const name = a.name;
   switch (a.kind) {
     case PROPERTY:
-      bindValue(s, a.value, (v) => { (el as any)[name] = v; });
+      // Skip writes that would not change the property, so an input's caret
+      // and partial entry survive the value it just reported being written back.
+      bindValue(s, a.value, (v) => { if ((el as any)[name] !== v) (el as any)[name] = v; });
       break;
     case ATTRIBUTE:
       bindValue(s, a.value, (v: string) => { el.setAttribute(name, v); });

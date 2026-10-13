@@ -13,6 +13,7 @@ import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (defaultConfig, evalSpecT)
 import Test.Spec.Summary (successful)
 import Test.Dom as Dom
+import Test.Formlet as Formlet
 import Test.Owned as Owned
 import Test.Signal as Signal
 import Test.Subscriptions as Subscriptions
@@ -35,3 +36,4 @@ spec = do
   Dom.spec
   TypedDom.spec
   Subscriptions.spec
+  Formlet.spec

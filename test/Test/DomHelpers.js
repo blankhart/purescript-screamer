@@ -55,3 +55,26 @@ export const textsOf = (sel) => () => Array.from(document.querySelectorAll(sel))
 export const propertyOf = (sel) => (name) => () => String(document.querySelector(sel)[name]);
 
 export const currentTag = (e) => e.currentTarget.tagName;
+
+// Set an input's value and dispatch the event a user's edit would.
+export const typeInto = (sel) => (value) => () => {
+  const el = document.querySelector(sel);
+  el.value = value;
+  el.dispatchEvent(new window.Event('input', { bubbles: true }));
+};
+
+export const setChecked = (sel) => (checked) => () => {
+  const el = document.querySelector(sel);
+  el.checked = checked;
+  el.dispatchEvent(new window.Event('change', { bubbles: true }));
+};
+
+export const selectIndex = (sel) => (index) => () => {
+  const el = document.querySelector(sel);
+  el.selectedIndex = index;
+  el.dispatchEvent(new window.Event('change', { bubbles: true }));
+};
+
+// The text of each element matching the selector that is not hidden.
+export const visibleTextsOf = (sel) => () =>
+  Array.from(document.querySelectorAll(sel)).filter((n) => !n.hidden).map((n) => n.textContent);
