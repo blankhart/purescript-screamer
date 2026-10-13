@@ -10,6 +10,10 @@ module Test.DomHelpers
   , sameNode
   , textsOf
   , propertyOf
+  , typeInto
+  , setChecked
+  , selectIndex
+  , visibleTextsOf
   ) where
 
 import Prelude
@@ -45,3 +49,15 @@ foreign import propertyOf :: String -> String -> Effect String
 
 -- | The tag name of the event's current target.
 foreign import currentTag :: Event -> String
+
+-- | Set an input's value and dispatch an `input` event.
+foreign import typeInto :: String -> String -> Effect Unit
+
+-- | Set a checkbox and dispatch a `change` event.
+foreign import setChecked :: String -> Boolean -> Effect Unit
+
+-- | Select an option by index and dispatch a `change` event.
+foreign import selectIndex :: String -> Int -> Effect Unit
+
+-- | The text content of each matching element that is not hidden.
+foreign import visibleTextsOf :: String -> Effect (Array String)
