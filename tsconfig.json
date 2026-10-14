@@ -4,7 +4,6 @@
     "module": "es2020",
     "moduleResolution": "bundler",
     "strict": true,
-    //https://stackoverflow.com/questions/42987268/is-there-any-way-to-get-warnings-not-errors-for-noimplicitany-noncompliance
     "noImplicitAny": false,
     "skipLibCheck": true
   },

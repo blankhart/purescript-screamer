@@ -9,7 +9,6 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
 import Data.Time.Duration (Milliseconds(..))
-import Effect (Effect)
 import Effect.Aff (Aff, delay, effectCanceler, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
@@ -23,7 +22,6 @@ import Screamer.Signal (read)
 import Screamer.Subscriptions.AnimationFrame as AnimationFrame
 import Screamer.Subscriptions.Router as Router
 import Screamer.Subscriptions.Timer as Timer
-import Screamer.Subscriptions.WebSocket (ConnectionState(..))
 import Screamer.Subscriptions.WebSocket as WebSocket
 import Test.DomHelpers (click, innerHTML, resetBody)
 import Test.Fakes as Fake

@@ -1,7 +1,5 @@
 -- | Formlets: forms that compose like applicative values.
 -- |
--- | The design follows Lumi Components' `FormBuilder`
--- | (https://github.com/lumihq/purescript-lumi-components/blob/v3.0.4/src/Lumi/Components/Form.purs).
 -- | A `Form props i o` edits a state of type `i` and validates it into an
 -- | `o`. The state lives in one channel that `build` creates per instance;
 -- | each field reads its part of the state through a signal and writes it
@@ -21,7 +19,7 @@
 -- | References: the formlets paper (http://homepages.inf.ed.ac.uk/slindley/papers/formlets-essence.pdf),
 -- | halogen-form (https://github.com/fpco/halogen-form) and the Lumi posts
 -- | (https://www.lumi.dev/blog/using-purescript-to-create-a-dsl-for-building-forms).
-module Screamer.Formlet
+module Screamer.Examples.Formlet
   ( Form(..)
   , Context
   , Rendered
