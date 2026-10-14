@@ -78,3 +78,8 @@ export const selectIndex = (sel) => (index) => () => {
 // The text of each element matching the selector that is not hidden.
 export const visibleTextsOf = (sel) => () =>
   Array.from(document.querySelectorAll(sel)).filter((n) => !n.hidden).map((n) => n.textContent);
+
+export const fakeWidget = (host) => (label) => () => {
+  host.innerHTML = `<i>widget ${label}</i>`;
+  return () => { host.innerHTML = ''; };
+};

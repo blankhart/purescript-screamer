@@ -123,6 +123,35 @@ const examples = {
     if ((await results()) !== 'grapefruit') throw new Error(`results: ${await results()}`);
   },
 
+  async CodeMirror(page) {
+    const count = (id) => page.evaluate((i) => document.querySelector(`#${i} .count`).textContent, id);
+    const editorText = (id) => page.evaluate((i) => Array.from(document.querySelectorAll(`#${i} .cm-line`)).map((l) => l.textContent).join('\n'), id);
+    await page.waitForFunction(() => document.querySelectorAll('.cm-editor').length === 2);
+    const initial = await editorText('editor-1');
+    const before = await count('editor-1');
+    const other = await count('editor-2');
+    // Typing updates the count and preview; the other instance is untouched.
+    await page.click('#editor-1 .cm-content');
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('xyz');
+    await expectText(page, '#editor-1 .count', `${parseInt(before) + 3} characters`);
+    await page.waitForFunction(() => document.querySelector('#editor-1 .preview').textContent.endsWith('xyz'));
+    if ((await count('editor-2')) !== other) throw new Error('the second editor changed');
+    // Reset writes the source, and the editor follows.
+    await page.click('#editor-1 .reset');
+    await expectText(page, '#editor-1 .count', before);
+    await page.waitForFunction((t) => Array.from(document.querySelectorAll('#editor-1 .cm-line')).map((l) => l.textContent).join('\n') === t, initial);
+    // Read-only ignores typing.
+    await page.click('#editor-1 .read-only');
+    await expectText(page, '#editor-1 .read-only', 'Make editable');
+    await page.click('#editor-1 .cm-content');
+    await page.keyboard.type('nope');
+    await page.waitForTimeout(100);
+    if ((await count('editor-1')) !== before) throw new Error('a read-only editor accepted typing');
+    const left = await page.evaluate(() => { window.screamerExample.unmount(); return document.querySelectorAll('.cm-editor').length; });
+    if (left !== 0) throw new Error(`${left} editors left after unmount`);
+  },
+
   async JsFrameworksBenchmark(page) {
     await page.click('#run');
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1000);
