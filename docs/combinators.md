@@ -128,6 +128,19 @@ RxJS has no separate state type: its `BehaviorSubject` is closest to a signal so
 | `share`, `shareReplay(1)` | sharing by reference; `Owned.hold` | #25 |
 | `forkJoin`, `window*`, `publish`, `connectable`, schedulers | left out | #16 |
 
+## Implementation
+
+The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).
+
+- **Consumption by version.** An event node's value is the list of occurrences it produced when its version last increased, and the version increases only when a computation produces at least one occurrence. A consumer (a derived event, a stateful node or an effect) records the version of each input it read. On its next computation an input whose version changed contributes its current list, and any other input contributes nothing. So each consumer takes each occurrence once, however often it is read, and an event needs no per-round reset.
+- **Rounds.** `fire` queues an occurrence on its source. Each pass of the flush loop starts a round: the queued occurrences become their sources' values, one version step per source, and observers are notified. Fires made while a round runs are queued for the next one, so a `subscribe` callback that fires an event is followed by one more round.
+- **Resynchronizing.** A derived event that gains its first observer records its inputs' versions and produces nothing, so occurrences from before it was observed are never delivered. A stateful node over events records versions the same way, which is why it misses what was fired while it was paused.
+- **Settling.** A stateful node over events steps at the end of the round in which its inputs fired, even when no effect read it in that round, because the next round replaces its inputs' occurrences. `stepper` and `Event.fold` therefore advance whenever they are observed, as `fold` on signals does.
+- **Errors.** A throwing `Event.subscribe` callback is reported to the scope's `onError` (or rethrown at the end of the flush) and the round's later occurrences are still delivered.
+- `Owned.hold` keeps a stateful signal over events advancing, as for any signal. `holdEvent` keeps an event itself observed (#25).
+
+`WebSocket.connect` gives `messages :: Event String` (#18). The indexed `message :: Signal (Maybe Message)` stays for one release and is deprecated.
+
 ## What changed in this decision
 
 - `Screamer.Channel` is now `Screamer.SignalSource`, with `Channel` renamed `SignalSource` and `channel` renamed `signalSource`. This names the two kinds of source in parallel. "Channel" also suggested a queue of messages, which is closer to what an event source is.

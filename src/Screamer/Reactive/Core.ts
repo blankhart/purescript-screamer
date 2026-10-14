@@ -1,6 +1,6 @@
 // Screamer's reactive core.
 //
-// Four kinds of node; only effects have owners.
+// Four kinds of signal node, plus event nodes; only effects have owners.
 //
 // - Cells are sources. They hold their observers only while observed.
 // - Derived nodes are lazy: they link to their sources only while something
@@ -9,6 +9,8 @@
 // - Stateful nodes keep state in the node and step only while observed.
 // - Effects are always linked while alive and belong to a scope, which
 //   disposes them.
+// - Event nodes (see "Events" below) carry the occurrences of one round
+//   instead of a current value, and have no cutoff.
 //
 // Writes mark observed dependents dirty and queue effects (push). Reads
 // recompute only nodes whose recorded dependency versions changed (pull).
@@ -54,6 +56,20 @@ let pendingErrors: unknown[] = [];
  * changes observers within one batch neither pauses nor resynchronizes.
  */
 let pendingUnobserved: Source[] = [];
+/** Global fire counter: every occurrence gets the next stamp. */
+let stamp = 0;
+/** The stamp of the current round's start, given to occurrences of `changes`. */
+let roundStamp = 0;
+/** Greater than zero while the flush loop runs. */
+let flushing = 0;
+/** Event sources fired since the last round started. */
+let fired: EventSourceNode<any>[] = [];
+/**
+ * Stateful nodes over events that were notified and may not have stepped
+ * yet. They step at the end of the round, before the next one replaces
+ * their inputs' occurrences.
+ */
+let unsettled: Settle[] = [];
 
 // ---------------------------------------------------------------------------
 // Node interfaces
@@ -386,7 +402,14 @@ export function derived<T>(fn: () => T, eq?: Eq<T>): Derived<T> {
 
 export type Step<S> = (changed: boolean[], values: any[], state: S) => S;
 
-export class Stateful<S> implements Source<S>, Target {
+/** A stateful node that must step in the round its event inputs fired. */
+interface Settle {
+  linked: boolean;
+  dirty: boolean;
+  refresh(): void;
+}
+
+export class Stateful<S> implements Source<S>, Target, Settle {
   value: S = UNSET;
   version = 0;
   targets: Set<Target> = new Set();
@@ -398,19 +421,23 @@ export class Stateful<S> implements Source<S>, Target {
   failed = false;
   /** Input versions at the last step or resynchronization. */
   last: number[];
+  /** Some input is an event, whose occurrences last one round. */
+  private settles: boolean;
 
   constructor(
-    public inputs: Readable<any>[],
+    public inputs: Source<any>[],
     private initial: () => S,
     private step: Step<S>,
     private eq: Eq<S> = Object.is,
   ) {
     this.last = inputs.map(() => -1);
+    this.settles = inputs.some(isEvent);
   }
 
   notify(): void {
     if (this.dirty && !this.failed) return;
     this.dirty = true;
+    if (this.settles) unsettled.push(this);
     for (const t of this.targets) t.notify();
   }
 
@@ -514,7 +541,7 @@ function pure<T>(fn: () => T): T {
   }
 }
 
-export function stateful<S>(inputs: Readable<any>[], initial: () => S, step: Step<S>, eq?: Eq<S>): Stateful<S> {
+export function stateful<S>(inputs: Source<any>[], initial: () => S, step: Step<S>, eq?: Eq<S>): Stateful<S> {
   return new Stateful(inputs, initial, step, eq);
 }
 
@@ -849,14 +876,18 @@ function flush(): void {
   let rounds = 0;
   let loopError: unknown = null;
   batchDepth++;
+  flushing++;
   try {
-    while (queue.length > 0) {
+    while (queue.length > 0 || fired.length > 0) {
       if (++rounds > LOOP_LIMIT) {
         for (const e of queue) e.queued = false;
         queue = [];
+        for (const src of fired) src.pending = [];
+        fired = [];
         loopError = new Error('effect loop');
         break;
       }
+      startRound();
       const es = queue;
       queue = [];
       es.sort((x, y) => x.id - y.id);
@@ -865,9 +896,11 @@ function flush(): void {
         e.queued = false;
         if (!e.disposed && e.stale()) e.run();
       }
+      settle();
     }
   } finally {
     batchDepth--;
+    flushing--;
   }
   releaseUnobserved();
   if (loopError !== null) {
@@ -880,6 +913,513 @@ function flush(): void {
     for (let i = 1; i < errors.length; i++) console.error(errors[i]);
     throw errors[0];
   }
+}
+
+// ---------------------------------------------------------------------------
+// Events
+//
+// An event node carries occurrences instead of a current value. Its `value`
+// is the list of occurrences it produced when its version last increased,
+// each stamped with the global fire counter, in fire order. The version
+// increases only when a computation produces at least one occurrence, so
+// there is no cutoff and no "unchanged" value.
+//
+// Consumers take occurrences by version: a consumer that recorded version v
+// of an input and now sees a different version takes the input's current
+// list, and otherwise takes nothing. So each consumer sees each occurrence
+// once, however many times it is read.
+//
+// - Rounds. `fire` queues an occurrence on its source. Each pass of the flush
+//   loop starts a round: queued occurrences become their sources' values
+//   (one version step per source per round) and observers are notified.
+//   Occurrences fired while a round runs belong to the next round.
+// - Laziness. Derived event nodes link to their inputs only while observed.
+//   When observed again they resynchronize: they record their inputs'
+//   versions and produce nothing, so occurrences from before observation are
+//   never delivered.
+// - Settling. A stateful node over events (`stepper`, `Event.fold`, `take`)
+//   steps in the round its inputs fired, before the next round replaces
+//   their occurrences, even if no effect reads it in that round.
+
+/** One occurrence: its fire stamp and value. */
+export interface Occ<T> {
+  s: number;
+  v: T;
+}
+
+/** An event node: a source whose value is the occurrences of its last step. */
+export interface EventLike<T> extends Source<Occ<T>[]> {
+  isEvent: true;
+}
+
+const NONE: Occ<any>[] = [];
+
+function isEvent(n: Source): boolean {
+  return (n as any).isEvent === true;
+}
+
+/** Refresh `n` and record it as a dependency of the current computation. */
+export function touch(n: Source): void {
+  try {
+    n.refresh();
+  } finally {
+    track(n);
+  }
+}
+
+/** Step every stateful node over events that is still waiting to. */
+function settle(): void {
+  while (unsettled.length > 0) {
+    const ns = unsettled;
+    unsettled = [];
+    for (let i = 0; i < ns.length; i++) {
+      const n = ns[i];
+      if (n.linked && n.dirty) {
+        try {
+          n.refresh();
+        } catch {
+          // Rethrown to whoever reads the node.
+        }
+      }
+    }
+  }
+}
+
+/** Start a round: deliver the occurrences fired since the last one. */
+function startRound(): void {
+  roundStamp = ++stamp;
+  if (fired.length === 0) return;
+  const fs = fired;
+  fired = [];
+  epoch++;
+  for (let i = 0; i < fs.length; i++) {
+    const src = fs[i];
+    src.value = src.pending;
+    src.pending = [];
+    src.version++;
+  }
+  for (let i = 0; i < fs.length; i++) {
+    for (const t of fs[i].targets) t.notify();
+  }
+}
+
+export class EventSourceNode<T> implements EventLike<T> {
+  readonly isEvent = true;
+  value: Occ<T>[] = NONE;
+  version = 0;
+  targets: Set<Target> = new Set();
+  _track = 0;
+  _diff = 0;
+  /** Occurrences fired since the last round started. */
+  pending: Occ<T>[] = [];
+
+  refresh(): void {}
+
+  /** Add an occurrence. It is delivered when the next round starts. */
+  fire(x: T): void {
+    if (DEV && inDerived > 0) throw new Error('fire inside a derivation');
+    // Nothing observes the event, so the occurrence goes nowhere.
+    if (this.targets.size === 0) return;
+    if (this.pending.length === 0) fired.push(this);
+    this.pending.push({ s: ++stamp, v: x });
+    if (batchDepth === 0) flush();
+  }
+}
+
+export function eventSource<T>(): EventSourceNode<T> {
+  return new EventSourceNode<T>();
+}
+
+/** The event that never fires. */
+export const neverEvent: EventLike<any> = new EventSourceNode<any>();
+
+/** What an event computation can ask about its inputs. */
+export interface Inputs {
+  /** The input's occurrences that this computation has not seen yet. */
+  occ<X>(e: EventLike<X>): Occ<X>[];
+  /** Whether the signal changed since this computation last read it. False on first read. */
+  changed(s: Source<any>): boolean;
+}
+
+/**
+ * A stateless event node with dynamic dependencies. Its function reads
+ * events through `occ`, and signals through `read` as usual, and returns
+ * this round's occurrences.
+ */
+export class EventDerived<T> implements EventLike<T>, Target, Computation, Inputs {
+  readonly isEvent = true;
+  value: Occ<T>[] = NONE;
+  version = 0;
+  targets: Set<Target> = new Set();
+  _track = 0;
+  _diff = 0;
+  deps: Source[] = [];
+  versions: number[] = [];
+  newDeps: Source[] = [];
+  newVersions: number[] = [];
+  runMark = 0;
+  nested = false;
+  linked = false;
+  dirty = true;
+  failed = false;
+  init = false;
+  computing = false;
+  /** Resynchronizing: record the inputs' versions and produce nothing. */
+  private quiet = false;
+
+  constructor(private fn: (inputs: Inputs) => Occ<T>[]) {}
+
+  notify(): void {
+    if (this.dirty && !this.failed) return;
+    this.dirty = true;
+    for (const t of this.targets) t.notify();
+  }
+
+  onFirstTarget(): void {
+    if (this.linked) return; // still linked: its release was deferred
+    let ok = false;
+    try {
+      this.recompute(true);
+      ok = true;
+    } catch {
+      // Rethrown to whoever reads the node.
+    }
+    for (let i = 0; i < this.deps.length; i++) linkTo(this, this.deps[i]);
+    this.linked = true;
+    this.dirty = !ok;
+    this.failed = !ok;
+  }
+
+  onLastTarget(): void {
+    if (!this.linked) return;
+    this.linked = false;
+    for (let i = 0; i < this.deps.length; i++) unlinkFrom(this, this.deps[i]);
+    this.dirty = true;
+  }
+
+  refresh(): void {
+    if (this.linked && !this.dirty) return;
+    if (DEV && this.computing) throw new Error('cycle detected among derived events');
+    try {
+      if (this.init && !this.failed && !depsChanged(this.deps, this.versions)) {
+        this.dirty = false;
+        return;
+      }
+      this.recompute(false);
+      this.failed = false;
+    } catch (e) {
+      this.failed = true;
+      this.dirty = true;
+      throw e;
+    }
+  }
+
+  /** The version this computation recorded for `n` last time, or -1. */
+  private seen(n: Source): number {
+    const i = this.deps.indexOf(n);
+    return i < 0 ? -1 : this.versions[i];
+  }
+
+  occ<X>(e: EventLike<X>): Occ<X>[] {
+    touch(e);
+    if (this.quiet) return NONE;
+    const v = this.seen(e);
+    return v < 0 || v === e.version ? NONE : e.value;
+  }
+
+  changed(s: Source<any>): boolean {
+    touch(s);
+    if (this.quiet) return false;
+    const v = this.seen(s);
+    return v >= 0 && v !== s.version;
+  }
+
+  private recompute(quiet: boolean): void {
+    const prevOwner = owner;
+    const prev = startCapture(this);
+    this.computing = true;
+    this.quiet = quiet;
+    owner = null;
+    inDerived++;
+    let v: Occ<T>[] = NONE;
+    let error: unknown = null;
+    let ok = false;
+    try {
+      v = this.fn(this);
+      ok = true;
+    } catch (e) {
+      error = e;
+    } finally {
+      current = prev;
+      owner = prevOwner;
+      inDerived--;
+      this.computing = false;
+      this.quiet = false;
+    }
+    if (this.linked) relink(this, this.deps, this.newDeps);
+    this.deps = this.newDeps;
+    this.versions = this.newVersions;
+    this.newDeps = [];
+    this.newVersions = [];
+    if (!ok) throw error;
+    this.init = true;
+    this.dirty = false;
+    if (quiet || v.length === 0) {
+      this.value = NONE;
+    } else {
+      this.value = v;
+      this.version++;
+    }
+  }
+}
+
+export function eventDerived<T>(fn: (inputs: Inputs) => Occ<T>[]): EventDerived<T> {
+  return new EventDerived(fn);
+}
+
+/** The result of one step of a stateful event node. */
+export interface EventStep<S, T> {
+  state: S;
+  out: Occ<T>[];
+}
+
+/**
+ * A stateful event node: like `Stateful`, but each step produces
+ * occurrences. It starts from `initial` when first observed, steps once per
+ * round in which an input changed, keeps its state while paused and
+ * resynchronizes without stepping when observed again.
+ */
+export class EventStateful<S, T> implements EventLike<T>, Target, Settle {
+  readonly isEvent = true;
+  value: Occ<T>[] = NONE;
+  version = 0;
+  targets: Set<Target> = new Set();
+  _track = 0;
+  _diff = 0;
+  state: S = UNSET;
+  started = false;
+  linked = false;
+  dirty = true;
+  failed = false;
+  last: number[];
+
+  constructor(
+    public inputs: Source<any>[],
+    private initial: () => S,
+    private step: (changed: boolean[], values: any[], state: S) => EventStep<S, T>,
+  ) {
+    this.last = inputs.map(() => -1);
+  }
+
+  notify(): void {
+    if (this.dirty && !this.failed) return;
+    this.dirty = true;
+    unsettled.push(this);
+    for (const t of this.targets) t.notify();
+  }
+
+  onFirstTarget(): void {
+    if (this.linked) return; // still linked: its release was deferred
+    let ok = false;
+    try {
+      if (!this.started) {
+        this.state = pure(this.initial);
+        this.started = true;
+      }
+      for (let i = 0; i < this.inputs.length; i++) {
+        const d = this.inputs[i];
+        d.refresh();
+        this.last[i] = d.version;
+      }
+      ok = true;
+    } catch {
+      // Rethrown to whoever reads the node.
+    }
+    this.value = NONE;
+    for (let i = 0; i < this.inputs.length; i++) linkTo(this, this.inputs[i]);
+    this.linked = true;
+    this.dirty = !ok;
+    this.failed = !ok;
+  }
+
+  onLastTarget(): void {
+    if (!this.linked) return;
+    this.linked = false;
+    for (let i = 0; i < this.inputs.length; i++) unlinkFrom(this, this.inputs[i]);
+    this.dirty = true;
+  }
+
+  refresh(): void {
+    // Paused: produce nothing and keep the state.
+    if (!this.linked || !this.dirty) return;
+    try {
+      if (!this.started) {
+        this.state = pure(this.initial);
+        this.started = true;
+      }
+      const n = this.inputs.length;
+      const changed: boolean[] = new Array(n);
+      const versions: number[] = new Array(n);
+      let any = false;
+      for (let i = 0; i < n; i++) {
+        const d = this.inputs[i];
+        d.refresh();
+        versions[i] = d.version;
+        changed[i] = d.version !== this.last[i];
+        if (changed[i]) any = true;
+      }
+      if (any) {
+        if (DEV) stats.steps++;
+        const values = this.inputs.map((d) => d.value);
+        const state = this.state;
+        const r = pure(() => this.step(changed, values, state));
+        this.state = r.state;
+        if (r.out.length > 0) {
+          this.value = r.out;
+          this.version++;
+        } else {
+          this.value = NONE;
+        }
+      }
+      this.last = versions;
+      this.dirty = false;
+      this.failed = false;
+    } catch (e) {
+      this.dirty = true;
+      this.failed = true;
+      throw e;
+    }
+  }
+}
+
+export function eventStateful<S, T>(
+  inputs: Source<any>[],
+  initial: () => S,
+  step: (changed: boolean[], values: any[], state: S) => EventStep<S, T>,
+): EventStateful<S, T> {
+  return new EventStateful(inputs, initial, step);
+}
+
+/** Occurrences of both lists in stamp order; the left goes first on equal stamps. */
+export function interleave<T>(a: Occ<T>[], b: Occ<T>[]): Occ<T>[] {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+  const out: Occ<T>[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (b[j].s < a[i].s) out.push(b[j++]);
+    else out.push(a[i++]);
+  }
+  while (i < a.length) out.push(a[i++]);
+  while (j < b.length) out.push(b[j++]);
+  return out;
+}
+
+export function mapEvent<A, B>(f: (a: A) => B, e: EventLike<A>): EventLike<B> {
+  if (e === neverEvent) return neverEvent;
+  return eventDerived((r) => {
+    const os = r.occ(e);
+    if (os.length === 0) return NONE;
+    const out = new Array<Occ<B>>(os.length);
+    for (let i = 0; i < os.length; i++) out[i] = { s: os[i].s, v: f(os[i].v) };
+    return out;
+  });
+}
+
+export function filterMapEvent<A, B>(f: (a: A) => { ok: boolean; v?: B }, e: EventLike<A>): EventLike<B> {
+  return eventDerived((r) => {
+    const os = r.occ(e);
+    const out: Occ<B>[] = [];
+    for (let i = 0; i < os.length; i++) {
+      const x = f(os[i].v);
+      if (x.ok) out.push({ s: os[i].s, v: x.v as B });
+    }
+    return out;
+  });
+}
+
+export function filterEvent<A>(p: (a: A) => boolean, e: EventLike<A>): EventLike<A> {
+  return eventDerived((r) => {
+    const os = r.occ(e);
+    const out: Occ<A>[] = [];
+    for (let i = 0; i < os.length; i++) if (p(os[i].v)) out.push(os[i]);
+    return out.length === os.length ? os : out;
+  });
+}
+
+/** Both events' occurrences in fire order; neither is dropped. */
+export function alt<A>(a: EventLike<A>, b: EventLike<A>): EventLike<A> {
+  if (a === neverEvent) return b;
+  if (b === neverEvent) return a;
+  return eventDerived((r) => interleave(r.occ(a), r.occ(b)));
+}
+
+/** An occurrence with the signal's new value in each round in which it changed. */
+export function changes<A>(s: Readable<A>): EventLike<A> {
+  return eventDerived((r) => (r.changed(s) ? [{ s: flushing > 0 ? roundStamp : ++stamp, v: s.value }] : NONE));
+}
+
+/** The latest occurrence, starting at `seed`. Stateful: steps only while observed. */
+export function stepper<A>(seed: A, e: EventLike<A>): Readable<A> {
+  return stateful([e], () => seed, (_, values) => {
+    const os: Occ<A>[] = values[0];
+    return os[os.length - 1].v;
+  });
+}
+
+/** Accumulate from `seed`, one step per occurrence. */
+export function foldEvent<A, B>(f: (a: A, b: B) => B, seed: B, e: EventLike<A>): Readable<B> {
+  return stateful([e], () => seed, (_, values, b) => {
+    const os: Occ<A>[] = values[0];
+    for (let i = 0; i < os.length; i++) b = f(os[i].v, b);
+    return b;
+  });
+}
+
+/** Each occurrence combined with the signal's value at the end of the round. */
+export function attachWith<A, B, C>(f: (b: B, a: A) => C, s: Readable<B>, e: EventLike<A>): EventLike<C> {
+  return eventDerived((r) => {
+    const b = s.read();
+    const os = r.occ(e);
+    if (os.length === 0) return NONE;
+    const out = new Array<Occ<C>>(os.length);
+    for (let i = 0; i < os.length; i++) out[i] = { s: os[i].s, v: f(b, os[i].v) };
+    return out;
+  });
+}
+
+/**
+ * Call `cb` once per occurrence, in order, until `s` is disposed. The effect
+ * behind it runs at most once per round.
+ */
+export function subscribeEvent<A>(s: Scope, e: EventLike<A>, cb: (a: A) => void): EffectNode {
+  let seen = -1;
+  return effectIn(s, () => {
+    touch(e);
+    const v = e.version;
+    if (seen < 0 || v === seen) {
+      seen = v;
+      return;
+    }
+    seen = v;
+    const os = e.value;
+    untracked(() => {
+      for (let i = 0; i < os.length; i++) {
+        try {
+          cb(os[i].v);
+        } catch (err) {
+          reportError(s, err);
+        }
+      }
+    });
+  });
+}
+
+/** Keep `e` observed for the lifetime of the current scope, and return it. */
+export function holdEvent<A>(e: EventLike<A>): EventLike<A> {
+  effect(() => { touch(e); });
+  return e;
 }
 
 // ---------------------------------------------------------------------------

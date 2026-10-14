@@ -33,6 +33,9 @@ Four kinds of signal node, plus the event nodes described in `docs/combinators.m
 | Derived | `map`, `apply`, `bind`, `sampleOn`, `sampleManyWith`, `dropRepeatsBy` | only while observed | none | GC when unreachable; cached while observed, recomputed on demand otherwise |
 | Stateful | `fold`, `merge`, `filter`, `filterOn` | only while observed | none | state lives in the node and advances only while observed |
 | Effect | DOM bindings, `subscribe`, `hold`, `dyn` | always, while alive | a scope (required) | disposed with its scope; creating one outside a scope is an error |
+| Event source | `eventSource` in `Effect` | is a source | none | GC when unreachable; an occurrence fired while unobserved goes nowhere |
+| Derived event | `map`, `filter`, `<|>`, `changes`, `attachWith` (#18) | only while observed | none | produces only occurrences fired while observed |
+| Stateful event | `take`, `zip`, `bufferCount` and the like (#19 to #23) | only while observed | none | state lives in the node; misses occurrences while paused |
 
 ### Stateful signals advance only while observed
 
@@ -220,3 +223,4 @@ Recorded as they are made; each one is also commented on #2.
 | 13 | `Form props i o` built with `component` | A form is `Context props i -> Owned (Rendered o)`; `build` runs it in the caller's scope, which is usually a `component`'s | A wizard keeps its current step in a channel and disposes each step it leaves, so building a form needs a scope. Fields stay pure elements. |
 | 13 | A number field | `number :: Form props String (Maybe Number)`: the state is the text as entered | Keeping the text lets a half-typed number survive, and lets `required` and `mustBe` validate the parsed value. |
 | 13 | (not specified) | A property binding skips writes that would not change the property | Writing back the value an input just reported is a no-op, so the caret and a partial entry in a number input (whose `value` reads as `""`) are not reset. |
+| #18 | `WebSocket.message` gains an `Event String` form | The socket record gains `messages :: Event String` next to the deprecated `message` signal | Adding a field keeps existing code compiling for the deprecation release. |
