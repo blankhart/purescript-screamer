@@ -1560,6 +1560,34 @@ export function withLatest<A, B, T>(pair: (a: A, b: B) => T, b: Readable<B>, a: 
     (changed[0] ? pair(values[0], values[1]) : prev));
 }
 
+// ---------------------------------------------------------------------------
+// Flattening (#21)
+
+/**
+ * The occurrences of whichever event the signal holds. When the signal
+ * changes, the new event is followed from then on: it delivers nothing
+ * fired before it was switched to.
+ */
+export function switchEvent<A>(s: Readable<EventLike<A>>): EventLike<A> {
+  return eventDerived((r) => r.occ(s.read()));
+}
+
+/** The occurrences of every event in the signal's array, in fire order. */
+export function mergeAll<A>(s: Readable<EventLike<A>[]>): EventLike<A> {
+  return eventDerived((r) => {
+    const es = s.read();
+    let out: Occ<A>[] = NONE;
+    let lists = 0;
+    for (let i = 0; i < es.length; i++) {
+      const os = r.occ(es[i]);
+      if (os.length === 0) continue;
+      out = lists === 0 ? os : out.concat(os);
+      lists++;
+    }
+    return lists > 1 ? out.slice().sort((x, y) => x.s - y.s) : out;
+  });
+}
+
 /** The occurrences of `e` in rounds that end with `cond` true. */
 export function gate<A>(cond: Readable<boolean>, e: EventLike<A>): EventLike<A> {
   return eventDerived((r) => {

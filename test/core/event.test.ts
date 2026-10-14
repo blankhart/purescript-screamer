@@ -4,7 +4,7 @@ import {
   cell, derived, map, scope, effect, batch, stats, hold, Readable,
   eventSource, mapEvent, filterEvent, alt, neverEvent, changes, stepper, foldEvent, attachWith,
   subscribeEvent, holdEvent, EventLike, touch, accumEvent, gate,
-  oneOf, leftmost, mergeWith, zip, race, combine, withLatest,
+  oneOf, leftmost, mergeWith, zip, race, combine, withLatest, switchEvent, mergeAll,
 } from '../../src/Screamer/Reactive/Core.ts';
 
 /** Record each occurrence of `e` until stopped. */
@@ -378,6 +378,50 @@ describe('combining', () => {
     a.write(2);
     assert.deepEqual(seen, ['1/0', '2/10']);
     stop();
+  });
+});
+
+describe('flattening', () => {
+  test('switchEvent follows the event the signal holds and releases the old one', () => {
+    const [a, b] = [eventSource<string>(), eventSource<string>()];
+    const which = cell<EventLike<string>>(a);
+    const r = record(switchEvent(which));
+    a.fire('a1');
+    b.fire('b1');
+    which.write(b);
+    a.fire('a2');
+    b.fire('b2');
+    assert.deepEqual(r.seen, ['a1', 'b2']);
+    assert.equal(a.targets.size, 0);
+    r.stop();
+    assert.equal(b.targets.size, 0);
+    assert.equal(which.targets.size, 0);
+  });
+
+  test('switching in the same batch as a fire delivers the new event from the next round', () => {
+    const [a, b] = [eventSource<string>(), eventSource<string>()];
+    const which = cell<EventLike<string>>(a);
+    const keep = scope(() => { holdEvent(b); });
+    const r = record(switchEvent(which));
+    batch(() => { which.write(b); b.fire('b1'); a.fire('a1'); });
+    b.fire('b2');
+    assert.deepEqual(r.seen, ['b2']);
+    r.stop();
+    keep();
+  });
+
+  test('mergeAll merges a changing set of events in fire order', () => {
+    const [a, b] = [eventSource<string>(), eventSource<string>()];
+    const set = cell<EventLike<string>[]>([a]);
+    const r = record(mergeAll(set));
+    a.fire('a1');
+    set.write([a, b]);
+    batch(() => { b.fire('b1'); a.fire('a2'); });
+    set.write([b]);
+    a.fire('a3');
+    assert.deepEqual(r.seen, ['a1', 'b1', 'a2']);
+    assert.equal(a.targets.size, 0);
+    r.stop();
   });
 });
 
