@@ -128,6 +128,25 @@ RxJS has no separate state type: its `BehaviorSubject` is closest to a signal so
 | `share`, `shareReplay(1)` | sharing by reference; `Owned.hold` | #25 |
 | `forkJoin`, `window*`, `publish`, `connectable`, schedulers | left out | #16 |
 
+## Transform, filter and accumulate (#19)
+
+All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`, `take`, `skip`, `takeWhile`, `skipWhile`, `first`, `count`) start from their seed when first observed and count or compare only occurrences seen while observed. A `take 3` that loses its observers and is observed again does not restart: it carries on from the count it had.
+
+| RxJS | Screamer | Notes |
+|---|---|---|
+| `map`, `mapTo` | `map`, `(<$)` | `Functor` on both |
+| `filter` | `Event.filter`, `filterMap`, `partition`, `compact`, `separate` | `Filterable`, `Compactable` on `Event` |
+| `scan` | `Event.fold`, `Signal.fold` | one step per occurrence on events, per change on signals |
+| `scan` with an output | `Event.mapAccum :: (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Event b` | |
+| `pairwise` | `Event.withPrevious :: Event a -> Event { previous :: a, current :: a }`, `Signal.withPrevious :: a -> Signal a -> Signal (Tuple a a)` | the event form starts at the second occurrence; the signal form starts as the seed and the current value |
+| `startWith` | `Event.startWith` (an alias of `stepper`) | |
+| `distinctUntilChanged`, `distinctUntilKeyChanged` | `dropRepeats`, `dropRepeatsBy`, `dropRepeatsOn` on both | `dropRepeatsOn :: Eq k => (a -> k) -> …` |
+| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event` | |
+| `last` | left out | an event never completes, so it has no last occurrence |
+| `count`, `reduce` | `Event.count :: Event a -> Signal Int`, `fold` | |
+| `tap` | left out | an effect belongs in `subscribe`, which has an owner |
+| toggle, `gate` | `Event.gate :: Signal Boolean -> Event a -> Event a` | the event form of `filterOn`; reads the condition at the end of the round |
+
 ## Implementation
 
 The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).

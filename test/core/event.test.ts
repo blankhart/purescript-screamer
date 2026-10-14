@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   cell, derived, map, scope, effect, batch, stats, hold, Readable,
   eventSource, mapEvent, filterEvent, alt, neverEvent, changes, stepper, foldEvent, attachWith,
-  subscribeEvent, holdEvent, EventLike, touch,
+  subscribeEvent, holdEvent, EventLike, touch, accumEvent, gate,
 } from '../../src/Screamer/Reactive/Core.ts';
 
 /** Record each occurrence of `e` until stopped. */
@@ -233,6 +233,58 @@ describe('observation', () => {
   });
 });
 
+describe('stateful event nodes', () => {
+  const take = <A>(n: number, e: EventLike<A>) =>
+    accumEvent((a: A, k: number) => (k < n ? { state: k + 1, emit: true, value: a } : { state: k, emit: false }), () => 0, e);
+
+  test('accumEvent steps once per occurrence and keeps stamps', () => {
+    const a = eventSource<number>();
+    const b = eventSource<number>();
+    const r = record(alt(take(2, a), b));
+    batch(() => { b.fire(10); a.fire(1); a.fire(2); b.fire(20); a.fire(3); });
+    assert.deepEqual(r.seen, [10, 1, 2, 20]);
+    r.stop();
+  });
+
+  test('take counts only occurrences seen while observed and does not restart', () => {
+    const src = eventSource<number>();
+    const first2 = take(2, src);
+    const keep = record(src);
+    let r = record(first2);
+    src.fire(1);
+    r.stop();
+    src.fire(2);
+    src.fire(3);
+    r = record(first2);
+    src.fire(4);
+    src.fire(5);
+    assert.deepEqual(r.seen, [4]);
+    r.stop();
+    keep.stop();
+  });
+
+  test('a stateful event node holds no links once unobserved', () => {
+    const before = stats.links;
+    const src = eventSource<number>();
+    const r = record(take(3, src));
+    src.fire(1);
+    r.stop();
+    assert.equal(stats.links, before);
+  });
+
+  test('gate passes the occurrences of rounds that end with the condition true', () => {
+    const open = cell(false);
+    const src = eventSource<number>();
+    const r = record(gate(open, src));
+    src.fire(1);
+    batch(() => { src.fire(2); open.write(true); });
+    src.fire(3);
+    batch(() => { src.fire(4); open.write(false); });
+    assert.deepEqual(r.seen, [2, 3]);
+    r.stop();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Randomized oracle for event nodes.
 //
@@ -251,9 +303,12 @@ type Node =
   | { kind: 'attach'; s: number; e: number }
   | { kind: 'fold'; e: number }
   | { kind: 'stepper'; e: number }
+  | { kind: 'take'; e: number; n: number }
+  | { kind: 'withPrev'; e: number }
+  | { kind: 'gate'; s: number; e: number }
   | { kind: 'sum'; ins: number[] };
 
-const isEventKind = (n: Node) => ['src', 'map', 'filter', 'alt', 'changes', 'attach'].includes(n.kind);
+const isEventKind = (n: Node) => ['src', 'map', 'filter', 'alt', 'changes', 'attach', 'take', 'withPrev', 'gate'].includes(n.kind);
 
 function lcg(seed: number) {
   let s = seed >>> 0;
@@ -288,8 +343,11 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
       else if (r < 0.6) n = { kind: 'changes', s: s() };
       else if (r < 0.7) n = { kind: 'attach', s: s(), e: e() };
       else if (r < 0.8) n = { kind: 'fold', e: e() };
-      else if (r < 0.9) n = { kind: 'stepper', e: e() };
-      else n = { kind: 'sum', ins: [s(), s()] };
+      else if (r < 0.85) n = { kind: 'stepper', e: e() };
+      else if (r < 0.9) n = { kind: 'sum', ins: [s(), s()] };
+      else if (r < 0.94) n = { kind: 'take', e: e(), n: pick(6) };
+      else if (r < 0.97) n = { kind: 'withPrev', e: e() };
+      else n = { kind: 'gate', s: s(), e: e() };
       spec.push(n);
       switch (n.kind) {
         case 'map': { const k = n.k; real.push(mapEvent((x: number) => x + k, real[n.e])); break; }
@@ -300,11 +358,22 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
         case 'fold': real.push(foldEvent(foldStep, 0, real[n.e])); break;
         case 'stepper': real.push(stepper(0, real[n.e])); break;
         case 'sum': { const [x, y] = n.ins; real.push(derived(() => (real[x].read() + real[y].read()) % 7)); break; }
+        case 'take': {
+          const k = n.n;
+          real.push(accumEvent((a: number, c: number) => (c < k ? { state: c + 1, emit: true, value: a } : { state: c, emit: false }), () => 0, real[n.e]));
+          break;
+        }
+        case 'withPrev':
+          real.push(accumEvent((a: number, p: number | null) => ({ state: a, emit: p !== null, value: p === null ? 0 : p * 100 + a }), () => null, real[n.e]));
+          break;
+        case 'gate': real.push(gate(derived(() => real[(n as any).s].read() % 2 === 0), real[n.e])); break;
       }
     }
 
     // Reference: signal values carried across rounds, occurrences per round.
     const value: number[] = spec.map((n, i) => (n.kind === 'cell' ? real[i].value : 0));
+    const counter: number[] = spec.map(() => 0);
+    const previous: (number | null)[] = spec.map(() => null);
     const evalRound = (fires: { src: number; v: number; s: number }[], writes: Map<number, number>, roundStamp: number, init = false) => {
       const occ: { s: number; v: number }[][] = [];
       const prev = value.slice();
@@ -331,6 +400,16 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
           case 'fold': for (const o of occ[n.e]) value[i] = foldStep(o.v, value[i]); break;
           case 'stepper': if (occ[n.e].length) value[i] = occ[n.e][occ[n.e].length - 1].v; break;
           case 'sum': value[i] = (value[n.ins[0]] + value[n.ins[1]]) % 7; break;
+          case 'take':
+            for (const o of occ[n.e]) if (counter[i] < n.n) { counter[i]++; occ[i].push(o); }
+            break;
+          case 'withPrev':
+            for (const o of occ[n.e]) {
+              if (previous[i] !== null) occ[i].push({ s: o.s, v: previous[i]! * 100 + o.v });
+              previous[i] = o.v;
+            }
+            break;
+          case 'gate': if (value[n.s] % 2 === 0) occ[i] = occ[n.e]; break;
         }
       }
       return occ;

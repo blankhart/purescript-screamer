@@ -29,6 +29,15 @@ export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (s: S<A
 export const fold = <A, B>(f: (a: A) => (b: B) => B) => (seed: B) => (s: S<A>): S<B> =>
   R.fold((a: A, b: B) => f(a)(b), seed, s);
 
+export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A) => (s: S<A>): S<T> => {
+  const pair = R.stateful<{ previous: A; current: A }>(
+    [s],
+    () => ({ previous: seed, current: s.read() }),
+    (_, values, p) => ({ previous: p.current, current: values[0] }),
+  );
+  return R.map((p) => tuple(p.previous)(p.current), pair);
+};
+
 export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => R.merge(a, b);
 
 export const filter = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => R.filter(p, seed, s);
