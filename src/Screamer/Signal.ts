@@ -49,6 +49,15 @@ export const history = (n: number) => <A>(s: S<A>): S<A[]> =>
     return next.length > n ? next.slice(next.length - n) : next;
   });
 
+export const attemptImpl = <A, T>(left: (e: Error) => T) => (right: (a: A) => T) => (s: S<A>): S<T> =>
+  R.derived(() => {
+    try {
+      return right(s.read());
+    } catch (e) {
+      return left(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+
 export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => R.merge(a, b);
 
 export const filter = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => R.filter(p, seed, s);
