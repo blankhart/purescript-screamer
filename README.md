@@ -42,6 +42,22 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them,
 
 The full specification, including the rules for ordering, errors and loops, is in `docs/ownership-design.md`.
 
+## Combinators
+
+Most RxJS operators have a counterpart, pure where it can be and `Owned` where it starts timers or requests. The common ones:
+
+| RxJS | Screamer |
+|---|---|
+| `map`, `filter`, `scan` | `map`, `filter`, `Event.fold` / `Event.mapAccum` |
+| `distinctUntilChanged` | `Event.dropRepeats` (signals drop repeats already) |
+| `merge`, `combineLatest`, `withLatestFrom` | `<\|>` / `Event.oneOf`, `Signal.combine` / `ado`, `Event.attachWith` |
+| `switchMap`, `mergeMap`, `concatMap`, `exhaustMap` | `Resource.resourceWith` / `request` with `Switch`, `Merge`, `Concat`, `Exhaust`; `Flatten.switchOwned` etc. for owned inner work |
+| `debounceTime`, `throttleTime`, `delay` | `Time.debounce`, `Time.throttle`, `Time.delay` (`Owned`) |
+| `catchError`, `retry` | `Signal.catching`, `Resource.retry` |
+| `share`, `shareReplay(1)` | bind once with `let`; `hold` / `Event.hold` |
+
+`examples/src/Typeahead.purs` uses them together: a debounced, deduplicated query sent with `resourceWith Switch` and `retry`, results kept on screen with `keepLast` while the next ones load, and keyboard selection as a held `Event.fold`. The full list, with semantics, is in [`docs/combinators.md`](docs/combinators.md).
+
 ## Migrating from the observable API
 
 | Before | Now |
