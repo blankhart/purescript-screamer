@@ -12,6 +12,7 @@
             "effect",
             "either",
             "exceptions",
+            "filterable",
             "foldable-traversable",
             "maybe",
             "now",
@@ -21,6 +22,7 @@
             "record",
             "refs",
             "strings",
+            "tuples",
             "typelevel-prelude",
             "unsafe-coerce",
             "web-clipboard",
@@ -969,6 +971,25 @@
       "integrity": "sha256-vtLbrWNaI+pzx/2fw2AQnCovoLtcosClIhjO26QKkh8=",
       "dependencies": [
         "unsafe-coerce"
+      ]
+    },
+    "filterable": {
+      "type": "registry",
+      "version": "5.0.0",
+      "integrity": "sha256-be7ci1Bzwud2waqoCtNGsTBZbt7fi+gCLvGddQQRJ3A=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "either",
+        "foldable-traversable",
+        "identity",
+        "lists",
+        "maybe",
+        "newtype",
+        "ordered-collections",
+        "prelude",
+        "st",
+        "tuples"
       ]
     },
     "foldable-traversable": {

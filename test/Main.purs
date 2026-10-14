@@ -13,6 +13,7 @@ import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (defaultConfig, evalSpecT)
 import Test.Spec.Summary (successful)
 import Test.Dom as Dom
+import Test.Event as Event
 import Test.Owned as Owned
 import Test.Signal as Signal
 import Test.Subscriptions as Subscriptions
@@ -31,6 +32,7 @@ spec = do
     it "runs PureScript tests" do
       (1 + 1) `shouldEqual` 2
   Signal.spec
+  Event.spec
   Owned.spec
   Dom.spec
   TypedDom.spec
