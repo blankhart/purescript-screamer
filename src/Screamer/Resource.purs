@@ -5,6 +5,13 @@ module Screamer.Resource
   , resource
   , resourceWith
   , request
+  , withDefault
+  , toMaybe
+  , isLoading
+  , keepLast
+  , Backoff(..)
+  , RetryPolicy
+  , retry
   ) where
 
 import Prelude
@@ -14,7 +21,8 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
-import Effect.Aff (Aff, Fiber, attempt, error, killFiber, launchAff, launchAff_)
+import Data.Time.Duration (Milliseconds(..))
+import Effect.Aff (Aff, Fiber, attempt, delay, error, killFiber, launchAff, launchAff_, throwError)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, message)
 import Effect.Ref as Ref
@@ -44,6 +52,81 @@ instance Functor Remote where
     Loading -> Loading
     Failed e -> Failed e
     Loaded b -> Loaded (f b)
+
+-- | Combine several resources: `Failed` if any failed (the leftmost
+-- | failure wins), else `Loading` if any is loading, else `Loaded`.
+instance Apply Remote where
+  apply (Failed e) _ = Failed e
+  apply _ (Failed e) = Failed e
+  apply (Loaded f) (Loaded a) = Loaded (f a)
+  apply _ _ = Loading
+
+instance Applicative Remote where
+  pure = Loaded
+
+-- | The loaded value, or the default.
+withDefault :: forall a. a -> Remote a -> a
+withDefault d = case _ of
+  Loaded a -> a
+  _ -> d
+
+toMaybe :: forall a. Remote a -> Maybe a
+toMaybe = case _ of
+  Loaded a -> Just a
+  _ -> Nothing
+
+isLoading :: forall a. Remote a -> Boolean
+isLoading = case _ of
+  Loading -> true
+  _ -> false
+
+-- | Keep showing the last `Loaded` value while a new request loads, so a
+-- | list does not flash empty on every keystroke. `Failed` and new `Loaded`
+-- | values pass through; `Loading` shows only before anything has loaded.
+-- | Stateful: it starts from the input's current value when observed.
+keepLast :: forall a. Signal (Remote a) -> Signal (Remote a)
+keepLast = keepLastImpl isLoading isLoaded
+  where
+  isLoaded = case _ of
+    Loaded _ -> true
+    _ -> false
+
+foreign import keepLastImpl :: forall a. (Remote a -> Boolean) -> (Remote a -> Boolean) -> Signal (Remote a) -> Signal (Remote a)
+
+-- | How long to wait before each retry.
+-- |
+-- | - `Immediately`: no wait.
+-- | - `Fixed d`: d before every retry.
+-- | - `Exponential { initial, max }`: initial before the first retry,
+-- |   doubling each time, never more than max.
+data Backoff
+  = Immediately
+  | Fixed Milliseconds
+  | Exponential { initial :: Milliseconds, max :: Milliseconds }
+
+-- | Retry a failed request up to `retries` times, waiting as the backoff
+-- | says before each retry.
+type RetryPolicy = { retries :: Int, backoff :: Backoff }
+
+-- | Run the request, and retry it on failure under the policy; the last
+-- | failure is rethrown. The waits are `Aff` delays, so killing the request
+-- | (a new input under `Switch`, or disposing the scope) cancels a pending
+-- | retry. Pass `retry policy request` to `resourceWith` or `request`.
+-- | (RxJS `retry` with a delay.)
+retry :: forall a b. RetryPolicy -> (a -> Aff b) -> a -> Aff b
+retry policy req a = go 0
+  where
+  go n = attempt (req a) >>= case _ of
+    Right b -> pure b
+    Left e
+      | n < policy.retries -> wait n *> go (n + 1)
+      | otherwise -> throwError e
+  wait n = case policy.backoff of
+    Immediately -> pure unit
+    Fixed d -> delay d
+    Exponential { initial: Milliseconds i, max: Milliseconds m } ->
+      delay (Milliseconds (min m (i * pow2 n)))
+  pow2 n = if n <= 0 then 1.0 else 2.0 * pow2 (n - 1)
 
 -- | How requests that overlap are run. The names are RxJS's flattening
 -- | operators.
