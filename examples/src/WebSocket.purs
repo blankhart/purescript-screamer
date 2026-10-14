@@ -14,7 +14,7 @@ import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
 import Screamer.DOM.EventHandler as H
 import Screamer.Examples.Harness as Harness
-import Screamer.Owned (subscribe)
+import Screamer.Event as Event
 import Screamer.Signal (read)
 import Screamer.Subscriptions.WebSocket (ConnectionState(..), connect)
 import Web.Event.Event (preventDefault, target)
@@ -42,9 +42,7 @@ chat url = component do
         socket.send text
         add text true
         draft.put ""
-  subscribe socket.message case _ of
-    Just m -> add m.data false
-    Nothing -> pure unit
+  Event.subscribe socket.messages \m -> add m false
   pure $ E.div_ []
     [ E.p_ [ A.id_ "status" ] [ text (socket.state <#> status) ]
     , E.ul_ [ A.id_ "lines" ]

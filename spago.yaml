@@ -8,6 +8,7 @@ package:
     - effect
     - either
     - exceptions
+    - filterable
     - foldable-traversable
     - maybe
     - now
@@ -17,6 +18,7 @@ package:
     - record
     - refs
     - strings
+    - tuples
     - typelevel-prelude
     - unsafe-coerce
     - web-clipboard

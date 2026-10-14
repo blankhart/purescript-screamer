@@ -26,7 +26,7 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them,
 
 **Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.SignalSource`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
 
-**Events are planned next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (#18) will carry occurrences instead, such as clicks or messages, with every occurrence delivered. An `EventSource` gives `{ event, fire }`. The design, and the names of the planned combinators next to their RxJS counterparts, are in `docs/combinators.md`.
+**Events sit next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (`Screamer.Event`, imported qualified) carries occurrences instead, such as clicks or messages, and delivers every one, in fire order, even repeats and several in one batch. `eventSource` (in `Effect`, from `Screamer.EventSource`) gives `{ event, fire }`, and a typed handler takes `fire` directly. `Event.fold`, `stepper`, `changes`, `tag`, `attachWith` and `Event.subscribe` connect events and signals. The semantics, and every combinator next to its RxJS counterpart, are in `docs/combinators.md`.
 
 **Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `subscribe`, `hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
 

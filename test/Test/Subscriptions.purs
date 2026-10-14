@@ -16,6 +16,7 @@ import Effect.Ref as Ref
 import Screamer.SignalSource (signalSource)
 import Screamer.Core (text)
 import Screamer.Core as Core
+import Screamer.Event as Event
 import Screamer.Owned (runOwned, subscribe)
 import Screamer.Resource (Remote(..), resource)
 import Screamer.Signal (read)
@@ -87,10 +88,12 @@ webSocket = before_ (liftEffect Fake.installMockWebSocket) $ after_ (liftEffect 
     liftEffect resetBody
     states <- liftEffect $ Ref.new []
     sock <- liftEffect $ Ref.new Nothing
+    received <- liftEffect $ Ref.new []
     unmount <- liftEffect $ Core.mount "#root" $ Core.component do
       s <- WebSocket.connect "ws://example.test/chat"
       subscribe s.state \st -> Ref.modify_ (_ <> [ show st ]) states
       liftEffect $ Ref.write (Just s) sock
+      Event.subscribe s.messages \m -> Ref.modify_ (_ <> [ m ]) received
       pure $ text (s.message <#> maybe "" _.data)
     liftEffect (Ref.read sock) >>= case _ of
       Nothing -> pure unit
@@ -102,6 +105,7 @@ webSocket = before_ (liftEffect Fake.installMockWebSocket) $ after_ (liftEffect 
         liftEffect (innerHTML "#root") >>= shouldEqual "pong"
         liftEffect $ Fake.serverSend "pong"
         liftEffect (read s.message) >>= shouldEqual (Just { index: 1, data: "pong" })
+        liftEffect (Ref.read received) >>= shouldEqual [ "pong", "pong" ]
     liftEffect unmount
     info <- liftEffect Fake.socketInfo
     info `shouldEqual` { url: "ws://example.test/chat", sent: [ "early", "hello" ], closed: true }

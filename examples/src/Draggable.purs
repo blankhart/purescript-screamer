@@ -1,5 +1,6 @@
--- | Drag circles around an SVG canvas. The drag state is a `fold` over
--- | pointer events, so the only signal source is the event stream itself.
+-- | Drag circles around an SVG canvas. The drag state is an `Event.fold`
+-- | over pointer events, so the only source is the event stream itself, and
+-- | every pointer event is one step, even several in one handler.
 module Screamer.Examples.Draggable where
 
 import Prelude
@@ -9,14 +10,15 @@ import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
+import Screamer.Event as Event
+import Screamer.EventSource (eventSource)
 import Screamer.Core (Element, component, element)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
 import Screamer.DOM.Svg as Svg
 import Screamer.DOM.EventHandler as H
 import Screamer.Examples.Harness as Harness
-import Screamer.Signal (Signal, fold)
+import Screamer.Signal (Signal)
 import Web.PointerEvent.PointerEvent (PointerEvent, toMouseEvent)
 import Web.UIEvent.MouseEvent (clientX, clientY)
 
@@ -63,9 +65,9 @@ point e = { x: Int.toNumber (clientX m), y: Int.toNumber (clientY m) }
 
 draggable :: Element
 draggable = component do
-  pointer <- liftEffect $ signalSource Up
+  pointer <- liftEffect eventSource
   let
-    drag = fold step start pointer.signal
+    drag = Event.fold step start pointer.event
     colours = [ "tomato", "seagreen", "steelblue" ]
     circle i colour =
       Svg.circle_
@@ -75,7 +77,7 @@ draggable = component do
         , Svg.r_ "30"
         , Svg.fill_ colour
         , Svg.stroke_ (drag <#> \d -> if map _.index d.dragging == Just i then "black" else "none")
-        , H.onPointerDown_ \e -> pointer.put (Down i (point e))
+        , H.onPointerDown_ \e -> pointer.fire (Down i (point e))
         ]
         []
     position :: Int -> (Point -> Number) -> Signal String
@@ -89,8 +91,8 @@ draggable = component do
         , Svg.height_ "200"
         , Svg.viewBox_ "0 0 400 200"
         , A.style_ { "touch-action": "none", border: "1px solid #ccc", display: "block" }
-        , H.onPointerMove_ \e -> pointer.put (Move (point e))
-        , H.onPointerUp_ \_ -> pointer.put Up
+        , H.onPointerMove_ \e -> pointer.fire (Move (point e))
+        , H.onPointerUp_ \_ -> pointer.fire Up
         ]
         (Array.mapWithIndex circle colours)
     ]
