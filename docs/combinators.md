@@ -163,6 +163,37 @@ All pure. The simultaneity rule for each: on signals, one step per batch and the
 | `race` | `Event.race :: Array (Event a) -> Event a` | follows the first input to fire after first observation (the leftmost, on a tie); keeps that choice while paused |
 | `forkJoin`, `combineLatestAll` | left out | events never complete, so there is no last value to join; for a list of async results use `Remote`'s `Applicative` (#24) or `sequence` on signals |
 
+## Flattening (#21)
+
+For pure inner streams nothing needs an owner: `bind` on signals already switches, and so do these.
+
+| RxJS | Screamer | Notes |
+|---|---|---|
+| `switchAll` on signals | `Signal.switchLatest :: Signal (Signal a) -> Signal a` | `join`; the branch no longer read is released |
+| `switchMap` to events | `Event.switchEvent :: Signal (Event a) -> Event a` | follows the event the signal holds; a new event is followed from the next occurrence on, so nothing it fired before the switch is delivered |
+| `mergeMap`, `concatMap` over `Event (Event a)` | left out | an event of events has no owner for the inner events' lifetimes; use `switchEvent`, or the owned forms below |
+
+Inner work that needs an owner (timers, sockets, requests) runs in a child scope per inner value, like `dyn` for values other than elements. `Screamer.Flatten`:
+
+| RxJS | Screamer |
+|---|---|
+| `switchMap` | `switchOwned :: Signal a -> (a -> Owned b) -> Owned (Signal b)`: each new value disposes the running child first |
+| `mergeMap` | `mergeOwned :: Event a -> (a -> Effect Unit -> Owned (Event b)) -> Owned (Event b)`: every child runs at once |
+| `concatMap` | `concatOwned` (same type): occurrences queue while a child runs, without bound, and start in order |
+| `exhaustMap` | `exhaustOwned` (same type): occurrences are ignored while a child runs |
+
+A child of the event forms is *running* until it calls the `Effect Unit` it is given (`done`), which disposes it, or until the parent scope is disposed. The output merges the events the running children return, in fire order; an inner event delivers what it fires after its child's setup returns.
+
+For `Aff` requests, `Screamer.Resource` has the same four strategies as a `Strategy` (`Switch`, `Merge`, `Concat`, `Exhaust`). A request is running until it settles.
+
+```purescript
+resourceWith :: forall a b. Strategy -> Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))
+request      :: forall a b. Strategy -> Event a -> (a -> Aff b) -> Owned (Event (Either Error b))
+resource = resourceWith Switch
+```
+
+`resourceWith` turns `Loading` when a request starts and shows each result its strategy keeps; under `Exhaust` that can be the result for an older input than the signal's current value. `request` fires one occurrence per kept result. Disposing the scope kills every running request, and a result that arrives after its request was killed is never shown.
+
 ## Implementation
 
 The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).

@@ -35,6 +35,7 @@ module Screamer.Signal
   , withPrevious
   , combine
   , withLatest
+  , switchLatest
   , fold
   , merge
   , filter
@@ -127,6 +128,12 @@ withLatest :: forall a b. Signal b -> Signal a -> Signal (Tuple a b)
 withLatest = withLatestImpl Tuple
 
 foreign import withLatestImpl :: forall a b. (a -> b -> Tuple a b) -> Signal b -> Signal a -> Signal (Tuple a b)
+
+-- | The value of whichever signal the outer signal holds: `join`. The inner
+-- | signal is rebuilt only when the outer one changes, and the branch no
+-- | longer read is released. (RxJS `switchAll`.)
+switchLatest :: forall a. Signal (Signal a) -> Signal a
+switchLatest s = bindImpl s identity
 
 -- | Accumulate from a seed, one step per propagation in which the input changed.
 foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b

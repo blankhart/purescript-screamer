@@ -94,3 +94,7 @@ export const zipWith = <A, B, C>(f: (a: A) => (b: B) => C) => (ea: E<A>) => (eb:
   R.zip((a: A, b: B) => f(a)(b), ea, eb);
 
 export const race = <A>(es: E<A>[]): E<A> => R.race(es);
+
+// Flattening (#21).
+
+export const switchEvent = <A>(s: S<E<A>>): E<A> => R.switchEvent(s);

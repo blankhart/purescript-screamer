@@ -46,6 +46,8 @@ module Screamer.Event
   , zip
   , zipWith
   , race
+  -- Flattening
+  , switchEvent
   ) where
 
 import Prelude
@@ -236,3 +238,11 @@ foreign import zipWith :: forall a b c. (a -> b -> c) -> Event a -> Event b -> E
 -- | (the leftmost, if several fire in one round) and ignore the rest from
 -- | then on. (RxJS `race`.)
 foreign import race :: forall a. Array (Event a) -> Event a
+
+-- Flattening (#21). Flattening that owns inner work (timers, requests) is
+-- in `Screamer.Flatten`.
+
+-- | The occurrences of whichever event the signal currently holds. After a
+-- | switch, the new event is followed from then on; nothing it fired before
+-- | is delivered. (RxJS `switchMap` over events, `switchAll`.)
+foreign import switchEvent :: forall a. Signal (Event a) -> Event a
