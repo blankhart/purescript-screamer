@@ -1300,6 +1300,32 @@ export function eventStateful<S, T>(
   return new EventStateful(inputs, initial, step);
 }
 
+/** One step of `accumEvent`: the new state, and the occurrence to emit, if any. */
+export interface Accum<S, B> {
+  state: S;
+  emit: boolean;
+  value?: B;
+}
+
+/**
+ * A per-occurrence state machine over one event: `f` sees each occurrence
+ * in order with the current state, and may emit one occurrence for it, with
+ * its stamp. Stateful: starts from `seed()` when first observed and steps
+ * only while observed.
+ */
+export function accumEvent<A, S, B>(f: (a: A, s: S) => Accum<S, B>, seed: () => S, e: EventLike<A>): EventLike<B> {
+  return eventStateful<S, B>([e], seed, (_, values, state) => {
+    const os: Occ<A>[] = values[0];
+    const out: Occ<B>[] = [];
+    for (let i = 0; i < os.length; i++) {
+      const r = f(os[i].v, state);
+      state = r.state;
+      if (r.emit) out.push({ s: os[i].s, v: r.value as B });
+    }
+    return { state, out };
+  });
+}
+
 /** Occurrences of both lists in stamp order; the left goes first on equal stamps. */
 export function interleave<T>(a: Occ<T>[], b: Occ<T>[]): Occ<T>[] {
   if (a.length === 0) return b;
@@ -1386,6 +1412,15 @@ export function attachWith<A, B, C>(f: (b: B, a: A) => C, s: Readable<B>, e: Eve
     const out = new Array<Occ<C>>(os.length);
     for (let i = 0; i < os.length; i++) out[i] = { s: os[i].s, v: f(b, os[i].v) };
     return out;
+  });
+}
+
+/** The occurrences of `e` in rounds that end with `cond` true. */
+export function gate<A>(cond: Readable<boolean>, e: EventLike<A>): EventLike<A> {
+  return eventDerived((r) => {
+    const open = cond.read();
+    const os = r.occ(e);
+    return open ? os : NONE;
   });
 }
 

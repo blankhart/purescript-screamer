@@ -32,3 +32,51 @@ export const attachWith = <A, B, C>(f: (b: B) => (a: A) => C) => (s: S<B>) => (e
 export const subscribeImpl = <A>(s: Core.Scope) => (e: E<A>) => (cb: (a: A) => () => void) => () => {
   R.subscribeEvent(s, e, (a) => cb(a)());
 };
+
+// Transform, filter and accumulate (#19). Each stateful combinator is an
+// `accumEvent` state machine; `seed` makes a fresh state when first observed.
+
+type Accum<S, B> = Core.Accum<S, B>;
+const accum = <A, S, B>(f: (a: A, s: S) => Accum<S, B>, seed: () => S) => (e: E<A>): E<B> =>
+  R.accumEvent(f, seed, e);
+
+export const gate = <A>(cond: S<boolean>) => (e: E<A>): E<A> => R.gate(cond, e);
+
+export const mapAccum = <A, S, B>(f: (a: A) => (s: S) => { state: S; value: B }) => (seed: S) =>
+  accum<A, S, B>((a, s) => {
+    const r = f(a)(s);
+    return { state: r.state, emit: true, value: r.value };
+  }, () => seed);
+
+interface Prev<A> {
+  has: boolean;
+  v: A;
+}
+
+const noPrev = (): Prev<any> => ({ has: false, v: undefined });
+
+export const withPrevious = <A>(e: E<A>): E<{ previous: A; current: A }> =>
+  accum<A, Prev<A>, { previous: A; current: A }>(
+    (a, p) => (p.has
+      ? { state: { has: true, v: a }, emit: true, value: { previous: p.v, current: a } }
+      : { state: { has: true, v: a }, emit: false }),
+    noPrev,
+  )(e);
+
+export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (e: E<A>): E<A> =>
+  accum<A, Prev<A>, A>(
+    (a, p) => ({ state: { has: true, v: a }, emit: !p.has || !eq(p.v)(a), value: a }),
+    noPrev,
+  )(e);
+
+export const take = (n: number) => <A>(e: E<A>): E<A> =>
+  accum<A, number, A>((a, k) => (k < n ? { state: k + 1, emit: true, value: a } : { state: k, emit: false }), () => 0)(e);
+
+export const skip = (n: number) => <A>(e: E<A>): E<A> =>
+  accum<A, number, A>((a, k) => (k < n ? { state: k + 1, emit: false } : { state: k, emit: true, value: a }), () => 0)(e);
+
+export const takeWhile = <A>(p: (a: A) => boolean) => (e: E<A>): E<A> =>
+  accum<A, boolean, A>((a, done) => (!done && p(a) ? { state: false, emit: true, value: a } : { state: true, emit: false }), () => false)(e);
+
+export const skipWhile = <A>(p: (a: A) => boolean) => (e: E<A>): E<A> =>
+  accum<A, boolean, A>((a, open) => (open || !p(a) ? { state: true, emit: true, value: a } : { state: false, emit: false }), () => false)(e);

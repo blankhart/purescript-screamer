@@ -25,6 +25,20 @@ module Screamer.Event
   , attach
   , attachWith
   , subscribe
+  -- Transform, filter and accumulate
+  , mapAccum
+  , withPrevious
+  , startWith
+  , dropRepeats
+  , dropRepeatsBy
+  , dropRepeatsOn
+  , take
+  , skip
+  , takeWhile
+  , skipWhile
+  , first
+  , count
+  , gate
   ) where
 
 import Prelude
@@ -123,3 +137,60 @@ foreign import subscribeImpl :: forall a. Scope -> Event a -> (a -> Effect Unit)
 -- | next flush round.
 subscribe :: forall a. Event a -> (a -> Effect Unit) -> Owned Unit
 subscribe e cb = Owned \s -> subscribeImpl s e cb
+
+-- Transform, filter and accumulate (#19). The stateful ones start from
+-- their seed when first observed and count only occurrences seen while
+-- observed: a `take 3` observed again later does not restart.
+
+-- | Thread a state through the occurrences, emitting one value for each,
+-- | like `fold` but with an output per occurrence. (RxJS `scan` with a
+-- | separate output.)
+foreign import mapAccum :: forall a s b. (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Event b
+
+-- | Each occurrence with the one before it, from the second occurrence seen
+-- | while observed. (RxJS `pairwise`.)
+foreign import withPrevious :: forall a. Event a -> Event { previous :: a, current :: a }
+
+-- | The latest occurrence, starting at the seed. An alias of `stepper`.
+-- | (RxJS `startWith`.)
+startWith :: forall a. a -> Event a -> Signal a
+startWith = stepper
+
+-- | Drop an occurrence equal to the one before it. (RxJS
+-- | `distinctUntilChanged`.)
+dropRepeats :: forall a. Eq a => Event a -> Event a
+dropRepeats = dropRepeatsByImpl eq
+
+dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Event a -> Event a
+dropRepeatsBy = dropRepeatsByImpl
+
+-- | Drop an occurrence whose key equals the previous occurrence's key.
+-- | (RxJS `distinctUntilKeyChanged`.)
+dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Event a -> Event a
+dropRepeatsOn key = dropRepeatsByImpl \x y -> key x == key y
+
+foreign import dropRepeatsByImpl :: forall a. (a -> a -> Boolean) -> Event a -> Event a
+
+-- | The first n occurrences seen while observed.
+foreign import take :: forall a. Int -> Event a -> Event a
+
+-- | Every occurrence after the first n seen while observed.
+foreign import skip :: forall a. Int -> Event a -> Event a
+
+-- | Occurrences up to the first that fails the predicate; none after it.
+foreign import takeWhile :: forall a. (a -> Boolean) -> Event a -> Event a
+
+-- | Occurrences from the first that fails the predicate on.
+foreign import skipWhile :: forall a. (a -> Boolean) -> Event a -> Event a
+
+-- | The first occurrence seen while observed. `take 1`.
+first :: forall a. Event a -> Event a
+first = take 1
+
+-- | How many occurrences have been seen while observed.
+count :: forall a. Event a -> Signal Int
+count = fold (\_ n -> n + 1) 0
+
+-- | The occurrences of rounds that end with the signal true. The event
+-- | version of `Screamer.Signal.filterOn`.
+foreign import gate :: forall a. Signal Boolean -> Event a -> Event a
