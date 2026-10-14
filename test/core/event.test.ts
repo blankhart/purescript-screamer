@@ -4,6 +4,7 @@ import {
   cell, derived, map, scope, effect, batch, stats, hold, Readable,
   eventSource, mapEvent, filterEvent, alt, neverEvent, changes, stepper, foldEvent, attachWith,
   subscribeEvent, holdEvent, EventLike, touch, accumEvent, gate,
+  oneOf, leftmost, mergeWith, zip, race, combine, withLatest,
 } from '../../src/Screamer/Reactive/Core.ts';
 
 /** Record each occurrence of `e` until stopped. */
@@ -285,6 +286,101 @@ describe('stateful event nodes', () => {
   });
 });
 
+describe('combining', () => {
+  const pair = (a: unknown, b: unknown) => `${a}${b}`;
+
+  test('oneOf interleaves every input by fire order', () => {
+    const [a, b, c] = [eventSource<string>(), eventSource<string>(), eventSource<string>()];
+    const r = record(oneOf([a, b, c]));
+    batch(() => { c.fire('c1'); a.fire('a1'); b.fire('b1'); c.fire('c2'); });
+    assert.deepEqual(r.seen, ['c1', 'a1', 'b1', 'c2']);
+    r.stop();
+  });
+
+  test('leftmost keeps the leftmost input that fired in the round', () => {
+    const [a, b] = [eventSource<string>(), eventSource<string>()];
+    const r = record(leftmost([a, b]));
+    batch(() => { b.fire('b1'); a.fire('a1'); a.fire('a2'); });
+    b.fire('b2');
+    assert.deepEqual(r.seen, ['a1', 'a2', 'b2']);
+    r.stop();
+  });
+
+  test('mergeWith combines occurrences of one fire and loses nothing', () => {
+    const src = eventSource<number>();
+    const other = eventSource<number>();
+    const e = mergeWith((x: number, y: number) => `both${x},${y}`, (x: number) => `L${x}`, (y: number) => `R${y}`,
+      mapEvent((x: number) => x, src), alt(mapEvent((x: number) => -x, src), other));
+    const r = record(e);
+    batch(() => { src.fire(1); other.fire(9); src.fire(2); });
+    assert.deepEqual(r.seen, ['both1,-1', 'R9', 'both2,-2']);
+    r.stop();
+  });
+
+  test('zip pairs the nth with the nth, across rounds and within one', () => {
+    const [a, b] = [eventSource<string>(), eventSource<string>()];
+    const r = record(zip(pair, a, b));
+    batch(() => { a.fire('a1'); a.fire('a2'); b.fire('b1'); });
+    b.fire('b2');
+    b.fire('b3');
+    a.fire('a3');
+    assert.deepEqual(r.seen, ['a1b1', 'a2b2', 'a3b3']);
+    r.stop();
+  });
+
+  test('zip drops its queues when unobserved', () => {
+    const [a, b] = [eventSource<string>(), eventSource<string>()];
+    const z = zip(pair, a, b);
+    const keep = scope(() => { holdEvent(a); holdEvent(b); });
+    let r = record(z);
+    a.fire('a1');
+    a.fire('a2');
+    r.stop();
+    r = record(z);
+    b.fire('b1');
+    a.fire('a3');
+    assert.deepEqual(r.seen, ['a3b1']);
+    r.stop();
+    keep();
+  });
+
+  test('race follows the first input to fire, the leftmost on a tie', () => {
+    const [a, b, c] = [eventSource<string>(), eventSource<string>(), eventSource<string>()];
+    const r = record(race([a, b, c]));
+    batch(() => { c.fire('c1'); b.fire('b1'); });
+    a.fire('a1');
+    b.fire('b2');
+    assert.deepEqual(r.seen, ['b1', 'b2']);
+    r.stop();
+  });
+
+  test('combine is one node over every signal', () => {
+    const cs = [cell(1), cell(2), cell(3)];
+    const all = combine(cs);
+    const seen: string[] = [];
+    let runs = 0;
+    const stop = scope(() => { effect(() => { seen.push(all.read().join()); runs++; }); });
+    batch(() => { cs[0].write(4); cs[2].write(6); });
+    assert.deepEqual(seen, ['1,2,3', '4,2,6']);
+    assert.equal(runs, 2);
+    stop();
+  });
+
+  test('withLatest changes only with its driver, and keeps the other observed', () => {
+    const a = cell(1);
+    const src = eventSource<number>();
+    const total = foldEvent((x: number, n: number) => n + x, 0, src);
+    const w = withLatest((x: number, y: number) => `${x}/${y}`, total, a);
+    const seen: string[] = [];
+    const stop = scope(() => { effect(() => { seen.push(w.read()); }); });
+    src.fire(5);
+    src.fire(5);
+    a.write(2);
+    assert.deepEqual(seen, ['1/0', '2/10']);
+    stop();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Randomized oracle for event nodes.
 //
@@ -306,9 +402,12 @@ type Node =
   | { kind: 'take'; e: number; n: number }
   | { kind: 'withPrev'; e: number }
   | { kind: 'gate'; s: number; e: number }
+  | { kind: 'zip'; a: number; b: number }
+  | { kind: 'leftmost'; a: number; b: number }
+  | { kind: 'mergeWith'; a: number; b: number }
   | { kind: 'sum'; ins: number[] };
 
-const isEventKind = (n: Node) => ['src', 'map', 'filter', 'alt', 'changes', 'attach', 'take', 'withPrev', 'gate'].includes(n.kind);
+const isEventKind = (n: Node) => ['src', 'map', 'filter', 'alt', 'changes', 'attach', 'take', 'withPrev', 'gate', 'zip', 'leftmost', 'mergeWith'].includes(n.kind);
 
 function lcg(seed: number) {
   let s = seed >>> 0;
@@ -347,7 +446,10 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
       else if (r < 0.9) n = { kind: 'sum', ins: [s(), s()] };
       else if (r < 0.94) n = { kind: 'take', e: e(), n: pick(6) };
       else if (r < 0.97) n = { kind: 'withPrev', e: e() };
-      else n = { kind: 'gate', s: s(), e: e() };
+      else if (r < 0.98) n = { kind: 'gate', s: s(), e: e() };
+      else if (r < 0.99) n = { kind: 'zip', a: e(), b: e() };
+      else if (r < 0.995) n = { kind: 'leftmost', a: e(), b: e() };
+      else n = { kind: 'mergeWith', a: e(), b: e() };
       spec.push(n);
       switch (n.kind) {
         case 'map': { const k = n.k; real.push(mapEvent((x: number) => x + k, real[n.e])); break; }
@@ -367,6 +469,11 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
           real.push(accumEvent((a: number, p: number | null) => ({ state: a, emit: p !== null, value: p === null ? 0 : p * 100 + a }), () => null, real[n.e]));
           break;
         case 'gate': real.push(gate(derived(() => real[(n as any).s].read() % 2 === 0), real[n.e])); break;
+        case 'zip': real.push(zip((x: number, y: number) => x * 10 + y, real[n.a], real[n.b])); break;
+        case 'leftmost': real.push(leftmost([real[n.a], real[n.b]])); break;
+        case 'mergeWith':
+          real.push(mergeWith((x: number, y: number) => x * 10 + y, (x: number) => x, (y: number) => -y, real[n.a], real[n.b]));
+          break;
       }
     }
 
@@ -374,6 +481,7 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
     const value: number[] = spec.map((n, i) => (n.kind === 'cell' ? real[i].value : 0));
     const counter: number[] = spec.map(() => 0);
     const previous: (number | null)[] = spec.map(() => null);
+    const queues: { a: number[]; b: number[] }[] = spec.map(() => ({ a: [], b: [] }));
     const evalRound = (fires: { src: number; v: number; s: number }[], writes: Map<number, number>, roundStamp: number, init = false) => {
       const occ: { s: number; v: number }[][] = [];
       const prev = value.slice();
@@ -410,6 +518,29 @@ export function eventFuzz(seed: number, graphs = 60): { checks: number; bad: num
             }
             break;
           case 'gate': if (value[n.s] % 2 === 0) occ[i] = occ[n.e]; break;
+          case 'zip': {
+            const q = queues[i];
+            const tagged = [...occ[n.a].map((o) => ({ o, side: 0 })), ...occ[n.b].map((o) => ({ o, side: 1 }))]
+              .sort((x, y) => x.o.s - y.o.s || x.side - y.side);
+            for (const { o, side } of tagged) {
+              if (side === 0) { if (q.b.length) occ[i].push({ s: o.s, v: o.v * 10 + q.b.shift()! }); else q.a.push(o.v); }
+              else if (q.a.length) occ[i].push({ s: o.s, v: q.a.shift()! * 10 + o.v }); else q.b.push(o.v);
+            }
+            break;
+          }
+          case 'leftmost': occ[i] = occ[n.a].length ? occ[n.a] : occ[n.b]; break;
+          case 'mergeWith': {
+            const as = occ[n.a];
+            const bs = occ[n.b];
+            let x = 0;
+            let y = 0;
+            while (x < as.length || y < bs.length) {
+              if (y >= bs.length || (x < as.length && as[x].s < bs[y].s)) { occ[i].push({ s: as[x].s, v: as[x].v }); x++; }
+              else if (x >= as.length || bs[y].s < as[x].s) { occ[i].push({ s: bs[y].s, v: -bs[y].v }); y++; }
+              else { occ[i].push({ s: as[x].s, v: as[x].v * 10 + bs[y].v }); x++; y++; }
+            }
+            break;
+          }
         }
       }
       return occ;
