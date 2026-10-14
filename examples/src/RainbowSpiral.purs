@@ -1,4 +1,8 @@
--- A port of the rainbow spiral demo (see "History" in the README).
+-- | A rainbow spiral of up to three thousand dots that follows the pointer,
+-- | one signal per dot style, all updated on every animation frame. Hold
+-- | the pointer down to grow the dots.
+-- |
+-- | A port of the rainbow spiral demo (see "History" in the README).
 
 module Screamer.Examples.RainbowSpiral where
 
@@ -6,10 +10,10 @@ import Prelude
 
 import Data.Array as Array
 import Data.Int as Int
+import Data.Maybe (Maybe(..))
 import Data.Number (cos, pi, sin)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
 import Screamer.Core (Element, component, dyn, element, fragment_)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
@@ -17,8 +21,11 @@ import Screamer.DOM.EventHandler as H
 import Screamer.Examples.Harness as Harness
 import Screamer.Signal (Signal, filterOn, sampleManyWith, sampleOn)
 import Screamer.Subscriptions.AnimationFrame as AnimationFrame
-import Web.Event.Event (preventDefault)
-import Web.UIEvent.MouseEvent (pageX, pageY, toEvent)
+import Screamer.SignalSource (SignalSource, signalSource)
+import Web.DOM.Element as Element
+import Web.Event.Event (currentTarget, preventDefault)
+import Web.PointerEvent.PointerEvent (toMouseEvent)
+import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
 
 main :: Effect Unit
 main = Harness.run "main" spiral
@@ -86,6 +93,18 @@ mkDot dotAttrs i =
   isActive = dotAttrs <#> \{ max } -> Int.toNumber i < max
   activeAttrs = filterOn isActive { hb: 0, pos: origin, max: 0.0 } dotAttrs
 
+-- | The pointer's position relative to the centre of the element handling
+-- | the event, which is where the spiral starts.
+fromCentre :: MouseEvent -> Effect Position
+fromCentre e = case currentTarget (toEvent e) >>= Element.fromEventTarget of
+  Nothing -> pure origin
+  Just el -> do
+    r <- Element.getBoundingClientRect el
+    pure
+      { x: Int.toNumber (clientX e) - r.left - r.width / 2.0
+      , y: Int.toNumber (clientY e) - r.top - r.height / 2.0
+      }
+
 spiral :: Element
 spiral = component do
   numerosity <- liftEffect $ signalSource 200
@@ -96,22 +115,28 @@ spiral = component do
   let
     dotAttrs = sampleManyWith { pos: position.signal, n: numerosity.signal } { hb: heartbeat.signal } toDotAttrs
     cursor = sampleOn heartbeat.signal position.signal
-  pure $ E.div_
-    [ A.id_ "main"
-    , H.onMouseMove_ \e -> position.put { x: Int.toNumber (pageX e), y: Int.toNumber (pageY e) }
-    , H.onMouseDown_ \e -> preventDefault (toEvent e) *> isBig.put true
-    , H.onMouseUp_ \_ -> isBig.put false
-    ]
-    [ animationPicker
-    , dot isBig.signal
-        { left: cursor <#> \{ x } -> px x
-        , top: cursor <#> \{ y } -> px y
-        , "border-color": pure "red"
-        , display: pure "inline"
-        }
-        []
-    , dyn $ numerosity.signal <#> \n ->
-        fragment_ $ Array.range 0 (n * 3 / 2) <#> \i -> dot isBig.signal (mkDot dotAttrs i) []
+  pure $ E.div_ [ A.class_ "rainbow" ]
+    [ animationPicker numerosity
+    , E.div_
+        [ A.id_ "spiral"
+        , H.onPointerMove_ \e -> position.put =<< fromCentre (toMouseEvent e)
+        , H.onPointerDown_ \e -> preventDefault (toEvent (toMouseEvent e)) *> isBig.put true
+        , H.onPointerUp_ \_ -> isBig.put false
+        , H.onPointerLeave_ \_ -> isBig.put false *> position.put origin
+        ]
+        -- The dots are positioned relative to a point at the centre.
+        [ E.div_ [ A.class_ "origin" ]
+            [ dot isBig.signal
+                { left: cursor <#> \{ x } -> px x
+                , top: cursor <#> \{ y } -> px y
+                , "border-color": pure "red"
+                , display: pure "inline"
+                }
+                []
+            , dyn $ numerosity.signal <#> \n ->
+                fragment_ $ Array.range 0 (n * 3 / 2) <#> \i -> dot isBig.signal (mkDot dotAttrs i) []
+            ]
+        ]
     ]
 
 -- | A single colored dot.
@@ -122,5 +147,14 @@ dot isBig dotStyle =
     , A.style_ dotStyle
     ]
 
-animationPicker :: Element
-animationPicker = element "Picker goes here"
+-- | Buttons choosing how many dots the spiral has.
+animationPicker :: SignalSource Int -> Element
+animationPicker numerosity = E.div_ [ A.class_ "picker" ]
+  [ E.span_ [] [ element "Dots" ]
+  , fragment_ $ counts <#> \n ->
+      E.button_
+        [ A.class_ (numerosity.signal <#> \m -> if m == n then "active" else "")
+        , H.onClick_ \_ -> numerosity.put n
+        ]
+        [ element (show n) ]
+  ]
