@@ -98,3 +98,52 @@ export const race = <A>(es: E<A>[]): E<A> => R.race(es);
 // Flattening (#21).
 
 export const switchEvent = <A>(s: S<E<A>>): E<A> => R.switchEvent(s);
+
+// Buffering (#23). A paused buffer keeps what it holds, like any stateful node.
+
+export const bufferCount = (n: number) => (step: number) => <A>(e: E<A>): E<A[]> => {
+  const size = Math.max(1, n);
+  const every = Math.max(1, step);
+  return accum<A, { seen: number; open: A[][] }, A[]>((a, st) => {
+    const open = st.seen % every === 0 ? st.open.concat([[]]) : st.open.slice();
+    let full: A[] | null = null;
+    for (let i = 0; i < open.length; i++) {
+      open[i] = open[i].concat([a]);
+      if (open[i].length === size && full === null) full = open[i];
+    }
+    const rest = full === null ? open : open.filter((b) => b !== full);
+    return { state: { seen: st.seen + 1, open: rest }, emit: full !== null, value: full ?? undefined };
+  }, () => ({ seen: 0, open: [] }))(e);
+};
+
+export const bufferOn = <B>(notifier: E<B>) => <A>(e: E<A>): E<A[]> =>
+  R.eventStateful<A[], A[]>([e, notifier], () => [], (changed, values, held) => {
+    const as: Core.Occ<A>[] = changed[0] ? values[0] : [];
+    const ns: Core.Occ<B>[] = changed[1] ? values[1] : [];
+    const out: Core.Occ<A[]>[] = [];
+    let buf = held;
+    let i = 0;
+    for (let j = 0; j < ns.length; j++) {
+      // Occurrences fired up to the notifier's (inclusive) go in its buffer.
+      const take: A[] = [];
+      while (i < as.length && as[i].s <= ns[j].s) take.push(as[i++].v);
+      out.push({ s: ns[j].s, v: buf.concat(take) });
+      buf = [];
+    }
+    while (i < as.length) buf = buf.concat([as[i++].v]);
+    return { state: buf, out };
+  });
+
+export const bufferWhile = (cond: S<boolean>) => <A>(e: E<A>): E<A[]> =>
+  R.eventStateful<{ open: boolean; buf: A[] }, A[]>(
+    [cond, e],
+    () => ({ open: cond.read(), buf: [] }),
+    (changed, values, st) => {
+      const open: boolean = values[0];
+      const os: Core.Occ<A>[] = changed[1] ? values[1] : [];
+      if (open) return { state: { open, buf: st.buf.concat(os.map((o) => o.v)) }, out: [] };
+      // Closed at the end of the round: emit what the window held, if it was open.
+      const out = st.open ? [{ s: R.signalStamp(), v: st.buf }] : [];
+      return { state: { open, buf: [] }, out };
+    },
+  );

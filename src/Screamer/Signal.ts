@@ -43,6 +43,12 @@ export const combine = <A>(ss: S<A>[]): S<A[]> => R.combine(ss);
 export const withLatestImpl = <A, B, T>(pair: (a: A) => (b: B) => T) => (b: S<B>) => (a: S<A>): S<T> =>
   R.withLatest((x: A, y: B) => pair(x)(y), b, a);
 
+export const history = (n: number) => <A>(s: S<A>): S<A[]> =>
+  R.stateful<A[]>([s], () => (n > 0 ? [s.read()] : []), (_, values, xs) => {
+    const next = xs.concat([values[0]]);
+    return next.length > n ? next.slice(next.length - n) : next;
+  });
+
 export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => R.merge(a, b);
 
 export const filter = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => R.filter(p, seed, s);

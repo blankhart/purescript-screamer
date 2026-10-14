@@ -18,6 +18,7 @@ module Screamer.Time
   , delay
   , timeout
   , onFrame
+  , bufferFor
   ) where
 
 import Prelude
@@ -180,3 +181,18 @@ onFrame input = do
 -- | Mark the slot's timer as having run, so `busy` turns false.
 timerDone :: Slot -> Effect Unit
 timerDone = _.cancel
+
+-- | The occurrences of each interval, fired at its end, starting one
+-- | interval from now. An interval with no occurrences fires nothing,
+-- | unlike RxJS. What is buffered when the scope is disposed is dropped.
+-- | (RxJS `bufferTime`.)
+bufferFor :: forall a. Milliseconds -> Event a -> Owned (Event (Array a))
+bufferFor (Milliseconds ms) input = do
+  out <- liftEffect eventSource
+  held <- liftEffect $ Ref.new []
+  Event.subscribe input \a -> Ref.modify_ (_ <> [ a ]) held
+  cancel <- liftEffect $ intervalImpl ms do
+    xs <- Ref.modify' (\xs -> { state: [], value: xs }) held
+    unless (Array.null xs) $ out.fire xs
+  onCleanup (cancel *> Ref.write [] held)
+  pure out.event
