@@ -16,7 +16,7 @@ main :: Effect Unit
 main = void $ mount "main" counter
 ```
 
-The examples are in `examples/src`. Run `npm run build:examples` to bundle them, and `npm run test:smoke` to check them in headless Chromium.
+The examples are in `examples/src`. Run `npm run build:examples` to bundle them into `examples/output`, which also gets an `index.html` linking each one. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
 
 ## How ownership works
 
