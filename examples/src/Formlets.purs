@@ -13,7 +13,7 @@ import Data.Number.Format (fixed, toStringWith)
 import Data.String as String
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Element, component, element, text)
 import Screamer.DOM.Attribute (InputType(..))
 import Screamer.DOM.Attribute as A
@@ -75,7 +75,7 @@ blankSignup =
 signup :: Element
 signup = component do
   form <- build unit blankSignup signupForm
-  submitted <- liftEffect $ channel ""
+  submitted <- liftEffect $ signalSource ""
   let
     submit = read form.result >>= case _ of
       Left _ -> form.reveal

@@ -10,7 +10,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Class as Owned
 import Effect.Ref as Ref
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, fragment_, mount, on_, property, styleProperty, text)
 import Screamer.Owned (onCleanup, subscribe)
 import Screamer.Reactive.Core (readStats)
@@ -37,9 +37,9 @@ spec = describe "Screamer.Core" do
 
   it "renders signal-bound markup and keeps it up to date" do
     liftEffect resetBody
-    name <- liftEffect $ channel "Ada"
-    hidden <- liftEffect $ channel false
-    colour <- liftEffect $ channel "red"
+    name <- liftEffect $ signalSource "Ada"
+    hidden <- liftEffect $ signalSource false
+    colour <- liftEffect $ signalSource "red"
     _ <- liftEffect $ mount "#root" $
       div'
         [ booleanAttribute "hidden" hidden.signal
@@ -58,16 +58,16 @@ spec = describe "Screamer.Core" do
 
   it "sets properties" do
     liftEffect resetBody
-    v <- liftEffect $ channel "one"
+    v <- liftEffect $ signalSource "one"
     _ <- liftEffect $ mount "#root" $ element_ "input" [ property "value" v.signal ] []
     liftEffect $ v.put "two"
     -- A property, not an attribute: the markup has no value attribute.
     liftEffect (innerHTML "#root") >>= shouldEqual "<input>"
 
-  it "updates exactly one DOM node when one channel is written" do
+  it "updates exactly one DOM node when one signal source is written" do
     liftEffect resetBody
-    chans <- liftEffect $ traverse channel [ "a", "b", "c" ]
-    cls <- liftEffect $ channel "x"
+    chans <- liftEffect $ traverse signalSource [ "a", "b", "c" ]
+    cls <- liftEffect $ signalSource "x"
     _ <- liftEffect $ mount "#root" $
       div' [ attribute "class" cls.signal ] (chans <#> \c -> element_ "p" [] [ text c.signal ])
     n <- liftEffect $ mutationsDuring "#root" do
@@ -78,7 +78,7 @@ spec = describe "Screamer.Core" do
   it "leaves zero live effects and zero element listeners after unmount" do
     liftEffect resetBody
     before <- liftEffect readStats
-    count <- liftEffect $ channel 0
+    count <- liftEffect $ signalSource 0
     unmount <- liftEffect $ mount "#root" $
       div' [ on_ "click" \_ -> count.modify (_ + 1) ]
         [ text (show <$> count.signal)
@@ -99,8 +99,8 @@ spec = describe "Screamer.Core" do
 
   it "delegated handlers see currentTarget, honour stopPropagation and stop after disposal" do
     liftEffect resetBody
-    log <- liftEffect $ channel []
-    shown <- liftEffect $ channel true
+    log <- liftEffect $ signalSource []
+    shown <- liftEffect $ signalSource true
     let record x = log.modify (_ <> [ x ])
     _ <- liftEffect $ mount "#root" $
       element_ "section" [ on_ "click" \_ -> record "section" ]
@@ -117,8 +117,8 @@ spec = describe "Screamer.Core" do
 
   it "dyn disposes its previous branch's effects" do
     liftEffect resetBody
-    tab <- liftEffect $ channel "a"
-    src <- liftEffect $ channel 0
+    tab <- liftEffect $ signalSource "a"
+    src <- liftEffect $ signalSource 0
     let
       branch t = component do
         let clicks = fold (\_ n -> n + 1) 0 src.signal
@@ -139,7 +139,7 @@ spec = describe "Screamer.Core" do
   describe "each" do
     it "keeps node identity for kept keys" do
       liftEffect resetBody
-      items <- liftEffect $ channel [ 1, 2, 3, 4, 5 ]
+      items <- liftEffect $ signalSource [ 1, 2, 3, 4, 5 ]
       _ <- liftEffect $ mount "#root" $ element_ "ul" []
         [ each identity items.signal \s -> element_ "li" [ attribute "data-key" (show <$> s) ] [ text (show <$> s) ] ]
       let
@@ -165,7 +165,7 @@ spec = describe "Screamer.Core" do
 
     it "updates kept rows' signals in place" do
       liftEffect resetBody
-      items <- liftEffect $ channel [ { id: 1, label: "one" }, { id: 2, label: "two" } ]
+      items <- liftEffect $ signalSource [ { id: 1, label: "one" }, { id: 2, label: "two" } ]
       _ <- liftEffect $ mount "#root" $ element_ "ul" []
         [ each _.id items.signal \s -> element_ "li" [ attribute "data-key" (show <<< _.id <$> s) ] [ text (_.label <$> s) ] ]
       before <- liftEffect $ rowNodes "#root li"
@@ -180,7 +180,7 @@ spec = describe "Screamer.Core" do
     liftEffect resetBody
     setups <- liftEffect $ Ref.new 0
     cleanups <- liftEffect $ Ref.new 0
-    shared <- liftEffect $ channel 0
+    shared <- liftEffect $ signalSource 0
     let
       counter = component do
         liftEffect' (Ref.modify_ (_ + 1) setups)
@@ -221,8 +221,8 @@ genList = do
 
 app :: Element
 app = component do
-  count <- liftEffect $ channel 0
-  items <- liftEffect $ channel ([] :: Array Int)
+  count <- liftEffect $ signalSource 0
+  items <- liftEffect $ signalSource ([] :: Array Int)
   let
     remove n = items.modify (Array.filter (_ /= n))
   pure $ div' []

@@ -1,7 +1,7 @@
 -- | Formlets: forms that compose like applicative values.
 -- |
 -- | A `Form props i o` edits a state of type `i` and validates it into an
--- | `o`. The state lives in one channel that `build` creates per instance;
+-- | `o`. The state lives in one signal source that `build` creates per instance;
 -- | each field reads its part of the state through a signal and writes it
 -- | back through `modify`. Because the state is plain data, going back a step
 -- | in a wizard or resetting the form shows the values the user entered.
@@ -65,7 +65,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Prim.Row as Row
 import Record as Record
-import Screamer.Channel (Channel, batch, channel)
+import Screamer.SignalSource (SignalSource, batch, signalSource)
 import Screamer.Core (Element, attribute, dyn, element, fragment_, text)
 import Screamer.DOM.Attribute (InputType(..))
 import Screamer.DOM.Attribute as A
@@ -278,10 +278,10 @@ select placeholder options = Form \c -> pure
 inputValue :: (String -> Effect Unit) -> Event -> Effect Unit
 inputValue k e = for_ (target e >>= Input.fromEventTarget) (Input.value >=> k)
 
--- | Build a form over a fresh state channel, in the current scope.
+-- | Build a form over a fresh state signal source, in the current scope.
 type Built i o =
   { element :: Element
-  , state :: Channel i
+  , state :: SignalSource i
   , result :: Signal (Either Errors o)
   -- Show every validation message, edited or not (for example when the
   -- user tries to submit an invalid form).
@@ -292,8 +292,8 @@ type Built i o =
 
 build :: forall props i o. props -> i -> Form props i o -> Owned (Built i o)
 build props initial (Form f) = do
-  state <- liftEffect $ channel initial
-  revealed <- liftEffect $ channel false
+  state <- liftEffect $ signalSource initial
+  revealed <- liftEffect $ signalSource false
   r <- f { props, value: state.signal, modify: state.modify, reveal: revealed.signal }
   pure
     { element: E.div_ [ A.class_ "screamer-form" ] r.fields
@@ -330,7 +330,7 @@ type Current props i o =
   { form :: Form props i (Wizard props i o)
   , rendered :: Rendered (Wizard props i o)
   , dispose :: Effect Unit
-  , reveal :: Channel Boolean
+  , reveal :: SignalSource Boolean
   , back :: Array (Form props i (Wizard props i o))
   }
 
@@ -344,13 +344,13 @@ wizard (Step first) = Form \c -> do
   let
     open :: Form props i (Wizard props i o) -> Array (Form props i (Wizard props i o)) -> Effect (Current props i o)
     open form back = do
-      reveal <- channel false
+      reveal <- signalSource false
       let
         Owned run = child (runForm form c { reveal = (||) <$> c.reveal <*> reveal.signal })
       r <- run scope
       pure { form, rendered: r.value, dispose: r.dispose, reveal, back }
   initial <- liftEffect $ open first []
-  current <- liftEffect $ channel initial
+  current <- liftEffect $ signalSource initial
   let
     go form back = do
       read current.signal >>= _.dispose

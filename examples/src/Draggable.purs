@@ -1,5 +1,5 @@
 -- | Drag circles around an SVG canvas. The drag state is a `fold` over
--- | pointer events, so the only channel is the event stream itself.
+-- | pointer events, so the only signal source is the event stream itself.
 module Screamer.Examples.Draggable where
 
 import Prelude
@@ -9,7 +9,7 @@ import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Element, component, element)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
@@ -63,7 +63,7 @@ point e = { x: Int.toNumber (clientX m), y: Int.toNumber (clientY m) }
 
 draggable :: Element
 draggable = component do
-  pointer <- liftEffect $ channel Up
+  pointer <- liftEffect $ signalSource Up
   let
     drag = fold step start pointer.signal
     colours = [ "tomato", "seagreen", "steelblue" ]
