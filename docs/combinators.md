@@ -194,6 +194,23 @@ resource = resourceWith Switch
 
 `resourceWith` turns `Loading` when a request starts and shows each result its strategy keeps; under `Exhaust` that can be the result for an older input than the signal's current value. `request` fires one occurrence per kept result. Disposing the scope kills every running request, and a result that arrives after its request was killed is never shown.
 
+## Time (#22)
+
+`Screamer.Time`. Each combinator needs a timer, so each returns `Owned` and cancels its timers when its scope is disposed; an occurrence still pending then is dropped. Timers start at instantiation: each combinator subscribes to its input when its scope runs and observes it for the scope's whole life, whether or not anything observes the output. `timeout` and `sampleEvery` count their first interval from instantiation.
+
+| RxJS | Screamer |
+|---|---|
+| `debounceTime` | `debounce :: Milliseconds -> Event a -> Owned (Event a)`; `debounced :: Milliseconds -> Signal a -> Owned (Signal a)` holds the last settled value, starting at the current one |
+| `throttleTime` | `throttle :: { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)`; a trailing occurrence opens a new interval, as in RxJS |
+| `auditTime` | `audit :: Milliseconds -> Event a -> Owned (Event a)` |
+| `sampleTime` | `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)`; holds the signal so a stateful one keeps advancing |
+| `delay` | `delay :: Milliseconds -> Event a -> Owned (Event a)`; keeps order |
+| `timeout` | `timeout :: Milliseconds -> Event a -> Owned (Event (Either Unit a))`; a `Left unit` for each silence of the interval, from instantiation and after each occurrence, instead of an error |
+| `interval`, `timer` | `Timer.every`, `Timer.after` |
+| animation-frame scheduling | `onFrame :: Event a -> Owned (Event a)`: the latest occurrence on the next frame |
+
+Each timer callback runs in one `batch`, so what it fires arrives in one round. An occurrence passed on without a timer (a leading `throttle` edge, a `timeout`'s `Right`) is fired from a subscription, so it arrives one round after the input's.
+
 ## Implementation
 
 The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).
