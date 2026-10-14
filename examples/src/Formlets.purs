@@ -19,8 +19,8 @@ import Screamer.DOM.Attribute (InputType(..))
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
 import Screamer.DOM.EventHandler as H
+import Screamer.Examples.Formlet (Form, Validated(..), Wizard, build, checkbox, indent, mustBe, nonEmpty, number, password, prop, required, section, select, step, textbox, validated, wizard)
 import Screamer.Examples.Harness as Harness
-import Screamer.Formlet (Form, Validated(..), Wizard, build, checkbox, indent, mustBe, nonEmpty, number, password, prop, required, section, select, step, textbox, validated, wizard)
 import Screamer.Signal (read)
 import Type.Proxy (Proxy(..))
 import Web.Event.Event (preventDefault)
