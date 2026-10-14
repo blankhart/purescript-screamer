@@ -18,6 +18,7 @@ import Test.Errors as Errors
 import Test.Flatten as Flatten
 import Test.Time as Time
 import Test.Owned as Owned
+import Test.Sharing as Sharing
 import Test.Signal as Signal
 import Test.Subscriptions as Subscriptions
 import Test.TypedDom as TypedDom
@@ -38,6 +39,7 @@ spec = do
   Event.spec
   Flatten.spec
   Errors.spec
+  Sharing.spec
   Time.spec
   Owned.spec
   Dom.spec

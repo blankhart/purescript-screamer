@@ -254,6 +254,25 @@ boundary body = component do
 
 There is no error channel on events: an event occurrence is a value, so a request's failure is an `Either` (`request`) or a `Remote` (`resource`), and a throwing callback goes to `onError`.
 
+## Sharing (#25)
+
+RxJS needs `share`, `shareReplay` and `publish` because an observable is a recipe: each subscriber runs it again. Here a `Signal` or `Event` value **is** a node, so sharing is by reference.
+
+- **One value, one node.** `let total = Event.fold (+) 0 clicks` observed by two effects is one stateful node. It steps once per occurrence and both effects see the same value in the same batch.
+- **Two evaluations, two nodes.** Writing `Event.fold (+) 0 clicks` twice (or calling a function that builds it twice) makes two nodes with separate state. They agree only if both are observed for the same occurrences; one created later starts from its seed. Bind the value once with `let` and pass it around.
+- **Paused state.** A stateful node steps only while observed. When its last observer leaves it keeps its state and misses what fires meanwhile (a stateful *signal* resynchronizes from its input's current value when it returns; a stateful *event* node cannot, since events have no current value). To keep one stepping for a scope's lifetime, pin it: `Owned.hold` for a signal, `Event.hold :: Event a -> Owned (Event a)` for an event (`take`, `mapAccum`, `dropRepeats`, ...).
+
+| RxJS | Screamer |
+|---|---|
+| `share()` | bind the value once (`let`); every observer shares the node |
+| `shareReplay(1)` | a signal: `Event.stepper` or `Event.fold`, plus `Owned.hold` if it must not pause |
+| `publish()` / `connect()` | `Event.hold` (or `Owned.hold`) starts it for the scope; disposing the scope disconnects |
+| cold vs hot | every node is hot while observed and inert otherwise; there is no per-subscriber execution to make cold |
+
+- **`replay` is left out.** A replay buffer would hand late observers occurrences from earlier batches, which breaks "an occurrence happens at one moment". No example needed it: what a late observer wants is almost always a current value (`stepper`, `Signal.history n` for the last n).
+- **No dev warning for duplicated stateful expressions.** Building the same expression twice allocates two nodes that look identical to the core; telling an accidental duplicate from a deliberate second instance (two independent counters) would need call-site identity, which costs a stack trace per allocation. The test `Test.Sharing` documents both behaviours instead.
+- A late subscriber never sees occurrences delivered earlier in the same batch: `Event.subscribe` records the event's version when it starts. `Event.hold` does not change that; it only keeps stateful nodes stepping.
+
 ## Implementation
 
 The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).
