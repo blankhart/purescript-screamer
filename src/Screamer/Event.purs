@@ -11,7 +11,8 @@
 -- | when first observed, step once per occurrence while observed, and keep
 -- | their state when the last observer leaves. Unlike stateful signals they
 -- | do not resynchronize on return: occurrences fired while paused are
--- | missed. Use `Screamer.Owned.hold` on the result to keep one advancing.
+-- | missed. Use `Screamer.Owned.hold` on a signal, or `hold` here on an
+-- | event, to keep one advancing.
 -- |
 -- | This module reuses names from `Screamer.Signal` and `Screamer.Owned`,
 -- | so import it qualified: `import Screamer.Event as Event`. See
@@ -25,6 +26,7 @@ module Screamer.Event
   , attach
   , attachWith
   , subscribe
+  , hold
   -- Transform, filter and accumulate
   , mapAccum
   , withPrevious
@@ -150,6 +152,15 @@ foreign import subscribeImpl :: forall a. Scope -> Event a -> (a -> Effect Unit)
 -- | next flush round.
 subscribe :: forall a. Event a -> (a -> Effect Unit) -> Owned Unit
 subscribe e cb = Owned \s -> subscribeImpl s e cb
+
+foreign import holdImpl :: forall a. Scope -> Event a -> Effect (Event a)
+
+-- | Observe an event for the lifetime of the current scope, so a stateful
+-- | event (`take`, `mapAccum`, `dropRepeats`, ...) keeps stepping while
+-- | nothing else observes it. Returns the same event. The event counterpart
+-- | of `Screamer.Owned.hold`; see "Sharing" in `docs/combinators.md`.
+hold :: forall a. Event a -> Owned (Event a)
+hold e = Owned \s -> holdImpl s e
 
 -- Transform, filter and accumulate (#19). The stateful ones start from
 -- their seed when first observed and count only occurrences seen while

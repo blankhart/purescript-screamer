@@ -29,6 +29,8 @@ export const fold = <A, B>(f: (a: A) => (b: B) => B) => (seed: B) => (e: E<A>): 
 export const attachWith = <A, B, C>(f: (b: B) => (a: A) => C) => (s: S<B>) => (e: E<A>): E<C> =>
   R.attachWith((b: B, a: A) => f(b)(a), s, e);
 
+export const holdImpl = <A>(s: Core.Scope) => (e: E<A>) => (): E<A> => R.runInScope(s, () => R.holdEvent(e));
+
 export const subscribeImpl = <A>(s: Core.Scope) => (e: E<A>) => (cb: (a: A) => () => void) => () => {
   R.subscribeEvent(s, e, (a) => cb(a)());
 };
