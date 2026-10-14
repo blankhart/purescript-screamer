@@ -26,3 +26,4 @@ package:
     - web-html
     - web-pointerevents
     - web-uievents
+    - windrose-router

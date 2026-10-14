@@ -23,9 +23,14 @@ const examples = {
 
   async RainbowSpiral(page) {
     // A cursor dot and 301 spiral dots (the inactive ones hidden).
-    await page.waitForFunction(() => document.querySelectorAll('#main .cursor').length === 302);
-    await page.mouse.move(150, 8);
-    await page.waitForFunction(() => document.querySelector('#main .cursor').style.left === '150px');
+    await page.waitForFunction(() => document.querySelectorAll('#spiral .cursor').length === 302);
+    // The cursor dot is placed relative to the centre of the stage.
+    const box = await page.locator('#spiral').boundingBox();
+    await page.mouse.move(box.x + box.width / 2 + 150, box.y + box.height / 2 + 8);
+    await page.waitForFunction(() => Math.abs(parseFloat(document.querySelector('#spiral .cursor').style.left) - 150) < 1);
+    // The picker changes the number of dots.
+    await page.click('.picker button:nth-of-type(2)');
+    await page.waitForFunction(() => document.querySelectorAll('#spiral .cursor').length === 752);
   },
 
   async Draggable(page) {
@@ -43,11 +48,14 @@ const examples = {
     await expectText(page, '#page h1', 'Home');
     await page.click('#item');
     await expectText(page, '#page h1', 'Item 42');
-    if (new URL(page.url()).pathname !== '/items/42') throw new Error(`location is ${page.url()}`);
+    if (new URL(page.url()).hash !== '#/items/42') throw new Error(`location is ${page.url()}`);
+    await expectClass(page, '#item', 'current');
     await page.click('#about');
     await expectText(page, '#page h1', 'About');
     await page.goBack();
     await expectText(page, '#page h1', 'Item 42');
+    await page.click('#broken');
+    await expectText(page, '#page h1', 'Not found');
   },
 
   async WebSocket(page) {
@@ -201,6 +209,7 @@ const browser = await chromium.launch({ executablePath });
 let failed = false;
 for (const [name, interact] of Object.entries(examples)) {
   const bundle = path.join(here, 'output', `${name}.js`);
+  const stylesheet = path.join(here, 'static', 'examples.css');
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -210,7 +219,8 @@ for (const [name, interact] of Object.entries(examples)) {
     await page.route(`${origin}/**`, (route) => {
       const url = new URL(route.request().url());
       if (url.pathname === '/bundle.js') return route.fulfill({ path: bundle, contentType: 'text/javascript' });
-      return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body><main></main><script src="/bundle.js"></script></body></html>' });
+      if (url.pathname === '/examples.css') return route.fulfill({ path: stylesheet, contentType: 'text/css' });
+      return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html data-example="${name}"><head><link rel="stylesheet" href="/examples.css"></head><body><main></main><script src="/bundle.js"></script></body></html>` });
     });
     await page.addInitScript(mockWebSocket);
     await page.goto(`${origin}/`);

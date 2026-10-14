@@ -1,3 +1,5 @@
+-- | The js-framework-benchmark app: create, update, swap, select and
+-- | remove up to ten thousand table rows.
 module Screamer.Examples.JsFrameworksBenchmark where
 
 -- https://github.com/krausest/js-framework-benchmark

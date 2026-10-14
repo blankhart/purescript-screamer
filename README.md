@@ -16,7 +16,7 @@ main :: Effect Unit
 main = void $ mount "main" counter
 ```
 
-The examples are in `examples/src`. Run `npm run build:examples` to bundle them into `examples/output`, which also gets an `index.html` linking each one. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
+The examples are in `examples/src`. Run `npm run build:examples` to bundle them into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
 
 ## How ownership works
 
@@ -34,7 +34,7 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them 
 
 **`mount` returns unmount.** `mount :: String -> Element -> Effect (Effect Unit)` renders into the first element matching the selector. The action it returns removes the nodes and disposes every effect the tree created.
 
-**Subscriptions and resources are owned too.** `Screamer.Subscriptions.Timer` (`every`, `after`), `AnimationFrame` (`frames`, `every`), `WebSocket` (`connect`) and `Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
+**Subscriptions and resources are owned too.** `Screamer.Subscriptions.Timer` (`every`, `after`), `AnimationFrame` (`frames`, `every`), `WebSocket` (`connect`) and `Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Router` only tracks the location; the Router example matches it, and builds its links, with [windrose-router](https://github.com/blankhart/purescript-windrose-router), whose routes are a type. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
 
 **Typed DOM.** `Screamer.DOM.Element`, `Attribute`, `EventHandler` and `Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
 
