@@ -85,7 +85,8 @@
             "web-events",
             "web-html",
             "web-pointerevents",
-            "web-uievents"
+            "web-uievents",
+            "windrose-router"
           ]
         },
         "test": {
@@ -752,7 +753,12 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "windrose-router": {
+        "git": "https://github.com/blankhart/purescript-windrose-router.git",
+        "ref": "6199237cf42d35b8ca3d89ceaba40efb83966ac3"
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -1104,6 +1110,20 @@
         "tailrec",
         "tuples",
         "unfoldable"
+      ]
+    },
+    "heterogeneous": {
+      "type": "registry",
+      "version": "0.7.0",
+      "integrity": "sha256-pQwcFvhWL8noktxaoD7FlLs2F2lYf3QHoyO0VOWO3I0=",
+      "dependencies": [
+        "either",
+        "foldable-traversable",
+        "functors",
+        "prelude",
+        "record",
+        "tuples",
+        "variant"
       ]
     },
     "identity": {
@@ -1613,6 +1633,22 @@
       "integrity": "sha256-0L1QsaY20OILjfU5TV72d3U/tSjhmL9hJ32WMp857Lk=",
       "dependencies": []
     },
+    "variant": {
+      "type": "registry",
+      "version": "8.0.0",
+      "integrity": "sha256-Ydrgl8liWEwYQOWW76PdZtg3vxKpoKgsnmFyTLgZkoU=",
+      "dependencies": [
+        "control",
+        "enums",
+        "foldable-traversable",
+        "lists",
+        "maybe",
+        "partial",
+        "prelude",
+        "type-equality",
+        "unsafe-coerce"
+      ]
+    },
     "web-clipboard": {
       "type": "registry",
       "version": "6.0.0",
@@ -1760,6 +1796,25 @@
         "unsafe-coerce",
         "web-events",
         "web-html"
+      ]
+    },
+    "windrose-router": {
+      "type": "git",
+      "url": "https://github.com/blankhart/purescript-windrose-router.git",
+      "rev": "6199237cf42d35b8ca3d89ceaba40efb83966ac3",
+      "dependencies": [
+        "arrays",
+        "control",
+        "either",
+        "foldable-traversable",
+        "heterogeneous",
+        "integers",
+        "maybe",
+        "numbers",
+        "prelude",
+        "record",
+        "strings",
+        "tuples"
       ]
     }
   }

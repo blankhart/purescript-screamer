@@ -90,7 +90,7 @@ draggable = component do
         [ Svg.width_ "400"
         , Svg.height_ "200"
         , Svg.viewBox_ "0 0 400 200"
-        , A.style_ { "touch-action": "none", border: "1px solid #ccc", display: "block" }
+        , A.style_ { "touch-action": "none", display: "block" }
         , H.onPointerMove_ \e -> pointer.fire (Move (point e))
         , H.onPointerUp_ \_ -> pointer.fire Up
         ]
