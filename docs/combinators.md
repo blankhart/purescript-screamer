@@ -147,6 +147,22 @@ All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`, `take`,
 | `tap` | left out | an effect belongs in `subscribe`, which has an owner |
 | toggle, `gate` | `Event.gate :: Signal Boolean -> Event a -> Event a` | the event form of `filterOn`; reads the condition at the end of the round |
 
+## Combining several streams (#20)
+
+All pure. The simultaneity rule for each: on signals, one step per batch and the left input wins where only one value can be kept; on events, every occurrence is kept in fire order unless the combinator says otherwise.
+
+| RxJS | Screamer | Simultaneity |
+|---|---|---|
+| `combineLatest` | `apply`, `sequence`, `sampleMany`, and `Signal.combine :: Array (Signal a) -> Signal (Array a)` | one value per batch; `combine` is one node instead of a chain of `apply`s |
+| `withLatestFrom` | `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Signal (Tuple a b)` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; the first is observed with it, so a stateful signal there keeps advancing |
+| `sample` | `Event.tag`; `Signal.sampleOn` | the signal is read at the end of the round |
+| `merge` | `<|>`, `Event.oneOf :: Array (Event a) -> Event a` | every occurrence, in fire order; `oneOf` is one node and agrees with folding `<|>` |
+| (Reflex `leftmost`) | `Event.leftmost :: Array (Event a) -> Event a` | only the leftmost input that fired in the round |
+| `mergeWith` keeping both | `Event.mergeWith :: (a -> b -> c) -> (a -> c) -> (b -> c) -> Event a -> Event b -> Event c` | occurrences with the same fire stamp (both derived from one fire) are combined; nothing is lost |
+| `zip` | `Event.zip`, `Event.zipWith` | pairs the nth occurrence of each, counting from observation; unpaired occurrences queue without bound; a paused zip drops its queues, because what they would pair with is missed |
+| `race` | `Event.race :: Array (Event a) -> Event a` | follows the first input to fire after first observation (the leftmost, on a tie); keeps that choice while paused |
+| `forkJoin`, `combineLatestAll` | left out | events never complete, so there is no last value to join; for a list of async results use `Remote`'s `Applicative` (#24) or `sequence` on signals |
+
 ## Implementation
 
 The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).

@@ -80,3 +80,17 @@ export const takeWhile = <A>(p: (a: A) => boolean) => (e: E<A>): E<A> =>
 
 export const skipWhile = <A>(p: (a: A) => boolean) => (e: E<A>): E<A> =>
   accum<A, boolean, A>((a, open) => (open || !p(a) ? { state: true, emit: true, value: a } : { state: false, emit: false }), () => false)(e);
+
+// Combining several streams (#20).
+
+export const oneOf = <A>(es: E<A>[]): E<A> => R.oneOf(es);
+
+export const leftmost = <A>(es: E<A>[]): E<A> => R.leftmost(es);
+
+export const mergeWith = <A, B, C>(both: (a: A) => (b: B) => C) => (left: (a: A) => C) => (right: (b: B) => C) =>
+  (ea: E<A>) => (eb: E<B>): E<C> => R.mergeWith((a: A, b: B) => both(a)(b), left, right, ea, eb);
+
+export const zipWith = <A, B, C>(f: (a: A) => (b: B) => C) => (ea: E<A>) => (eb: E<B>): E<C> =>
+  R.zip((a: A, b: B) => f(a)(b), ea, eb);
+
+export const race = <A>(es: E<A>[]): E<A> => R.race(es);

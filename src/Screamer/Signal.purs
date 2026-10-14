@@ -33,6 +33,8 @@ module Screamer.Signal
   , dropRepeatsBy
   , dropRepeatsOn
   , withPrevious
+  , combine
+  , withLatest
   , fold
   , merge
   , filter
@@ -113,6 +115,18 @@ withPrevious :: forall a. a -> Signal a -> Signal (Tuple a a)
 withPrevious = withPreviousImpl Tuple
 
 foreign import withPreviousImpl :: forall a. (a -> a -> Tuple a a) -> a -> Signal a -> Signal (Tuple a a)
+
+-- | The current values of every signal in the array, as one node rather
+-- | than a chain of `apply`s. (RxJS `combineLatest`.)
+foreign import combine :: forall a. Array (Signal a) -> Signal (Array a)
+
+-- | The second signal's value paired with the first's, changing only when
+-- | the second changes. The first is observed with it, so a stateful signal
+-- | there keeps advancing. (RxJS `withLatestFrom`.)
+withLatest :: forall a b. Signal b -> Signal a -> Signal (Tuple a b)
+withLatest = withLatestImpl Tuple
+
+foreign import withLatestImpl :: forall a b. (a -> b -> Tuple a b) -> Signal b -> Signal a -> Signal (Tuple a b)
 
 -- | Accumulate from a seed, one step per propagation in which the input changed.
 foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b
