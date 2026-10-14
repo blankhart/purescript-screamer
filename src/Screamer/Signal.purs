@@ -37,6 +37,8 @@ module Screamer.Signal
   , withLatest
   , switchLatest
   , history
+  , catching
+  , attempt
   , fold
   , merge
   , filter
@@ -50,8 +52,10 @@ module Screamer.Signal
 import Prelude
 
 import Control.Alt (class Alt)
+import Data.Either (Either(..), either)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Exception (Error)
 import Prim.Row (class Nub, class Union)
 import Prim.RowList (RowList, class RowToList, Cons, Nil)
 import Type.RowList (class ListToRow)
@@ -139,6 +143,20 @@ switchLatest s = bindImpl s identity
 -- | The last n values, oldest first, starting with the current one; for
 -- | sparklines and undo. Stateful: it records only while observed.
 foreign import history :: forall a. Int -> Signal a -> Signal (Array a)
+
+-- | Recover from a derivation that throws: the handler's value while the
+-- | signal's computation fails, and the signal's value again once it
+-- | succeeds. The failing node stays consistent: it recomputes when its
+-- | inputs change, and its next successful computation clears the error.
+-- | (RxJS `catchError` for pure derivations.)
+catching :: forall a. (Error -> a) -> Signal a -> Signal a
+catching handler s = map (either handler identity) (attempt s)
+
+-- | `Right` the signal's value, or `Left` the error its computation throws.
+attempt :: forall a. Signal a -> Signal (Either Error a)
+attempt = attemptImpl Left Right
+
+foreign import attemptImpl :: forall a. (Error -> Either Error a) -> (a -> Either Error a) -> Signal a -> Signal (Either Error a)
 
 -- | Accumulate from a seed, one step per propagation in which the input changed.
 foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b

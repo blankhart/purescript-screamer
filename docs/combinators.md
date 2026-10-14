@@ -228,6 +228,32 @@ The pure buffers are stateful nodes: they collect only occurrences seen while ob
 - `bufferWhile` reads its signal at the end of each round, like `gate`: it collects the occurrences of rounds that end with the signal true, and fires the collection (possibly empty) in the round that ends with it false.
 - `bufferFor` fires every interval from instantiation, but skips an interval with nothing collected, unlike RxJS, so an idle buffer does not wake its observers. What it holds when its scope is disposed is dropped.
 
+## Error handling (#24)
+
+| RxJS | Screamer | Pure? |
+|---|---|---|
+| `catchError` on a signal | `Signal.catching :: (Error -> a) -> Signal a -> Signal a` | pure |
+| `materialize` (errors only) | `Signal.attempt :: Signal a -> Signal (Either Error a)` | pure |
+| `retry({ count, delay })` | `Resource.retry :: RetryPolicy -> (a -> Aff b) -> a -> Aff b` | `Aff` |
+| error boundary | `Owned.onError` in a component's scope | `Owned` |
+
+- **Recovering a signal.** A derivation that throws makes every read of it throw. `catching` and `attempt` read the input inside a `try`, so the signal recovers on its own the next time the input changes. Dependents of the caught signal stay consistent: they see the fallback in the same batch.
+- **Retrying a request.** `retry policy request` is a request again, so it plugs into `resource`, `resourceWith` and `request` without new strategies. `type RetryPolicy = { retries :: Int, backoff :: Backoff }`, with `Backoff = Immediately | Fixed Milliseconds | Exponential { initial, max }`. The waits are `Aff` delays inside the request's fiber, so a new input under `Switch`, or disposing the scope, cancels a pending retry; the resource stays `Loading` until the last attempt settles.
+- **Combining remote data.** `Remote` is `Applicative`: `Failed` if any failed (the leftmost failure wins), else `Loading` if any loads, else `Loaded`. `withDefault`, `toMaybe` and `isLoading` read it; `keepLast :: Signal (Remote a) -> Signal (Remote a)` keeps showing the last `Loaded` value while the next request loads.
+- **Error boundaries.** An effect that throws (a DOM binding, `subscribe`, `Event.subscribe`) is reported to the nearest `onError` up its scope chain. A component that registers `onError` and puts the error in a signal source is a boundary: it can swap its body for a fallback with `dyn`.
+
+```purescript
+boundary :: Element -> Element
+boundary body = component do
+  failed <- liftEffect (signalSource Nothing)
+  onError (failed.put <<< Just)
+  pure $ dyn $ failed.signal <#> case _ of
+    Nothing -> body
+    Just e -> div_ [ text ("Something went wrong: " <> message e) ]
+```
+
+There is no error channel on events: an event occurrence is a value, so a request's failure is an `Either` (`request`) or a `Remote` (`resource`), and a throwing callback goes to `onError`.
+
 ## Implementation
 
 The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).

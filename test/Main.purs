@@ -14,6 +14,7 @@ import Test.Spec.Runner (defaultConfig, evalSpecT)
 import Test.Spec.Summary (successful)
 import Test.Dom as Dom
 import Test.Event as Event
+import Test.Errors as Errors
 import Test.Flatten as Flatten
 import Test.Time as Time
 import Test.Owned as Owned
@@ -36,6 +37,7 @@ spec = do
   Signal.spec
   Event.spec
   Flatten.spec
+  Errors.spec
   Time.spec
   Owned.spec
   Dom.spec
