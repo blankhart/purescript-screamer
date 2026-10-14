@@ -10,6 +10,7 @@ import Data.Either (Either(..))
 import Data.Filterable (filter, filterMap, partition)
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (Maybe(..))
+import Control.Alternative (guard)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -89,6 +90,45 @@ model op ref = do
     let want = ref (Array.concat script)
     when (got /= want) do
       fail $ "for " <> show script <> ": got " <> show got <> ", want " <> show want
+
+countModel :: Int -> Int -> Array Int -> Array (Array Int)
+countModel n step xs = do
+  i <- Array.range 0 (Array.length xs - 1)
+  guard (i `mod` step == 0 && i + n <= Array.length xs)
+  pure (Array.slice i (i + n) xs)
+
+-- | Batches of fires of a data source or a notifier.
+type Tagged = Array (Array { notify :: Boolean, value :: Int })
+
+genTagged :: Gen Tagged
+genTagged = arrayOf do
+  n <- chooseInt 1 4
+  vectorOf n ({ notify: _, value: _ } <$> map (_ == 0) (chooseInt 0 2) <*> chooseInt 0 4)
+
+bufferOnModel :: Array { notify :: Boolean, value :: Int } -> Array (Array Int)
+bufferOnModel = go [] []
+  where
+  go acc buf fs = case Array.uncons fs of
+    Nothing -> acc
+    Just { head, tail }
+      | head.notify -> go (acc <> [ buf ]) [] tail
+      | otherwise -> go acc (buf <> [ head.value ]) tail
+
+-- | Rounds are batches; a notify toggles the condition, read at the end of
+-- | the round. Occurrences of rounds that end open are collected; a round
+-- | that ends closed after an open one fires the collection.
+bufferWhileModel :: Tagged -> Array (Array Int)
+bufferWhileModel script = (Array.foldl step { open: false, buf: [], out: [] } script).out
+  where
+  step st fires =
+    let
+      toggles = Array.length (Array.filter _.notify fires)
+      open = if toggles `mod` 2 == 1 then not st.open else st.open
+      values = map _.value (Array.filter (not <<< _.notify) fires)
+    in
+      if open then st { open = true, buf = st.buf <> values }
+      else if st.open then { open: false, buf: [], out: st.out <> [ st.buf ] }
+      else st
 
 checkLaw :: forall a. Eq a => Show a => (Srcs -> Event a) -> (Srcs -> Event a) -> Effect Unit
 checkLaw lhs rhs = do
@@ -242,6 +282,56 @@ spec = describe "Screamer.Event" do
       liftEffect $ x.put 2
       liftEffect $ batch (x.put 3 *> y.put "c")
       liftEffect o.trace >>= shouldEqual [ Tuple 1 "a", Tuple 2 "b", Tuple 3 "c" ]
+      liftEffect o.stop
+
+  describe "buffering against a model" do
+    it "bufferCount chunks" $ liftEffect $ model (Event.bufferCount 3 3) (countModel 3 3)
+    it "bufferCount slides" $ liftEffect $ model (Event.bufferCount 3 1) (countModel 3 1)
+    it "bufferCount with gaps" $ liftEffect $ model (Event.bufferCount 2 3) (countModel 2 3)
+    it "bufferOn" $ liftEffect do
+      scripts <- randomSample' 200 genTagged
+      for_ scripts \script -> do
+        d <- eventSource
+        n <- eventSource
+        o <- observeE (Event.bufferOn n.event d.event)
+        for_ script \fires -> batch $ for_ fires \f -> if f.notify then n.fire unit else d.fire f.value
+        got <- o.trace
+        o.stop
+        let want = bufferOnModel (Array.concat script)
+        when (got /= want) $ fail $ "bufferOn " <> show script <> ": got " <> show got <> ", want " <> show want
+    it "bufferWhile" $ liftEffect do
+      scripts <- randomSample' 200 genTagged
+      for_ scripts \script -> do
+        d <- eventSource
+        cond <- signalSource false
+        o <- observeE (Event.bufferWhile cond.signal d.event)
+        -- In each batch a notify toggles the condition.
+        for_ script \fires -> batch $ for_ fires \f ->
+          if f.notify then cond.modify not else d.fire f.value
+        got <- o.trace
+        o.stop
+        let want = bufferWhileModel script
+        when (got /= want) $ fail $ "bufferWhile " <> show script <> ": got " <> show got <> ", want " <> show want
+
+  describe "buffering" do
+    it "a paused buffer keeps what it holds" do
+      src <- liftEffect eventSource
+      keep <- liftEffect $ observeE src.event
+      let b = Event.bufferCount 3 3 src.event
+      o1 <- liftEffect $ observeE b
+      liftEffect $ traverse_ src.fire [ 1, 2 ]
+      liftEffect o1.stop
+      liftEffect $ src.fire 99
+      o2 <- liftEffect $ observeE b
+      liftEffect $ traverse_ src.fire [ 3, 4, 5, 6 ]
+      liftEffect o2.trace >>= shouldEqual [ [ 1, 2, 3 ], [ 4, 5, 6 ] ]
+      liftEffect (o2.stop *> keep.stop)
+
+    it "history keeps the last n values" do
+      s <- liftEffect $ signalSource 1
+      o <- liftEffect $ observe (Signal.history 3 s.signal)
+      liftEffect $ traverse_ s.put [ 2, 3, 4 ]
+      liftEffect o.trace >>= shouldEqual [ [ 1 ], [ 1, 2 ], [ 1, 2, 3 ], [ 2, 3, 4 ] ]
       liftEffect o.stop
 
   describe "event sources" do
