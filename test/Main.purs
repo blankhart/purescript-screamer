@@ -15,6 +15,7 @@ import Test.Spec.Summary (successful)
 import Test.Dom as Dom
 import Test.Event as Event
 import Test.Flatten as Flatten
+import Test.Time as Time
 import Test.Owned as Owned
 import Test.Signal as Signal
 import Test.Subscriptions as Subscriptions
@@ -35,6 +36,7 @@ spec = do
   Signal.spec
   Event.spec
   Flatten.spec
+  Time.spec
   Owned.spec
   Dom.spec
   TypedDom.spec
