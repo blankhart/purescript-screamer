@@ -42,6 +42,8 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them,
 
 The full specification, including the rules for ordering, errors and loops, is in `docs/ownership-design.md`.
 
+**Embedding JS widgets.** A widget that owns its DOM subtree (an editor, a map, a chart) goes in `foreign_ setup tag attrs`, which creates the host element and runs `setup host :: Owned Unit` once per instance. Create the widget there and destroy it in `onCleanup`. Sync both ways with guards: push a signal in with `subscribe`, skipping values equal to what the widget already shows so the user's edits do not loop back; report the widget's own changes out through a callback wrapped in `batch`, ignoring changes the wrapper made itself. Screamer never touches the host's children. See `examples/src/CodeMirror.purs`.
+
 ## Combinators
 
 Most RxJS operators have a counterpart, pure where it can be and `Owned` where it starts timers or requests. The common ones:

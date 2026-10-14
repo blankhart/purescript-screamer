@@ -144,6 +144,7 @@ A working prototype (153 lines, 23 checks, randomized glitch test) is attached t
 | Events | `addEventListener` with the handler wrapped in `batch`; removal registered with `onCleanup` |
 | `dyn` | a pair of comment anchors; each new value disposes the previous child scope, removes nodes between anchors, instantiates the new element in a fresh child scope |
 | `each` | a row scope and row cell per key; kept keys update their cell; removed keys are disposed; moves use a longest-increasing-subsequence reconcile |
+| `foreign_` | create the host element with its attributes and no children, then run the setup on it in the instance's scope, before the host is inserted; Screamer never touches its children (#27) |
 | `mount` | root scope, instantiate into the mount point, return an action that disposes the scope and removes the nodes |
 
 ### Typed DOM
@@ -180,6 +181,7 @@ Handlers take the standard `Web.*` event types. Screamer's generated event class
 | Discrete events | **Decided (#17):** a separate `Event a` type with no current value and no cutoff; every occurrence propagates, in fire order. See `docs/combinators.md` |
 | Names of sources | **Decided (#17):** `SignalSource` (`signalSource`, formerly `Channel`/`channel`) and `EventSource` (`eventSource`) |
 | Combinators that need timers or async work | **Decided (#17):** they return `Owned`; everything else is pure |
+| Escape hatch for JS widgets | **Decided (#27):** `foreign_ :: (Web.DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element` in `Screamer.Core`, not a `withNode_` attribute. A host element with no Screamer children makes "Screamer never touches its children" true by construction, while an attribute could be put on an element that also has Screamer children, and attributes have no ordering to say when it runs. |
 
 ## Stages
 

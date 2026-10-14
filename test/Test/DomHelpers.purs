@@ -14,11 +14,13 @@ module Test.DomHelpers
   , setChecked
   , selectIndex
   , visibleTextsOf
+  , fakeWidget
   ) where
 
 import Prelude
 
 import Effect (Effect)
+import Web.DOM.Element as DOM
 import Web.DOM.Node (Node)
 import Web.Event.Event (Event)
 
@@ -61,3 +63,7 @@ foreign import selectIndex :: String -> Int -> Effect Unit
 
 -- | The text content of each matching element that is not hidden.
 foreign import visibleTextsOf :: String -> Effect (Array String)
+
+-- | A stand-in for a JS widget: fills the host with its own markup and
+-- | returns a function that destroys it.
+foreign import fakeWidget :: DOM.Element -> String -> Effect (Effect Unit)
