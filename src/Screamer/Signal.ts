@@ -38,6 +38,11 @@ export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A
   return R.map((p) => tuple(p.previous)(p.current), pair);
 };
 
+export const combine = <A>(ss: S<A>[]): S<A[]> => R.combine(ss);
+
+export const withLatestImpl = <A, B, T>(pair: (a: A) => (b: B) => T) => (b: S<B>) => (a: S<A>): S<T> =>
+  R.withLatest((x: A, y: B) => pair(x)(y), b, a);
+
 export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => R.merge(a, b);
 
 export const filter = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => R.filter(p, seed, s);

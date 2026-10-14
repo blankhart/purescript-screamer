@@ -1207,6 +1207,8 @@ export class EventStateful<S, T> implements EventLike<T>, Target, Settle {
     public inputs: Source<any>[],
     private initial: () => S,
     private step: (changed: boolean[], values: any[], state: S) => EventStep<S, T>,
+    /** The state to keep while paused; by default all of it. */
+    private pause?: (state: S) => S,
   ) {
     this.last = inputs.map(() => -1);
   }
@@ -1247,6 +1249,7 @@ export class EventStateful<S, T> implements EventLike<T>, Target, Settle {
     this.linked = false;
     for (let i = 0; i < this.inputs.length; i++) unlinkFrom(this, this.inputs[i]);
     this.dirty = true;
+    if (this.pause && this.started) this.state = this.pause(this.state);
   }
 
   refresh(): void {
@@ -1296,8 +1299,9 @@ export function eventStateful<S, T>(
   inputs: Source<any>[],
   initial: () => S,
   step: (changed: boolean[], values: any[], state: S) => EventStep<S, T>,
+  pause?: (state: S) => S,
 ): EventStateful<S, T> {
-  return new EventStateful(inputs, initial, step);
+  return new EventStateful(inputs, initial, step, pause);
 }
 
 /** One step of `accumEvent`: the new state, and the occurrence to emit, if any. */
@@ -1413,6 +1417,147 @@ export function attachWith<A, B, C>(f: (b: B, a: A) => C, s: Readable<B>, e: Eve
     for (let i = 0; i < os.length; i++) out[i] = { s: os[i].s, v: f(b, os[i].v) };
     return out;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Combining several streams (#20)
+
+/** All the inputs' occurrences in stamp order; on equal stamps, earlier inputs first. */
+export function oneOf<A>(es: EventLike<A>[]): EventLike<A> {
+  const ins = es.filter((e) => e !== neverEvent);
+  if (ins.length === 0) return neverEvent;
+  if (ins.length === 1) return ins[0];
+  return eventDerived((r) => {
+    let out: Occ<A>[] = NONE;
+    let lists = 0;
+    for (let i = 0; i < ins.length; i++) {
+      const os = r.occ(ins[i]);
+      if (os.length === 0) continue;
+      out = lists === 0 ? os : out.concat(os);
+      lists++;
+    }
+    // A stable sort keeps earlier inputs first on equal stamps.
+    return lists > 1 ? out.slice().sort((x, y) => x.s - y.s) : out;
+  });
+}
+
+/** The occurrences of the leftmost input that fired in the round. */
+export function leftmost<A>(es: EventLike<A>[]): EventLike<A> {
+  return eventDerived((r) => {
+    let out: Occ<A>[] = NONE;
+    // Read every input, so each records its version and stays linked.
+    for (let i = 0; i < es.length; i++) {
+      const os = r.occ(es[i]);
+      if (out.length === 0) out = os;
+    }
+    return out;
+  });
+}
+
+/**
+ * Both events' occurrences in stamp order. An occurrence of each with the
+ * same stamp (both derived from one fire) are combined with `both`.
+ */
+export function mergeWith<A, B, C>(
+  both: (a: A, b: B) => C,
+  left: (a: A) => C,
+  right: (b: B) => C,
+  ea: EventLike<A>,
+  eb: EventLike<B>,
+): EventLike<C> {
+  return eventDerived((r) => {
+    const as = r.occ(ea);
+    const bs = r.occ(eb);
+    if (as.length === 0 && bs.length === 0) return NONE;
+    const out: Occ<C>[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < as.length || j < bs.length) {
+      if (j >= bs.length || (i < as.length && as[i].s < bs[j].s)) {
+        out.push({ s: as[i].s, v: left(as[i].v) });
+        i++;
+      } else if (i >= as.length || bs[j].s < as[i].s) {
+        out.push({ s: bs[j].s, v: right(bs[j].v) });
+        j++;
+      } else {
+        out.push({ s: as[i].s, v: both(as[i].v, bs[j].v) });
+        i++;
+        j++;
+      }
+    }
+    return out;
+  });
+}
+
+interface ZipState<A, B> {
+  as: Occ<A>[];
+  bs: Occ<B>[];
+}
+
+/**
+ * Pairs the nth occurrence of `ea` with the nth of `eb`, counting from when
+ * it is observed. Unpaired occurrences queue without bound. A paused zip
+ * drops its queues, because what they would be paired with is missed.
+ */
+export function zip<A, B, C>(f: (a: A, b: B) => C, ea: EventLike<A>, eb: EventLike<B>): EventLike<C> {
+  return eventStateful<ZipState<A, B>, C>(
+    [ea, eb],
+    () => ({ as: [], bs: [] }),
+    (changed, values, st) => {
+      // Take the round's occurrences in stamp order, pairing as they come.
+      const as = changed[0] ? (values[0] as Occ<A>[]) : NONE;
+      const bs = changed[1] ? (values[1] as Occ<B>[]) : NONE;
+      const qa = st.as.slice();
+      const qb = st.bs.slice();
+      const out: Occ<C>[] = [];
+      let i = 0;
+      let j = 0;
+      while (i < as.length || j < bs.length) {
+        const takeA = j >= bs.length || (i < as.length && as[i].s <= bs[j].s);
+        if (takeA) {
+          const o = as[i++];
+          if (qb.length > 0) out.push({ s: o.s, v: f(o.v, qb.shift()!.v) });
+          else qa.push(o);
+        } else {
+          const o = bs[j++];
+          if (qa.length > 0) out.push({ s: o.s, v: f(qa.shift()!.v, o.v) });
+          else qb.push(o);
+        }
+      }
+      return { state: { as: qa, bs: qb }, out };
+    },
+    () => ({ as: [], bs: [] }),
+  );
+}
+
+/**
+ * Follows the first input to fire after it is first observed (the leftmost,
+ * if several fire in that round), and ignores the others from then on.
+ */
+export function race<A>(es: EventLike<A>[]): EventLike<A> {
+  return eventStateful<number, A>(es, () => -1, (changed, values, winner) => {
+    if (winner < 0) winner = changed.indexOf(true);
+    return { state: winner, out: winner >= 0 && changed[winner] ? values[winner] : NONE };
+  });
+}
+
+/** The current values of all the signals, as one node. */
+export function combine<A>(ss: Readable<A>[]): Readable<A[]> {
+  if (ss.every((s) => s instanceof Constant)) return constant(ss.map((s) => s.value));
+  return derived(() => {
+    const out = new Array<A>(ss.length);
+    for (let i = 0; i < ss.length; i++) out[i] = ss[i].read();
+    return out;
+  });
+}
+
+/**
+ * `a`'s value paired with `b`'s, changing only when `a` changes. `b` is
+ * observed with it, so a stateful `b` keeps advancing.
+ */
+export function withLatest<A, B, T>(pair: (a: A, b: B) => T, b: Readable<B>, a: Readable<A>): Readable<T> {
+  return stateful<T>([a, b], () => pair(a.read(), b.read()), (changed, values, prev) =>
+    (changed[0] ? pair(values[0], values[1]) : prev));
 }
 
 /** The occurrences of `e` in rounds that end with `cond` true. */

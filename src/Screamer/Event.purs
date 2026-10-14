@@ -39,6 +39,13 @@ module Screamer.Event
   , first
   , count
   , gate
+  -- Combining
+  , oneOf
+  , leftmost
+  , mergeWith
+  , zip
+  , zipWith
+  , race
   ) where
 
 import Prelude
@@ -194,3 +201,38 @@ count = fold (\_ n -> n + 1) 0
 -- | The occurrences of rounds that end with the signal true. The event
 -- | version of `Screamer.Signal.filterOn`.
 foreign import gate :: forall a. Signal Boolean -> Event a -> Event a
+
+-- Combining several streams (#20).
+
+-- | Every input's occurrences, in fire order, as one node. It agrees with
+-- | folding the array with `<|>`. (RxJS `merge`.)
+foreign import oneOf :: forall a. Array (Event a) -> Event a
+
+-- | In each round, the occurrences of the leftmost input that fired, and
+-- | none of the others'. (Reflex `leftmost`.)
+foreign import leftmost :: forall a. Array (Event a) -> Event a
+
+-- | Both events' occurrences in fire order, losing none. An occurrence of
+-- | each with the same fire stamp (both derived from one fire) are combined
+-- | with the first function into one occurrence. (Reflex `alignWith`.)
+foreign import mergeWith
+  :: forall a b c
+   . (a -> b -> c)
+  -> (a -> c)
+  -> (b -> c)
+  -> Event a
+  -> Event b
+  -> Event c
+
+-- | Pair the nth occurrence of each, counting from when the zip is
+-- | observed. Unpaired occurrences wait in a queue with no bound. A paused
+-- | zip drops its queues. (RxJS `zip`.)
+zip :: forall a b. Event a -> Event b -> Event (Tuple a b)
+zip = zipWith Tuple
+
+foreign import zipWith :: forall a b c. (a -> b -> c) -> Event a -> Event b -> Event c
+
+-- | Follow the first input that fires after the race is first observed
+-- | (the leftmost, if several fire in one round) and ignore the rest from
+-- | then on. (RxJS `race`.)
+foreign import race :: forall a. Array (Event a) -> Event a

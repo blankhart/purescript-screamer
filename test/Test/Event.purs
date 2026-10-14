@@ -178,6 +178,72 @@ spec = describe "Screamer.Event" do
       liftEffect o.trace >>= shouldEqual [ 1, 12, 3 ]
       liftEffect o.stop
 
+  describe "combining" do
+    it "oneOf agrees with a fold of <|>" $ liftEffect $ checkLaw
+      (\s -> Event.oneOf [ s.a, s.b, s.c ])
+      (\s -> s.a <|> s.b <|> s.c)
+    it "oneOf of maps of one event agrees with <|>" $ liftEffect $ checkLaw
+      (\s -> Event.oneOf [ map (_ * 2) s.a, s.a, map (_ + 1) s.b ])
+      (\s -> map (_ * 2) s.a <|> s.a <|> map (_ + 1) s.b)
+    it "leftmost keeps one input per round, mergeWith keeps both" do
+      src <- liftEffect eventSource
+      let
+        l = map (\x -> "L" <> show x) src.event
+        r = map (\x -> "R" <> show x) src.event
+      lm <- liftEffect $ observeE (Event.leftmost [ l, r ])
+      mw <- liftEffect $ observeE (Event.mergeWith (\x y -> x <> y) identity identity l r)
+      liftEffect $ batch (src.fire 1 *> src.fire 2)
+      liftEffect lm.trace >>= shouldEqual [ "L1", "L2" ]
+      liftEffect mw.trace >>= shouldEqual [ "L1R1", "L2R2" ]
+      liftEffect (lm.stop *> mw.stop)
+    it "zip pairs simultaneous and queued occurrences" do
+      a <- liftEffect eventSource
+      b <- liftEffect eventSource
+      o <- liftEffect $ observeE (Event.zip a.event b.event)
+      liftEffect $ batch (a.fire 1 *> a.fire 2 *> b.fire "x")
+      liftEffect $ b.fire "y"
+      liftEffect o.trace >>= shouldEqual [ Tuple 1 "x", Tuple 2 "y" ]
+      liftEffect o.stop
+    it "zip releases its queue when unobserved" do
+      a <- liftEffect eventSource
+      b <- liftEffect eventSource
+      keep <- liftEffect $ observeE (a.event <|> map (const 0) b.event)
+      let z = Event.zip a.event b.event
+      o1 <- liftEffect $ observeE z
+      liftEffect $ traverse_ a.fire [ 1, 2 ]
+      liftEffect o1.stop
+      o2 <- liftEffect $ observeE z
+      liftEffect $ b.fire "x"
+      liftEffect $ a.fire 3
+      liftEffect o2.trace >>= shouldEqual [ Tuple 3 "x" ]
+      liftEffect (o2.stop *> keep.stop)
+    it "race follows the first to fire, the leftmost on a tie" do
+      a <- liftEffect eventSource
+      b <- liftEffect eventSource
+      o <- liftEffect $ observeE (Event.race [ a.event, b.event ])
+      liftEffect $ batch (b.fire 1 *> a.fire 2)
+      liftEffect $ b.fire 3
+      liftEffect $ a.fire 4
+      liftEffect o.trace >>= shouldEqual [ 2, 4 ]
+      liftEffect o.stop
+    it "Signal.combine agrees with sequence" do
+      x <- liftEffect $ signalSource 1
+      y <- liftEffect $ signalSource 2
+      o <- liftEffect $ observe (Signal.combine [ x.signal, y.signal ])
+      liftEffect $ batch (x.put 3 *> y.put 4)
+      liftEffect $ y.put 5
+      liftEffect o.trace >>= shouldEqual [ [ 1, 2 ], [ 3, 4 ], [ 3, 5 ] ]
+      liftEffect o.stop
+    it "Signal.withLatest changes only with the driver" do
+      x <- liftEffect $ signalSource 1
+      y <- liftEffect $ signalSource "a"
+      o <- liftEffect $ observe (Signal.withLatest y.signal x.signal)
+      liftEffect $ y.put "b"
+      liftEffect $ x.put 2
+      liftEffect $ batch (x.put 3 *> y.put "c")
+      liftEffect o.trace >>= shouldEqual [ Tuple 1 "a", Tuple 2 "b", Tuple 3 "c" ]
+      liftEffect o.stop
+
   describe "event sources" do
     it "delivers two fires of the same value in one batch to a fold" do
       src <- liftEffect eventSource
