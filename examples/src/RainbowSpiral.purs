@@ -9,7 +9,7 @@ import Data.Int as Int
 import Data.Number (cos, pi, sin)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Element, component, dyn, element, fragment_)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
@@ -88,10 +88,10 @@ mkDot dotAttrs i =
 
 spiral :: Element
 spiral = component do
-  numerosity <- liftEffect $ channel 200
-  heartbeat <- liftEffect $ channel 0
-  position <- liftEffect $ channel origin
-  isBig <- liftEffect $ channel false
+  numerosity <- liftEffect $ signalSource 200
+  heartbeat <- liftEffect $ signalSource 0
+  position <- liftEffect $ signalSource origin
+  isBig <- liftEffect $ signalSource false
   AnimationFrame.every (heartbeat.modify (_ + 1))
   let
     dotAttrs = sampleManyWith { pos: position.signal, n: numerosity.signal } { hb: heartbeat.signal } toDotAttrs

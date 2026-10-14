@@ -9,7 +9,7 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal)
 
@@ -21,7 +21,7 @@ foreign import loopImpl :: (Number -> Effect Unit) -> Effect (Effect Unit)
 -- | `performance.now()` clock. It starts at the current time.
 frames :: Owned (Signal Number)
 frames = do
-  time <- liftEffect $ channel =<< nowImpl
+  time <- liftEffect $ signalSource =<< nowImpl
   cancel <- liftEffect $ loopImpl time.put
   onCleanup cancel
   pure time.signal

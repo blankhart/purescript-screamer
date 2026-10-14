@@ -1,11 +1,11 @@
-// Foreign module of Screamer.Channel.
+// Foreign module of Screamer.SignalSource.
 import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Channel/foreign.js, next to the core's.
+// @ts-ignore: purs copies this file to output/Screamer.SignalSource/foreign.js, next to the core's.
 import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
 
 const R: typeof Core = CoreRuntime;
 
-export const channel = <A>(a: A) => () => {
+export const signalSource = <A>(a: A) => () => {
   const c = R.cell(a);
   return {
     signal: c,

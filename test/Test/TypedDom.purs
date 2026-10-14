@@ -4,7 +4,7 @@ import Prelude
 
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (element, mount)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
@@ -19,7 +19,7 @@ spec :: Spec Unit
 spec = describe "Screamer.DOM" do
   it "value_ sets the value property" do
     liftEffect resetBody
-    v <- liftEffect $ channel "hello"
+    v <- liftEffect $ signalSource "hello"
     _ <- liftEffect $ mount "#root" $ E.input_ [ A.value_ v.signal, A.type_ A.InputText ] []
     liftEffect (propertyOf "#root input" "value") >>= shouldEqual "hello"
     liftEffect $ v.put "world"
@@ -33,7 +33,7 @@ spec = describe "Screamer.DOM" do
 
   it "disabled_ toggles a boolean attribute" do
     liftEffect resetBody
-    off <- liftEffect $ channel true
+    off <- liftEffect $ signalSource true
     _ <- liftEffect $ mount "#root" $ E.button_ [ A.disabled_ off.signal ] []
     liftEffect (innerHTML "#root") >>= shouldEqual """<button disabled=""></button>"""
     liftEffect $ off.put false
@@ -53,7 +53,7 @@ spec = describe "Screamer.DOM" do
 
   it "style_ sets CSS properties from a record" do
     liftEffect resetBody
-    colour <- liftEffect $ channel "red"
+    colour <- liftEffect $ signalSource "red"
     _ <- liftEffect $ mount "#root" $ E.div_ [ A.style_ { color: colour.signal, "margin-top": "2px" } ] []
     liftEffect (innerHTML "#root") >>= shouldEqual """<div style="color: red; margin-top: 2px;"></div>"""
     liftEffect $ colour.put "blue"

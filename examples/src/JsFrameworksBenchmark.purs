@@ -18,7 +18,7 @@ import Effect.Class (liftEffect)
 import Effect.Random as Random
 import Effect.Ref as Ref
 import Partial.Unsafe (unsafePartial)
-import Screamer.Channel (Channel, batch, channel)
+import Screamer.SignalSource (SignalSource, batch, signalSource)
 import Screamer.Core (Element, component, each, element)
 import Screamer.DOM.Attribute (InputType(..))
 import Screamer.DOM.Attribute as A
@@ -36,7 +36,7 @@ main = Harness.run "main" benchmark
 ---------------------------------------------------
 -- Row operations
 
-type TableRow = { id :: Int, label :: Channel String, highlight :: Channel String }
+type TableRow = { id :: Int, label :: SignalSource String, highlight :: SignalSource String }
 
 randomRows :: Int -> Int -> Effect (Array TableRow)
 randomRows nextId length =
@@ -49,8 +49,8 @@ randomRows nextId length =
     adjective <- choose adjectives
     color <- choose colors
     noun <- choose nouns
-    label <- channel (adjective <> " " <> color <> " " <> noun)
-    highlight <- channel ""
+    label <- signalSource (adjective <> " " <> color <> " " <> noun)
+    highlight <- signalSource ""
     pure { label, highlight }
   numbering index { label, highlight } = { id: nextId + index, label, highlight }
 
@@ -76,7 +76,7 @@ nouns =
 
 benchmark :: Element
 benchmark = component do
-  table <- liftEffect $ channel []
+  table <- liftEffect $ signalSource []
   nextId <- liftEffect $ Ref.new 1
   -- The highlight of the selected row, cleared when another is selected.
   selected <- liftEffect $ Ref.new Nothing
@@ -168,7 +168,7 @@ button' { id, text, handler } =
     ]
 
 -- | A row's fields never change for a given key, so the row reads them once.
-row' :: (Channel String -> Effect Unit) -> (Int -> Effect Unit) -> Signal TableRow -> Element
+row' :: (SignalSource String -> Effect Unit) -> (Int -> Effect Unit) -> Signal TableRow -> Element
 row' select remove rowSignal = component do
   { id, label, highlight } <- liftEffect $ read rowSignal
   pure $ E.tr_

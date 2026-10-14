@@ -1,0 +1,134 @@
+# Events, sources and combinators
+
+_Decided in #17, part of the combinator plan in #16. This file is authoritative for the event model and for combinator names; `docs/ownership-design.md` remains authoritative for signals, ownership and the reactive core, and links here._
+
+Screamer has two kinds of stream:
+
+- **`Signal a`**: a value that changes over time. It always has a current value, and it propagates only when that value changes (`Object.is`, or `Eq` through `dropRepeats`). Use it for state.
+- **`Event a`**: occurrences at moments. It has no current value and no cutoff. Every occurrence propagates, including one equal to the last and several in the same batch. Use it for things that happen: clicks, key presses, messages, completed requests.
+
+Before this decision, occurrences were encoded as signals. That loses information in two ways. An occurrence equal to the previous one is cut off, which is why `WebSocket.Message` carries an `index`. And two writes in one batch step a `fold` once, so `Draggable` folds over one pointer event when a handler delivers two. Operators that count or queue occurrences (`zip`, `take`, `bufferCount`, `concatMap`) have no meaning on a signal at all.
+
+## Sources
+
+Change enters the graph through two kinds of source, both created in `Effect` and neither needing an owner:
+
+```purescript
+-- Screamer.SignalSource (formerly Screamer.Channel)
+type SignalSource a = { signal :: Signal a, put :: a -> Effect Unit, modify :: (a -> a) -> Effect Unit }
+signalSource :: forall a. a -> Effect (SignalSource a)
+batch        :: forall a. Effect a -> Effect a
+
+-- Screamer.EventSource (#18)
+type EventSource a = { event :: Event a, fire :: a -> Effect Unit }
+eventSource :: forall a. Effect (EventSource a)
+```
+
+`put` replaces a value; `fire` adds an occurrence. Both follow the write rules in `docs/ownership-design.md`: allowed in handlers, `subscribe` callbacks and `component` setup, rejected inside derivations. `Screamer.EventSource` re-exports `batch`.
+
+A typed DOM handler already takes `e -> Effect Unit`, so an event source plugs into it with no new DOM API:
+
+```purescript
+clicks <- liftEffect eventSource
+let count = Event.fold (\_ n -> n + 1) 0 clicks.event
+pure $ E.button_ [ H.onClick_ clicks.fire ] [ text (show <$> count) ]
+```
+
+## Event semantics
+
+**Rounds.** A propagation round is one pass of the flush loop: the end of the outermost `batch` (an `on_` handler is one), or a write outside any batch, and then each further round that writes from `subscribe` callbacks queue. An event's occurrences belong to the round in which they were fired.
+
+**Many occurrences per round.** Within a round an event carries a list of occurrences, in fire order. Every combinator handles the whole list: `map` maps each, `filter` keeps some, `fold` steps once per occurrence in order, `stepper` takes the last, and `Event.subscribe` calls its callback once per occurrence. The effect node behind a subscription still runs at most once per round, so the "an effect runs at most once per batch" guarantee holds for nodes; only the user callback runs several times.
+
+**Order across events.** Each `fire` is stamped with a global counter. Combinators that take one occurrence from another (`map`, `filter`, `tag`, `attachWith`) keep its stamp. `a <|> b` interleaves the occurrences of both inputs by stamp, so it delivers them in the order they were fired, losing none. Occurrences of `changes s` are stamped at the start of the round's propagation, after every fire of the round. Equal stamps go left first. Ordering by stamp makes `<|>` associative with `empty` (an event that never fires) as its identity.
+
+This differs from `<|>` on signals, which keeps the left value when both change in one batch. A signal has one value per round, so one input must win. An event has no such limit, so nothing is dropped. For left-wins behaviour, `leftmost :: Array (Event a) -> Event a` keeps only the occurrences of the leftmost input that fired in the round (#20).
+
+**Laziness and purity.** `Event` is a pure value, like `Signal`. Building one has no effect on the graph. An event links to its sources only while something observes it, and occurrences fired while nothing observes it go nowhere. Two evaluations of the same event expression see the same occurrences over the same interval.
+
+**Retention.** A round's occurrences are kept until that round's effects have run, then dropped. A stateful node records the last round it consumed, so it steps over each round once, however many targets read it.
+
+**Stateful nodes over events pause.** `Event.fold`, `stepper` and the counting and queueing combinators (#19, #20) follow the signal rules. They start from the seed when first observed, step only while observed, and keep their state when the last observer leaves. Unlike a stateful signal they do not resynchronize on return, because an event has no current value to resynchronize with: occurrences fired while paused are simply missed. Use `Owned.hold` to keep one observing for a scope's lifetime.
+
+## Bridges between signals and events
+
+```purescript
+-- Screamer.Event (#18)
+changes    :: forall a. Signal a -> Event a                    -- one occurrence per round in which the value changed
+stepper    :: forall a. a -> Event a -> Signal a               -- the latest occurrence; stateful, pauses
+fold       :: forall a b. (a -> b -> b) -> b -> Event a -> Signal b  -- one step per occurrence
+tag        :: forall a b. Signal b -> Event a -> Event b
+attach     :: forall a b. Signal b -> Event a -> Event (Tuple b a)
+attachWith :: forall a b c. (b -> a -> c) -> Signal b -> Event a -> Event c
+subscribe  :: forall a. Event a -> (a -> Effect Unit) -> Owned Unit
+```
+
+`tag`, `attach` and `attachWith` read the signal's value at the end of the round, which is the consistent value every effect in that round sees. They do not read the value at the moment of the fire. So a handler that fires an event and then writes a signal is read the same as one that writes first.
+
+`changes s` fires at most once per round, with the final value, because a signal's own writes coalesce within a batch.
+
+`Screamer.Event` reuses the names `fold`, `filter` and `subscribe` from `Screamer.Signal` and `Screamer.Owned`, so it is meant to be imported qualified: `import Screamer.Event as Event`. Its type also shares a name with `Web.Event.Event.Event`, the type DOM handlers receive. Code that needs both imports one of them qualified or under an alias. The typed handlers in `Screamer.DOM.EventHandler` take specific event types (`MouseEvent`, `KeyboardEvent`), so the clash comes up rarely.
+
+## Pure or `Owned`
+
+A combinator is pure when all it needs is its inputs, whatever state it keeps. It returns `Owned` when it needs something outside the graph: a timer, a fiber, a listener or a socket. That something writes into the graph later, and writes come only from sources that have owners.
+
+| Kind | Examples | Type |
+|---|---|---|
+| Stateless | `map`, `filter`, `tag`, `<|>` | pure |
+| Stateful over inputs | `fold`, `stepper`, `take`, `zip`, `bufferCount`, `withPrevious` | pure; pauses while unobserved |
+| Needs time | `debounce`, `throttle`, `delay`, `audit`, `bufferFor` | `Owned` |
+| Needs async work | `resource`, `request`, `switchOwned`, `retry` | `Owned` |
+
+The time-based combinators could have been pure, with a timer that starts when the node is first observed and stops when it is released. That was rejected. Timer callbacks would become writes that belong to no scope, and the rule that only effects need owners would grow an exception. Starting the timer in `Owned` also gives the combinator a definite start time, which matches `Timer.every`.
+
+## Instances
+
+| Class | `Signal` | `Event` |
+|---|---|---|
+| `Functor` | yes | yes |
+| `Apply`, `Applicative`, `Bind`, `Monad` | yes (`bind` switches) | no: occurrences of two events rarely coincide, so there is nothing to pair; use `attachWith`, or `zip` (#20) to pair the nth with the nth |
+| `Alt` | left wins on ties | interleaves by fire order |
+| `Plus` | no (a signal needs a value) | `empty` never fires |
+| `Semigroup`, `Monoid` | lifted over the values | no, to keep `<>` from meaning merge |
+| `Compactable`, `Filterable` | no: a signal needs a seed to filter, so `filter p seed` stays | yes: `filter`, `filterMap`, `partition`, `compact` |
+
+## RxJS names
+
+RxJS has no separate state type: its `BehaviorSubject` is closest to a signal source, and its `Subject` is closest to an event source. The table gives, for each common RxJS operator, the Screamer equivalent (existing, planned, or left out), and the issue that adds it.
+
+| RxJS | Screamer | Where |
+|---|---|---|
+| `BehaviorSubject`, `next` | `signalSource`, `put` | exists |
+| `Subject`, `next` | `eventSource`, `fire` | #18 |
+| `fromEvent` | a typed handler given `source.fire` | #18 |
+| `subscribe` | `Owned.subscribe` (signal), `Event.subscribe` (event) | exists / #18 |
+| `map`, `mapTo` | `map`, `(<$)` | exists / #18 |
+| `filter` | `Event.filter`, `filterMap`, `partition`; `Signal.filter p seed`, `filterOn` | #18 / exists |
+| `scan` | `Signal.fold`, `Event.fold`, `mapAccum` | exists / #18 / #19 |
+| `pairwise` | `withPrevious` | #19 |
+| `startWith` | `stepper` | #18 |
+| `distinctUntilChanged` | automatic on signals; `dropRepeats`, `dropRepeatsBy`, `dropRepeatsOn` | exists / #19 |
+| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | same names on `Event` | #19 |
+| `count` | `count :: Event a -> Signal Int` | #19 |
+| `tap` | left out: run effects in `subscribe` | |
+| `combineLatest` | `apply`, `sequence`, `sampleMany` | exists |
+| `withLatestFrom` | `attachWith`; `withLatest` on signals | #18 / #20 |
+| `sample` | `tag`; `sampleOn` on signals | #18 / exists |
+| `merge` | `<|>`, `oneOf` | #18 / #20 |
+| `zip` | `zip` | #20 |
+| `race` | `race` | #20 |
+| `switchMap` | `bind` on signals; `switchEvent`, `switchOwned`, `resource` | exists / #21 |
+| `mergeMap`, `concatMap`, `exhaustMap` | `mergeOwned`, `concatOwned`, `exhaustOwned`; `request` strategies | #21 |
+| `debounceTime`, `throttleTime`, `auditTime`, `delay`, `timeout` | `debounce`, `throttle`, `audit`, `delay`, `timeout` (all `Owned`) | #22 |
+| `sampleTime` | `sampleEvery` | #22 |
+| `interval`, `timer` | `Timer.every`, `Timer.after` | exists |
+| `bufferCount`, `buffer`, `bufferTime` | `bufferCount`, `bufferOn`, `bufferFor` | #23 |
+| `catchError`, `retry` | `catching`, `attempt`, `retry`, `Remote` combinators | #24 |
+| `share`, `shareReplay(1)` | sharing by reference; `Owned.hold` | #25 |
+| `forkJoin`, `window*`, `publish`, `connectable`, schedulers | left out | #16 |
+
+## What changed in this decision
+
+- `Screamer.Channel` is now `Screamer.SignalSource`, with `Channel` renamed `SignalSource` and `channel` renamed `signalSource`. This names the two kinds of source in parallel. "Channel" also suggested a queue of messages, which is closer to what an event source is.
+- `Event` and `EventSource` are specified here and implemented in #18.

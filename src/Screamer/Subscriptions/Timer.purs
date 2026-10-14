@@ -11,7 +11,7 @@ import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal)
 
@@ -22,7 +22,7 @@ foreign import setTimeoutImpl :: Number -> Effect Unit -> Effect (Effect Unit)
 -- | The current time, starting now and updated every interval.
 every :: Milliseconds -> Owned (Signal Instant)
 every (Milliseconds ms) = do
-  time <- liftEffect $ channel =<< now
+  time <- liftEffect $ signalSource =<< now
   cancel <- liftEffect $ setIntervalImpl ms (time.put =<< now)
   onCleanup cancel
   pure time.signal
