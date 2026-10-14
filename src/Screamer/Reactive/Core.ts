@@ -1385,9 +1385,18 @@ export function alt<A>(a: EventLike<A>, b: EventLike<A>): EventLike<A> {
   return eventDerived((r) => interleave(r.occ(a), r.occ(b)));
 }
 
+/**
+ * The stamp for an occurrence caused by a signal's change: the current
+ * round's start, after every fire of the round, or a fresh stamp outside a
+ * flush.
+ */
+export function signalStamp(): number {
+  return flushing > 0 ? roundStamp : ++stamp;
+}
+
 /** An occurrence with the signal's new value in each round in which it changed. */
 export function changes<A>(s: Readable<A>): EventLike<A> {
-  return eventDerived((r) => (r.changed(s) ? [{ s: flushing > 0 ? roundStamp : ++stamp, v: s.value }] : NONE));
+  return eventDerived((r) => (r.changed(s) ? [{ s: signalStamp(), v: s.value }] : NONE));
 }
 
 /** The latest occurrence, starting at `seed`. Stateful: steps only while observed. */

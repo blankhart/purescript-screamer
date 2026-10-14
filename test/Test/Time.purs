@@ -147,6 +147,23 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     liftEffect (o.stop *> r.dispose)
     liftEffect Fake.pendingFrames >>= shouldEqual 0
 
+  it "bufferFor fires each interval's occurrences and drops what is held on dispose" do
+    src <- liftEffect eventSource
+    r <- liftEffect $ runOwned (Time.bufferFor (ms 100.0) src.event)
+    o <- liftEffect $ observeE r.value
+    liftEffect do
+      traverse_ src.fire [ 1, 2 ]
+      Fake.advance 100.0
+      Fake.advance 100.0
+      src.fire 3
+      Fake.advance 50.0
+    liftEffect o.trace >>= shouldEqual [ [ 1, 2 ] ]
+    liftEffect r.dispose
+    liftEffect $ Fake.advance 500.0
+    liftEffect o.trace >>= shouldEqual [ [ 1, 2 ] ]
+    liftEffect Fake.pendingTimers >>= shouldEqual 0
+    liftEffect o.stop
+
   it "releases every timer, effect and scope on dispose" do
     before <- liftEffect readStats
     src <- liftEffect eventSource
@@ -158,6 +175,7 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
       _ <- Time.delay (ms 10.0) src.event
       _ <- Time.timeout (ms 10.0) src.event
       _ <- Time.onFrame src.event
+      _ <- Time.bufferFor (ms 10.0) src.event
       _ <- Time.sampleEvery (ms 10.0) s.signal
       Time.debounced (ms 10.0) s.signal
     liftEffect $ src.fire 1

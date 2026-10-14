@@ -36,6 +36,7 @@ module Screamer.Signal
   , combine
   , withLatest
   , switchLatest
+  , history
   , fold
   , merge
   , filter
@@ -134,6 +135,10 @@ foreign import withLatestImpl :: forall a b. (a -> b -> Tuple a b) -> Signal b -
 -- | longer read is released. (RxJS `switchAll`.)
 switchLatest :: forall a. Signal (Signal a) -> Signal a
 switchLatest s = bindImpl s identity
+
+-- | The last n values, oldest first, starting with the current one; for
+-- | sparklines and undo. Stateful: it records only while observed.
+foreign import history :: forall a. Int -> Signal a -> Signal (Array a)
 
 -- | Accumulate from a seed, one step per propagation in which the input changed.
 foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b

@@ -48,6 +48,10 @@ module Screamer.Event
   , race
   -- Flattening
   , switchEvent
+  -- Buffering
+  , bufferCount
+  , bufferOn
+  , bufferWhile
   ) where
 
 import Prelude
@@ -246,3 +250,23 @@ foreign import race :: forall a. Array (Event a) -> Event a
 -- | switch, the new event is followed from then on; nothing it fired before
 -- | is delivered. (RxJS `switchMap` over events, `switchAll`.)
 foreign import switchEvent :: forall a. Signal (Event a) -> Event a
+
+-- Buffering (#23). Each is stateful: it collects only occurrences seen
+-- while observed, and a paused buffer keeps what it holds. The timed form,
+-- `bufferFor`, is in `Screamer.Time`.
+
+-- | Buffers of n occurrences, a new one starting every `step` occurrences:
+-- | `bufferCount 3 3` chunks, `bufferCount 3 1` slides. Each buffer is fired
+-- | when it is full. (RxJS `bufferCount`.)
+foreign import bufferCount :: forall a. Int -> Int -> Event a -> Event (Array a)
+
+-- | The occurrences since the notifier last fired, each time it fires, even
+-- | when there were none. An occurrence fired in the same round as the
+-- | notifier but before it goes in that buffer. (RxJS `buffer`.)
+foreign import bufferOn :: forall a b. Event b -> Event a -> Event (Array a)
+
+-- | Collect occurrences while the signal is true, and fire the collection
+-- | when it turns false. The signal is read at the end of each round, so a
+-- | round that ends with it false is not collected. (RxJS `bufferToggle`,
+-- | `bufferWhen`.)
+foreign import bufferWhile :: forall a. Signal Boolean -> Event a -> Event (Array a)
