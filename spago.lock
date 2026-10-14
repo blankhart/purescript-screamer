@@ -61,10 +61,13 @@
         "path": "examples",
         "core": {
           "dependencies": [
+            "aff",
             "arrays",
             "console",
+            "datetime",
             "effect",
             "either",
+            "filterable",
             "foldable-traversable",
             "integers",
             "maybe",
@@ -72,6 +75,7 @@
             "partial",
             "prelude",
             "random",
+            "refs",
             "screamer",
             "st",
             "strings",
