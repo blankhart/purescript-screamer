@@ -11,12 +11,12 @@ import Effect.Class (liftEffect)
 import Effect.Class as Owned
 import Effect.Ref as Ref
 import Screamer.SignalSource (signalSource)
-import Screamer.Core (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, fragment_, mount, on_, property, styleProperty, text)
+import Screamer.Core (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, foreign_, fragment_, mount, on_, property, styleProperty, text)
 import Screamer.Owned (onCleanup, subscribe)
 import Screamer.Reactive.Core (readStats)
 import Screamer.Signal (Signal, fold, read)
 import Screamer.Signal as Signal
-import Test.DomHelpers (click, currentTag, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
+import Test.DomHelpers (click, fakeWidget, currentTag, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
 import Test.QuickCheck.Gen (randomSample', shuffle, chooseInt, Gen)
 import Web.Event.Event (stopPropagation)
 import Test.Spec (Spec, describe, it)
@@ -193,6 +193,30 @@ spec = describe "Screamer.Core" do
     liftEffect (Ref.read cleanups) >>= shouldEqual 1
     liftEffect $ shared.put 7
     liftEffect (innerHTML "#root") >>= shouldEqual "<b>7</b>"
+
+  it "foreign_ runs its setup once per instance and cleans up on dyn switch and unmount" do
+    liftEffect resetBody
+    log <- liftEffect $ Ref.new []
+    tab <- liftEffect $ signalSource "a"
+    cls <- liftEffect $ signalSource "x"
+    let
+      widget t = foreign_
+        ( \host -> do
+            liftEffect' (Ref.modify_ (_ <> [ "setup " <> t ]) log)
+            destroy <- liftEffect' (fakeWidget host t)
+            onCleanup (destroy *> Ref.modify_ (_ <> [ "cleanup " <> t ]) log)
+        )
+        "section"
+        [ attribute "class" cls.signal ]
+    unmount <- liftEffect $ mount "#root" $ div' [] [ dyn (widget <$> tab.signal) ]
+    liftEffect (innerHTML "#root") >>= shouldEqual """<div><!----><section class="x"><i>widget a</i></section><!----></div>"""
+    -- Attribute updates leave the widget's own children alone.
+    liftEffect $ cls.put "y"
+    liftEffect (innerHTML "#root") >>= shouldEqual """<div><!----><section class="y"><i>widget a</i></section><!----></div>"""
+    liftEffect $ tab.put "b"
+    liftEffect (innerHTML "#root") >>= shouldEqual """<div><!----><section class="y"><i>widget b</i></section><!----></div>"""
+    liftEffect unmount
+    liftEffect (Ref.read log) >>= shouldEqual [ "setup a", "cleanup a", "setup b", "cleanup b" ]
 
   it "runs a counter-and-list app" do
     liftEffect resetBody

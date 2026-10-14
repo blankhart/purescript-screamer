@@ -13,6 +13,7 @@ module Screamer.Core
   , text
   , dyn
   , component
+  , foreign_
   , each
   , property
   , attribute
@@ -34,6 +35,8 @@ import Prelude
 import Effect (Effect)
 import Screamer.Owned (Owned(..), Scope, runOwned)
 import Screamer.Signal (Signal)
+import Unsafe.Coerce (unsafeCoerce)
+import Web.DOM.Element as DOM
 import Web.DOM.Node (Node)
 import Web.Event.Event (Event)
 
@@ -86,6 +89,20 @@ component :: Owned Element -> Element
 component (Owned setup) = Element $ Owned \s -> do
   Element (Owned build) <- setup s
   build s
+
+-- | A host element for a JS widget that owns its own DOM subtree, such as
+-- | an editor or a map. Each instance creates the host element with its
+-- | attributes, then runs the setup on it in the instance's scope: create the
+-- | widget there, destroy it in `onCleanup`, and keep it in sync with
+-- | `subscribe` and event handlers that write in `batch`. Screamer never
+-- | touches the host's children. The host is not yet in the document while
+-- | the setup runs; defer measuring to a frame.
+foreign_ :: (DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element
+foreign_ setup tag attrs = Element $ Owned \s -> do
+  host <- elementImpl tag attrs [] s
+  let Owned run = setup (unsafeCoerce host)
+  run s
+  pure host
 
 -- | A keyed list. Each key gets a row scope and a row signal; kept keys
 -- | update their signal in place, removed keys are disposed, and reorders
