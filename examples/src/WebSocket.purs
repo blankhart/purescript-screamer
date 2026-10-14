@@ -7,7 +7,7 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Element, component, each, element, text)
 import Screamer.DOM.Attribute (InputType(..))
 import Screamer.DOM.Attribute as A
@@ -28,9 +28,9 @@ type Line = { index :: Int, text :: String, mine :: Boolean }
 chat :: String -> Element
 chat url = component do
   socket <- connect url
-  draft <- liftEffect $ channel ""
-  lines <- liftEffect $ channel ([] :: Array Line)
-  count <- liftEffect $ channel 0
+  draft <- liftEffect $ signalSource ""
+  lines <- liftEffect $ signalSource ([] :: Array Line)
+  count <- liftEffect $ signalSource 0
   let
     add text mine = do
       index <- read count.signal

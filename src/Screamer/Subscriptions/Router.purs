@@ -11,7 +11,7 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Attribute, Element)
 import Screamer.DOM.Attribute (href_)
 import Screamer.DOM.Element (a_)
@@ -36,7 +36,7 @@ foreign import replaceState :: String -> Effect Unit
 -- | `navigate` and `redirect`.
 location :: Owned (Signal Location)
 location = do
-  loc <- liftEffect $ channel =<< currentLocation
+  loc <- liftEffect $ signalSource =<< currentLocation
   stop <- liftEffect $ onPopState (loc.put =<< currentLocation)
   onCleanup stop
   pure loc.signal

@@ -13,7 +13,7 @@ import Effect.Aff (Aff, delay, effectCanceler, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Effect.Ref as Ref
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (text)
 import Screamer.Core as Core
 import Screamer.Owned (runOwned, subscribe)
@@ -144,7 +144,7 @@ resources = describe "resource" do
         pure $ effectCanceler (Ref.modify_ (_ <> [ n ]) killed)
       resolve n v = Ref.read pending >>= \ps ->
         for_ (Array.find (\p -> p.n == n) ps) \p -> p.cb (Right v)
-    input <- liftEffect $ channel 1
+    input <- liftEffect $ signalSource 1
     r <- liftEffect $ runOwned (resource input.signal request)
     yield
     liftEffect (read r.value) >>= shouldEqual Loading
@@ -167,7 +167,7 @@ resources = describe "resource" do
     liftEffect (Ref.read killed) >>= shouldEqual [ 1, 3 ]
 
   it "reports a failed request" do
-    input <- liftEffect $ channel unit
+    input <- liftEffect $ signalSource unit
     r <- liftEffect $ runOwned (resource input.signal \_ -> makeAff \cb -> cb (Left (error "boom")) $> mempty)
     yield
     liftEffect (read r.value) >>= shouldEqual (Failed (error "boom") :: Remote Unit)

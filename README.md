@@ -5,7 +5,7 @@ Screamer is a PureScript library for building DOM interfaces without a virtual D
 ```purescript
 counter :: Element
 counter = component do
-  count <- liftEffect $ channel 0
+  count <- liftEffect $ signalSource 0
   pure $ E.div_ [ A.class_ "counter" ]
     [ E.button_ [ H.onClick_ \_ -> count.modify (_ - 1) ] [ element "-" ]
     , E.span_ [] [ text (show <$> count.signal) ]
@@ -24,11 +24,13 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them,
 
 **Stateful signals advance only while observed.** `fold`, `merge`, `filter` and `filterOn` keep state. That state starts from the seed when the first observer arrives, and it pauses when the last observer leaves. On resuming it starts again from the inputs' current values, and changes made while it was paused are not replayed.
 
-**Channels are where change comes from.** `channel x` (in `Effect`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
+**Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.SignalSource`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
+
+**Events are planned next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (#18) will carry occurrences instead, such as clicks or messages, with every occurrence delivered. An `EventSource` gives `{ event, fire }`. The design, and the names of the planned combinators next to their RxJS counterparts, are in `docs/combinators.md`.
 
 **Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `subscribe`, `hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
 
-**`component` runs setup once per instance.** `component :: Owned Element -> Element` runs its setup when the element is instantiated. Channels, timers and subscriptions created there belong to that instance, and they are released when the instance is removed: by `dyn` switching branches, by `each` dropping a row, or by unmounting.
+**`component` runs setup once per instance.** `component :: Owned Element -> Element` runs its setup when the element is instantiated. Sources, timers and subscriptions created there belong to that instance, and they are released when the instance is removed: by `dyn` switching branches, by `each` dropping a row, or by unmounting.
 
 **`mount` returns unmount.** `mount :: String -> Element -> Effect (Effect Unit)` renders into the first element matching the selector. The action it returns removes the nodes and disposes every effect the tree created.
 
@@ -36,7 +38,7 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them,
 
 **Typed DOM.** `Screamer.DOM.Element`, `Attribute`, `EventHandler` and `Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
 
-**Formlets.** `Screamer.Formlet` builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state channel in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
+**Formlets.** `Screamer.Formlet` builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state source in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
 
 The full specification, including the rules for ordering, errors and loops, is in `docs/ownership-design.md`.
 
@@ -44,13 +46,14 @@ The full specification, including the rules for ordering, errors and loops, is i
 
 | Before | Now |
 |---|---|
-| `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.Channel` (`channel`, `batch`) |
+| `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.SignalSource` (`signalSource`, `batch`) |
+| `Screamer.Channel`, `Channel`, `channel` | `Screamer.SignalSource`, `SignalSource`, `signalSource` |
 | `get` | `read` |
 | `elements_` | `each key` (keyed rows, each row receives a `Signal` of its item) |
 | `distinct`, `nonequal` | `dropRepeats` (or nothing: every signal already cuts off by `Object.is`) |
 | `a <> b` on signals, meaning "the latest of the two" | `a <|> b` (`<>` now combines the values: `append <$> a <*> b`) |
 | `Signal (Effect a)` for dynamic content | `dyn` over a signal of elements, with `component` for per-instance setup |
-| `emit` | keep the action in a `Ref`, or `put` to a channel |
+| `emit` | keep the action in a `Ref`, or `put` to a signal source |
 | `S.mount` returning `Unit` | `mount` returning the unmount action |
 | `Screamer.DOM.Event` | the `Web.*` event types, passed to handlers directly |
 

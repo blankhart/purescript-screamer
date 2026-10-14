@@ -1,6 +1,6 @@
 # Ownership redesign: replace sinuous with an owned reactive core
 
-_Copied from the tracking issue #2 in stage 0. From here on this file is authoritative and #2 is kept in sync with it._
+_Copied from the tracking issue #2 in stage 0. From here on this file is authoritative and #2 is kept in sync with it. Discrete events and the combinator library are specified in `docs/combinators.md` (#17); the API below uses the names decided there, so `Channel` appears only in the history of the stages._
 
 Replace sinuous with a lazy reactive core that Screamer owns, and make `Signal` and `Element` pure values (Option B of the ownership redesign). The whole replacement lands as **one pull request** built in ten stages; each stage has its own sub-issue. Formlets follow in a second PR.
 
@@ -25,11 +25,11 @@ With a lazy core, a derived signal attaches to its sources only while observed. 
 
 ## Semantic model
 
-Four kinds of node; only effects have owners.
+Four kinds of signal node, plus the event nodes described in `docs/combinators.md`; only effects have owners.
 
 | Node | Created by | Linked to sources | Owner | Lifetime |
 |---|---|---|---|---|
-| Cell | `channel` in `Effect` | is a source | none | GC when unreachable; holds observers only while they observe |
+| Cell | `signalSource` in `Effect` | is a source | none | GC when unreachable; holds observers only while they observe |
 | Derived | `map`, `apply`, `bind`, `sampleOn`, `sampleManyWith`, `dropRepeatsBy` | only while observed | none | GC when unreachable; cached while observed, recomputed on demand otherwise |
 | Stateful | `fold`, `merge`, `filter`, `filterOn` | only while observed | none | state lives in the node and advances only while observed |
 | Effect | DOM bindings, `subscribe`, `hold`, `dyn` | always, while alive | a scope (required) | disposed with its scope; creating one outside a scope is an error |
@@ -77,10 +77,14 @@ filter   :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
 filterOn :: forall a. Signal Boolean -> a -> Signal a -> Signal a
 read     :: forall a. Signal a -> Effect a           -- untracked, formerly get
 
--- Screamer.Channel: sources
-type Channel a = { signal :: Signal a, put :: a -> Effect Unit, modify :: (a -> a) -> Effect Unit }
-channel :: forall a. a -> Effect (Channel a)
-batch   :: forall a. Effect a -> Effect a
+-- Screamer.SignalSource: sources of signals (Screamer.Channel until #17)
+type SignalSource a = { signal :: Signal a, put :: a -> Effect Unit, modify :: (a -> a) -> Effect Unit }
+signalSource :: forall a. a -> Effect (SignalSource a)
+batch        :: forall a. Effect a -> Effect a
+
+-- Screamer.Event and Screamer.EventSource: discrete events (#18), specified in docs/combinators.md
+type EventSource a = { event :: Event a, fire :: a -> Effect Unit }
+eventSource :: forall a. Effect (EventSource a)
 
 -- Screamer.Owned: effects with an owner
 newtype Owned a = Owned (Scope -> Effect a)        -- Functor .. Monad, MonadEffect
@@ -170,6 +174,9 @@ Handlers take the standard `Web.*` event types. Screamer's generated event class
 | Write the core or wrap a library | write it, after checking alien-signals and `@preact/signals-core` for link hooks (stage 1) |
 | Element encoding | final (`Owned Node`); no initial encoding |
 | Default cutoff equality | `Object.is`; `dropRepeats` for `Eq` |
+| Discrete events | **Decided (#17):** a separate `Event a` type with no current value and no cutoff; every occurrence propagates, in fire order. See `docs/combinators.md` |
+| Names of sources | **Decided (#17):** `SignalSource` (`signalSource`, formerly `Channel`/`channel`) and `EventSource` (`eventSource`) |
+| Combinators that need timers or async work | **Decided (#17):** they return `Owned`; everything else is pure |
 
 ## Stages
 

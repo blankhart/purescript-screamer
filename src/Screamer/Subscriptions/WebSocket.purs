@@ -14,7 +14,7 @@ import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal, read)
 
@@ -58,8 +58,8 @@ foreign import closeImpl :: WebSocket -> Effect Unit
 -- | dropped.
 connect :: String -> Owned Socket
 connect url = do
-  state <- liftEffect $ channel Connecting
-  message <- liftEffect $ channel Nothing
+  state <- liftEffect $ signalSource Connecting
+  message <- liftEffect $ signalSource Nothing
   count <- liftEffect $ Ref.new 0
   queue <- liftEffect $ Ref.new []
   socket <- liftEffect $ Ref.new Nothing

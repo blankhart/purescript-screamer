@@ -11,18 +11,18 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (Channel, batch, channel)
+import Screamer.SignalSource (SignalSource, batch, signalSource)
 import Screamer.Signal (Signal, dropRepeats, fold, read, sampleManyWith)
 import Test.Observe (observe)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
--- | Three source channels.
+-- | Three signal sources.
 type Chans = { a :: Signal Int, b :: Signal Int, c :: Signal Int }
 
--- | Initial values, then batches of writes. Each batch writes a channel at
--- | most once, so a channel's value changes exactly when its version does.
+-- | Initial values, then batches of writes. Each batch writes a signal source at
+-- | most once, so a signal source's value changes exactly when its version does.
 type Script =
   { initial :: Array Int
   , batches :: Array (Array { chan :: Int, value :: Int })
@@ -41,13 +41,13 @@ genScript = do
   m <- chooseInt (-3) 3
   pure { initial, batches, k, m }
 
--- | Observe both sides on the same channels while running the script, and
+-- | Observe both sides on the same signal sources while running the script, and
 -- | compare the traces of values shown. Consecutive repeats are dropped: a
 -- | merge reports every step, so an observer of a merge can be shown the same
 -- | value twice where the other side's observer is not.
 law :: forall a. Eq a => Show a => (Script -> Chans -> Signal a) -> (Script -> Chans -> Signal a) -> Script -> Effect Unit
 law lhs rhs script = do
-  chans <- for (Array.range 0 2) \i -> channel (Array.index script.initial i # fromMaybe0)
+  chans <- for (Array.range 0 2) \i -> signalSource (Array.index script.initial i # fromMaybe0)
   let
     sig i = case Array.index chans i of
       Just ch -> ch.signal
@@ -121,16 +121,16 @@ spec = describe "Screamer.Signal" do
 
   describe "lifted Semigroup and Monoid" do
     it "appends current values" do
-      x <- liftEffect $ channel "a"
-      y <- liftEffect $ channel "b"
+      x <- liftEffect $ signalSource "a"
+      y <- liftEffect $ signalSource "b"
       o <- liftEffect $ observe (x.signal <> y.signal <> mempty)
       liftEffect $ y.put "c"
       liftEffect o.trace >>= shouldEqual [ "ab", "ac" ]
 
   describe "sampleManyWith" do
     it "samples the first record's fields and tracks the second's" do
-      x <- liftEffect $ channel 1
-      y <- liftEffect $ channel 10
+      x <- liftEffect $ signalSource 1
+      y <- liftEffect $ signalSource 10
       let s = sampleManyWith { x: x.signal } { y: y.signal } \r -> r.x + r.y
       o <- liftEffect $ observe s
       liftEffect $ x.put 2
@@ -141,7 +141,7 @@ spec = describe "Screamer.Signal" do
 
   describe "dropRepeats" do
     it "suppresses structurally equal records" do
-      ch :: Channel { n :: Int } <- liftEffect $ channel { n: 1 }
+      ch :: SignalSource { n :: Int } <- liftEffect $ signalSource { n: 1 }
       o <- liftEffect $ observe (dropRepeats ch.signal)
       raw <- liftEffect $ observe ch.signal
       liftEffect $ ch.put { n: 1 }
@@ -152,7 +152,7 @@ spec = describe "Screamer.Signal" do
 
   describe "fold" do
     it "advances only while observed" do
-      ch <- liftEffect $ channel 0
+      ch <- liftEffect $ signalSource 0
       let count = fold (\_ n -> n + 1) 0 ch.signal
       o <- liftEffect $ observe count
       liftEffect $ ch.put 1

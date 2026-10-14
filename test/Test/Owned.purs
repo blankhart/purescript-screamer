@@ -8,7 +8,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (message, try)
 import Effect.Ref as Ref
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, child, hold, onCleanup, runOwned, subscribe)
 import Screamer.Reactive.Core (readStats)
 import Screamer.Signal (fold, read)
@@ -60,8 +60,8 @@ spec = describe "Screamer.Owned" do
     log <- liftEffect $ Ref.new []
     depth <- liftEffect $ Ref.new 0
     maxDepth <- liftEffect $ Ref.new 0
-    a <- liftEffect $ channel 0
-    b <- liftEffect $ channel 0
+    a <- liftEffect $ signalSource 0
+    b <- liftEffect $ signalSource 0
     r <- liftEffect $ runOwned do
       subscribe a.signal \x -> do
         d <- Ref.modify (_ + 1) depth
@@ -85,7 +85,7 @@ spec = describe "Screamer.Owned" do
     liftEffect r.dispose
 
   it "surfaces an effect loop as an exception" do
-    a <- liftEffect $ channel 0
+    a <- liftEffect $ signalSource 0
     r <- liftEffect $ runOwned $ subscribe a.signal \x -> a.put (x + 1)
     result <- liftEffect $ try (a.put 100)
     liftEffect r.dispose
@@ -94,7 +94,7 @@ spec = describe "Screamer.Owned" do
       Right _ -> fail "expected an effect loop"
 
   it "stops a held fold advancing when its child scope is disposed" do
-    clicks <- liftEffect $ channel 0
+    clicks <- liftEffect $ signalSource 0
     let count = fold (\_ n -> n + 1) 0 clicks.signal
     r <- liftEffect $ runOwned (child (void $ hold count) :: Owned _)
     liftEffect $ clicks.put 1
@@ -107,7 +107,7 @@ spec = describe "Screamer.Owned" do
 
   it "leaves nothing live after disposal" do
     before <- liftEffect readStats
-    a <- liftEffect $ channel 0
+    a <- liftEffect $ signalSource 0
     r <- liftEffect $ runOwned do
       subscribe (map (_ + 1) a.signal) \_ -> pure unit
       void $ hold (fold (+) 0 a.signal)

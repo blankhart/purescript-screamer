@@ -5,7 +5,7 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Core (Element, component, element, text)
 import Screamer.DOM.Attribute as A
 import Screamer.DOM.Element as E
@@ -17,7 +17,7 @@ main = Harness.run "main" counter
 
 counter :: Element
 counter = component do
-  count <- liftEffect $ channel 0
+  count <- liftEffect $ signalSource 0
   pure $ E.div_ [ A.class_ "counter" ]
     [ E.button_ [ A.id_ "decrement", H.onClick_ \_ -> count.modify (_ - 1) ] [ element "-" ]
     , E.span_ [ A.id_ "count" ] [ text (show <$> count.signal) ]

@@ -12,7 +12,7 @@ import Effect.Aff (Aff, attempt, error, killFiber, launchAff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, message)
 import Effect.Ref as Ref
-import Screamer.Channel (channel)
+import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, onCleanup, subscribe)
 import Screamer.Signal (Signal)
 
@@ -42,7 +42,7 @@ instance Functor Remote where
 -- | killed, and its result is never shown.
 resource :: forall a b. Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))
 resource input request = do
-  result <- liftEffect $ channel Loading
+  result <- liftEffect $ signalSource Loading
   running <- liftEffect $ Ref.new Nothing
   generation <- liftEffect $ Ref.new 0
   let
