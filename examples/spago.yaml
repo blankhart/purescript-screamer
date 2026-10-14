@@ -1,10 +1,13 @@
 package:
   name: screamer-examples
   dependencies:
+    - aff
     - arrays
     - console
-    - either
+    - datetime
     - effect
+    - either
+    - filterable
     - foldable-traversable
     - integers
     - maybe
@@ -12,6 +15,7 @@ package:
     - partial
     - prelude
     - random
+    - refs
     - screamer
     - st
     - strings

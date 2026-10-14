@@ -101,6 +101,28 @@ const examples = {
     await expectText(page, '#plan', 'City break in Lisbon');
   },
 
+  async Typeahead(page) {
+    const results = () => page.evaluate(() => Array.from(document.querySelectorAll('#results li')).map((l) => l.textContent).join());
+    await expectText(page, '#status', 'Type at least three letters');
+    // A query still in flight when the next one is sent is cancelled, so
+    // only the latest results are ever shown, however the latencies fall.
+    await page.fill('#search', 'app');
+    await page.waitForTimeout(200);
+    await page.fill('#search', 'grape');
+    await page.waitForFunction(() => Array.from(document.querySelectorAll('#results li')).map((l) => l.textContent).join() === 'grape,grapefruit');
+    await page.waitForTimeout(800);
+    if ((await results()) !== 'grape,grapefruit') throw new Error(`stale results: ${await results()}`);
+    await expectText(page, '#status', '2 results');
+    await page.press('#search', 'ArrowDown');
+    await expectClass(page, '#results li:nth-child(2)', 'selected');
+    await page.press('#search', 'Enter');
+    await expectText(page, '#chosen', 'Chosen: grapefruit');
+    // Typing more keeps the old list on screen until the new one arrives.
+    await page.type('#search', 'f', { delay: 0 });
+    await expectText(page, '#status', '1 result');
+    if ((await results()) !== 'grapefruit') throw new Error(`results: ${await results()}`);
+  },
+
   async JsFrameworksBenchmark(page) {
     await page.click('#run');
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1000);
