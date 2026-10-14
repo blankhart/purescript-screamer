@@ -31,6 +31,8 @@ module Screamer.Signal
   , sampleManyWith
   , dropRepeats
   , dropRepeatsBy
+  , dropRepeatsOn
+  , withPrevious
   , fold
   , merge
   , filter
@@ -44,6 +46,7 @@ module Screamer.Signal
 import Prelude
 
 import Control.Alt (class Alt)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Prim.Row (class Nub, class Union)
 import Prim.RowList (RowList, class RowToList, Cons, Nil)
@@ -97,6 +100,19 @@ dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Signal a -> Signal a
 dropRepeatsBy = dropRepeatsByImpl
 
 foreign import dropRepeatsByImpl :: forall a. (a -> a -> Boolean) -> Signal a -> Signal a
+
+-- | Propagate a change only when the key of the new value differs from the
+-- | key of the old one. (RxJS `distinctUntilKeyChanged`.)
+dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Signal a -> Signal a
+dropRepeatsOn key = dropRepeatsByImpl \x y -> key x == key y
+
+-- | The previous value and the current one. It starts as the seed and the
+-- | current value, and on each change pairs the value before it with the new
+-- | one. Stateful: it steps only while observed. (RxJS `pairwise`.)
+withPrevious :: forall a. a -> Signal a -> Signal (Tuple a a)
+withPrevious = withPreviousImpl Tuple
+
+foreign import withPreviousImpl :: forall a. (a -> a -> Tuple a a) -> a -> Signal a -> Signal (Tuple a a)
 
 -- | Accumulate from a seed, one step per propagation in which the input changed.
 foreign import fold :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b

@@ -5,6 +5,8 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Array as Array
+import Data.Array.NonEmpty as NonEmpty
+import Data.Either (Either(..))
 import Data.Filterable (filter, filterMap, partition)
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (Maybe(..))
@@ -19,6 +21,7 @@ import Screamer.EventSource (batch, eventSource)
 import Screamer.Owned (hold, runOwned)
 import Screamer.Reactive.Core (readStats)
 import Screamer.Signal (read)
+import Screamer.Signal as Signal
 import Screamer.SignalSource (signalSource)
 import Test.Observe (observe)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
@@ -66,6 +69,27 @@ law lhs rhs script = do
   when (lt /= rt) do
     fail $ "traces differ for " <> show script <> ": " <> show lt <> " /= " <> show rt
 
+-- | Batches of fires of one source.
+genFires :: Gen (Array (Array Int))
+genFires = arrayOf do
+  n <- chooseInt 1 4
+  vectorOf n (chooseInt 0 4)
+
+-- | An operator observed from the start agrees with a model over the
+-- | sequence of every occurrence fired.
+model :: forall b. Eq b => Show b => (Event Int -> Event b) -> (Array Int -> Array b) -> Effect Unit
+model op ref = do
+  scripts <- randomSample' 200 genFires
+  for_ scripts \script -> do
+    src <- eventSource
+    o <- observeE (op src.event)
+    for_ script \fires -> batch (for_ fires src.fire)
+    got <- o.trace
+    o.stop
+    let want = ref (Array.concat script)
+    when (got /= want) do
+      fail $ "for " <> show script <> ": got " <> show got <> ", want " <> show want
+
 checkLaw :: forall a. Eq a => Show a => (Srcs -> Event a) -> (Srcs -> Event a) -> Effect Unit
 checkLaw lhs rhs = do
   scripts <- randomSample' 200 genScript
@@ -88,6 +112,71 @@ spec = describe "Screamer.Event" do
     it "partition splits by the predicate" $ liftEffect $ checkLaw
       (\s -> let p = partition (_ > 1) s.a in map (Tuple true) p.yes <|> map (Tuple false) p.no)
       (\s -> map (\x -> Tuple (x > 1) x) s.a)
+
+  describe "transform, filter and accumulate against a model" do
+    it "mapAccum" $ liftEffect $ model
+      (Event.mapAccum (\a s -> { state: s + a, value: s * 10 + a }) 0)
+      (\xs -> Array.zipWith (\s a -> s * 10 + a) (Array.scanl (+) 0 xs # Array.cons 0) xs)
+    it "withPrevious" $ liftEffect $ model
+      (map (\p -> Tuple p.previous p.current) <<< Event.withPrevious)
+      (\xs -> Array.zip xs (Array.drop 1 xs))
+    it "dropRepeats" $ liftEffect $ model Event.dropRepeats (map NonEmpty.head <<< Array.group)
+    it "dropRepeatsOn" $ liftEffect $ model (Event.dropRepeatsOn (_ `div` 2))
+      (map NonEmpty.head <<< Array.groupBy (\x y -> x `div` 2 == y `div` 2))
+    it "take" $ liftEffect $ model (Event.take 3) (Array.take 3)
+    it "skip" $ liftEffect $ model (Event.skip 2) (Array.drop 2)
+    it "takeWhile" $ liftEffect $ model (Event.takeWhile (_ < 3)) (Array.takeWhile (_ < 3))
+    it "skipWhile" $ liftEffect $ model (Event.skipWhile (_ < 3)) (Array.dropWhile (_ < 3))
+    it "first" $ liftEffect $ model Event.first (Array.take 1)
+
+  describe "transform, filter and accumulate" do
+    it "take and skip count only while observed, and do not restart" do
+      src <- liftEffect eventSource
+      keep <- liftEffect $ observeE src.event
+      let
+        t = Event.take 2 src.event
+        s = Event.skip 2 src.event
+      o1 <- liftEffect $ observeE (map Left t <|> map Right s)
+      liftEffect $ src.fire 1
+      liftEffect o1.stop
+      liftEffect $ traverse_ src.fire [ 2, 3 ]
+      o2 <- liftEffect $ observeE (map Left t <|> map Right s)
+      liftEffect $ traverse_ src.fire [ 4, 5, 6 ]
+      liftEffect o1.trace >>= shouldEqual [ Left 1 ]
+      liftEffect o2.trace >>= shouldEqual [ Left 4, Right 5, Right 6 ]
+      liftEffect (o2.stop *> keep.stop)
+
+    it "count counts occurrences" do
+      src <- liftEffect eventSource
+      o <- liftEffect $ observe (Event.count src.event)
+      liftEffect $ batch (src.fire unit *> src.fire unit)
+      liftEffect o.trace >>= shouldEqual [ 0, 2 ]
+      liftEffect o.stop
+
+    it "gate passes rounds that end with the condition true" do
+      open <- liftEffect $ signalSource false
+      src <- liftEffect eventSource
+      o <- liftEffect $ observeE (Event.gate open.signal src.event)
+      liftEffect $ src.fire 1
+      liftEffect $ batch (src.fire 2 *> open.put true)
+      liftEffect $ src.fire 3
+      liftEffect o.trace >>= shouldEqual [ 2, 3 ]
+      liftEffect o.stop
+
+    it "Signal.withPrevious pairs each value with the one before" do
+      s <- liftEffect $ signalSource 1
+      o <- liftEffect $ observe (Signal.withPrevious 0 s.signal)
+      liftEffect $ s.put 2
+      liftEffect $ s.put 3
+      liftEffect o.trace >>= shouldEqual [ Tuple 0 1, Tuple 1 2, Tuple 2 3 ]
+      liftEffect o.stop
+
+    it "Signal.dropRepeatsOn compares keys" do
+      s <- liftEffect $ signalSource 1
+      o <- liftEffect $ observe (Signal.dropRepeatsOn (_ `div` 10) s.signal)
+      liftEffect $ traverse_ s.put [ 2, 12, 15, 3 ]
+      liftEffect o.trace >>= shouldEqual [ 1, 12, 3 ]
+      liftEffect o.stop
 
   describe "event sources" do
     it "delivers two fires of the same value in one batch to a fold" do
