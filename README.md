@@ -16,6 +16,31 @@ main :: Effect Unit
 main = void $ mount "main" counter
 ```
 
+## Packages
+
+One spago workspace, one version. An app depends on `screamer`, plus any add-ons it uses:
+
+```yaml
+package:
+  dependencies:
+    - screamer
+    - screamer-combinators   # Time, Flatten, Event.Extra, Signal.Extra
+    - screamer-resource      # Resource
+```
+
+| Package | Modules | For |
+|---|---|---|
+| [`screamer-reactive`](packages/screamer-reactive) | `Screamer.Signal`, `.Event`, `.Source`, `.Owned`, `.Context`, `.Host`, `.Pending`, `.Runtime` | the reactive core, with no DOM and no `web-*` dependency |
+| [`screamer`](packages/screamer) | `Screamer`, `Screamer.Element`, `.Attribute`, `.Html`, `.Html.Attributes`, `.Html.Handlers`, `.Svg` | elements |
+| [`screamer-combinators`](packages/screamer-combinators) | `Screamer.Event.Extra`, `.Signal.Extra`, `.Time`, `.Flatten` | more operators, timers and owned flattening |
+| [`screamer-resource`](packages/screamer-resource) | `Screamer.Resource` | requests as signals |
+| [`screamer-web`](packages/screamer-web) | `Screamer.Web.WebSocket` | browser subscriptions |
+| [`screamer-router`](packages/screamer-router) | `Screamer.Router`, `.Router.Windrose` | the location as a signal |
+| [`screamer-forms`](packages/screamer-forms) | `Screamer.Form` | formlets |
+| [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock` | test helpers |
+
+`npm run build` builds them all, `npm test` runs every package's tests, and [`CHANGELOG.md`](CHANGELOG.md) lists what moved.
+
 The examples are in `examples/src`. Run `npm run build:examples` to bundle them into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
 
 ## How ownership works
@@ -34,13 +59,13 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them 
 
 **`mount` returns unmount.** `mount :: String -> Element -> Effect (Effect Unit)` renders into the first element matching the selector. The action it returns removes the nodes and disposes every effect the tree created.
 
-**Subscriptions and resources are owned too.** `Screamer.Time` (`clock`, `interval`, `after`, `frames`), `Screamer.Subscriptions.WebSocket` (`connect`) and `Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Router` only tracks the location; the Router example matches it, and builds its links, with [windrose-router](https://github.com/blankhart/purescript-windrose-router), whose routes are a type. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
+**Subscriptions and resources are owned too.** `Screamer.Time` (`clock`, `interval`, `after`, `frames`), `Screamer.Web.WebSocket` (`connect`) and `Screamer.Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Router` only tracks the location; `Screamer.Router.Windrose` matches it with [windrose-router](https://github.com/blankhart/purescript-windrose-router), whose routes are a type, and the Router example builds its links the same way. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
 
 **Context, Host and Pending.** `Screamer.Context` provides values to a scope and everything under it (`key`, `provide`, `ask`) and gives stable ids (`uniqueId`). `Screamer.Host` is the clock, timers and frames as a context value: `Screamer.Time` and `Resource.retry` use it, and a test can `withHost` a fake one and move time itself. `Screamer.Pending.settled` is true when no request is running anywhere under the current scope. See [`docs/ownership-design.md`](docs/ownership-design.md#context-host-and-pending).
 
 **Typed DOM.** `Screamer.Html`, `Screamer.Html.Attributes`, `Screamer.Html.Handlers` and `Screamer.Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
 
-**Formlets.** `Screamer.Examples.Formlet` (in `examples/src/Formlet.purs`) builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state source in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
+**Formlets.** `Screamer.Form` (in screamer-forms) builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state source in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
 
 The full specification, including the rules for ordering, errors and loops, is in `docs/ownership-design.md`.
 
@@ -54,7 +79,7 @@ Most RxJS operators have a counterpart, pure where it can be and `Owned` where i
 |---|---|
 | `map`, `filter`, `scan` | `map`, `filter`, `Event.fold` / `Event.mapAccum` |
 | `distinctUntilChanged` | `Event.dropRepeats` (signals drop repeats already) |
-| `merge`, `combineLatest`, `withLatestFrom` | `<\|>` / `Event.oneOf`, `Signal.combine` / `ado`, `Event.attachWith` |
+| `merge`, `combineLatest`, `withLatestFrom` | `<\|>` / `Event.oneOf`, `ado` / `Signal.Extra.combine`, `Event.attachWith` |
 | `switchMap`, `mergeMap`, `concatMap`, `exhaustMap` | `Resource.resourceWith` / `request` with `Switch`, `Merge`, `Concat`, `Exhaust`; `Flatten.switchOwned` etc. for owned inner work |
 | `debounceTime`, `throttleTime`, `delay` | `Time.debounce`, `Time.throttle`, `Time.delay` (`Owned`) |
 | `catchError`, `retry` | `Signal.catching`, `Resource.retry` |
@@ -91,6 +116,11 @@ Nothing is called `Core` any more, the two source modules are one, and the gener
 | `Screamer.DOM.EventHandler` | `Screamer.Html.Handlers` |
 | `Screamer.DOM.Svg` | `Screamer.Svg` |
 | `Screamer.Internal` | removed (unused) |
+| `Screamer.Subscriptions.WebSocket` | `Screamer.Web.WebSocket` (screamer-web) |
+| `Screamer.Subscriptions.Router` | `Screamer.Router` (screamer-router) |
+| `Screamer.Examples.Formlet` | `Screamer.Form` (screamer-forms) |
+| attributes in `Screamer.Element` | `Screamer.Attribute` |
+| `Event.take`, `zip`, `race`, buffering, …; `Signal.combine`, `withLatest`, `history`, `switchLatest` | `Screamer.Event.Extra`, `Screamer.Signal.Extra` (screamer-combinators) |
 
 ### Signal and Event alignment
 
@@ -113,7 +143,7 @@ Efficient JS frameworks trace state changes to the view changes they cause, and 
 
 ## History
 
-Screamer first rendered through [sinuous](https://github.com/luwes/sinuous). There, a node's owner was whatever computation happened to be running when the node was created. Derived signals went stale, observers leaked, `merge` stopped listening, and nothing could be unmounted. The reactive core is now Screamer's own (`src/Screamer/Runtime.ts`). `docs/ownership-design.md` records the redesign and the deviations from its specification. The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral), and `bench/` drives the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations.
+Screamer first rendered through [sinuous](https://github.com/luwes/sinuous). There, a node's owner was whatever computation happened to be running when the node was created. Derived signals went stale, observers leaked, `merge` stopped listening, and nothing could be unmounted. The reactive core is now Screamer's own (`packages/screamer-reactive/src/Screamer/Runtime.ts`). `docs/ownership-design.md` records the redesign and the deviations from its specification. The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral), and `bench/` drives the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations.
 
 ## References
 

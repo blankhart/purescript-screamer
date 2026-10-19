@@ -130,7 +130,7 @@ Evaluating an `Element` runs nothing, including the setup inside `component`. In
 - **Release at batch end.** A node that loses its last target during a batch stays linked until the batch ends, and unlinks then only if nothing observes it again. A stateful node that moves from one observer to another within a batch therefore neither pauses nor resynchronizes.
 - **`gate` (formerly `filterOn`).** Follows its source while the condition is true and holds its last value while it is false; when the condition becomes true it takes the source's current value. It starts at the source if the condition holds at the start, otherwise at the seed.
 - **No owner inside computations.** Derivations and effect bodies run with no current scope, so they cannot create effects by accident. Code that builds a child scope from inside an effect (`dyn`, `each`) names the parent scope explicitly.
-- **Libraries checked (stage 1).** `@preact/signals-core` 1.14.4 has `watched`/`unwatched` options on signals but keeps versions internal (`_version`); `alien-signals` 3.2.1 exposes an `unwatched` hook in `createReactiveSystem` but no first-observer hook and only per-link versions. Neither exposes both without patching, so the core is our own (`src/Screamer/Runtime.ts`).
+- **Libraries checked (stage 1).** `@preact/signals-core` 1.14.4 has `watched`/`unwatched` options on signals but keeps versions internal (`_version`); `alien-signals` 3.2.1 exposes an `unwatched` hook in `createReactiveSystem` but no first-observer hook and only per-link versions. Neither exposes both without patching, so the core is our own (`packages/screamer-reactive/src/Screamer/Runtime.ts`).
 
 A working prototype (153 lines, 23 checks, randomized glitch test) is attached to the stage 1 issue, #4.
 

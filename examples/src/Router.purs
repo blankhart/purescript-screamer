@@ -9,15 +9,14 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either, either)
-import Data.Maybe (fromMaybe)
-import Data.String (Pattern(..), stripPrefix)
 import Effect (Effect)
 import Screamer.Element (Element, component, dyn, element)
 import Screamer.Examples.Harness as Harness
 import Screamer.Html as E
 import Screamer.Html.Attributes as A
 import Screamer.Signal (Signal)
-import Screamer.Subscriptions.Router (Location, link, location)
+import Screamer.Router (Location, link, location)
+import Screamer.Router.Windrose (matchHash)
 import Windrose.Router (type (:<|>), type (:>), C, P, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)
 
 main :: Effect Unit
@@ -43,9 +42,7 @@ router = route (mkRoutable (RouteProxy :: _ Api)) { home: Home, about: About, it
 -- | Routes live in the hash, so the page itself (and its `?example=` query)
 -- | never changes and a reload always finds it.
 toPage :: Location -> Page
-toPage { hash } = either (const (NotFound path)) identity (router path)
-  where
-  path = fromMaybe hash (stripPrefix (Pattern "#") hash)
+toPage = either NotFound identity <<< matchHash router
 
 -- | Where a page lives. Every route's link comes from `links`.
 href :: Page -> String

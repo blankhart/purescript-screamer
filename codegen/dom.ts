@@ -8,7 +8,7 @@ function main() {
   console.log("Code generation...");
 
   const sourceDir = `./codegen/templates/src`;
-  const targetDir = `./src/Screamer`;
+  const targetDir = `./packages/screamer/src/Screamer`;
 
   const capitalize = (string: string) =>
     string[0].toUpperCase() + string.slice(1);

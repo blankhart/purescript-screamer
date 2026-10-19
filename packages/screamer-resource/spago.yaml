@@ -1,0 +1,27 @@
+package:
+  name: screamer-resource
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - aff
+    - arrays
+    - effect
+    - either
+    - exceptions
+    - foldable-traversable
+    - maybe
+    - prelude
+    - refs
+    - screamer-reactive
+  test:
+    main: Test.Resource.Main
+    dependencies:
+      - aff
+      - effect
+      - either
+      - exceptions
+      - maybe
+      - refs
+      - screamer-test
+      - spec
