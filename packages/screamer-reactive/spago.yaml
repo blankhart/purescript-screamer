@@ -1,0 +1,35 @@
+package:
+  name: screamer-reactive
+  publish:
+    version: 0.1.0
+    license: MIT
+  build:
+    censorProjectWarnings:
+      # Its foreign module is a JavaScript API for add-on FFI, which no
+      # PureScript code imports.
+      - byPrefix: "The following definitions in the foreign module for module Screamer.Runtime.Unsafe are unused"
+  dependencies:
+    - control
+    - effect
+    - either
+    - exceptions
+    - filterable
+    - maybe
+    - prelude
+    - tuples
+    - typelevel-prelude
+    - unsafe-coerce
+  test:
+    main: Test.Reactive.Main
+    dependencies:
+      - arrays
+      - effect
+      - exceptions
+      - foldable-traversable
+      - integers
+      - maybe
+      - quickcheck
+      - refs
+      - screamer-test
+      - spec
+      - strings

@@ -17,6 +17,12 @@ package:
     - random
     - refs
     - screamer
+    - screamer-combinators
+    - screamer-forms
+    - screamer-reactive
+    - screamer-resource
+    - screamer-router
+    - screamer-web
     - st
     - strings
     - unfoldable

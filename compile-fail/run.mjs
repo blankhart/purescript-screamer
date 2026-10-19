@@ -5,7 +5,8 @@
 //
 //   node compile-fail/run.mjs        (after `spago build`)
 //
-// The fixtures live outside test/ so that `spago test` does not compile them.
+// The fixtures live outside the packages' test/ directories so that
+// `spago test` does not compile them.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -24,7 +25,7 @@ if (!fs.existsSync(out) && fs.existsSync(path.join(root, 'output'))) {
 const globs = execFileSync(bin('spago'), ['sources', '-p', 'screamer'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
   .split('\n')
   .map((s) => s.trim())
-  .filter((s) => s && !s.startsWith('test/') && !s.startsWith('compile-fail/'));
+  .filter((s) => s && !/(^|\/)test\//.test(s) && !s.startsWith('compile-fail/'));
 
 let failures = 0;
 for (const file of fs.readdirSync(here).filter((f) => f.endsWith('.purs')).sort()) {

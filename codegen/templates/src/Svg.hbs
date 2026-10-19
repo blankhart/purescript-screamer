@@ -4,7 +4,8 @@ module Screamer.Svg where
 
 import Prelude
 
-import Screamer.Element (class AttrValue, Attribute, Element, attribute, svgElement_, toSignal)
+import Screamer.Attribute (class AttrValue, Attribute, attribute, toSignal)
+import Screamer.Element (Element, svgElement_)
 
 {{#each SvgElements as |name|}}
 {{unhyphenate name}}_ :: Array Attribute -> Array Element -> Element

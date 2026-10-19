@@ -31,7 +31,7 @@ jobs:
           test -z "$(npm ls sinuous --parseable)"
           if grep -rnE "(from|import|require\()[[:space:]]*['\"]sinuous|Screamer\.Core\.Sinuous|Screamer\.Observable" \
               --include='*.ts' --include='*.js' --include='*.mjs' --include='*.purs' \
-              src test examples codegen bench compile-fail; then
+              packages examples codegen bench compile-fail; then
             echo "sinuous is imported above"; exit 1
           fi
 
@@ -40,18 +40,23 @@ jobs:
 
       - name: Compiled .js is committed and matches its .ts
         run: |
-          if [ -n "$(git status --porcelain -- 'src/**/*.js')" ]; then
+          if [ -n "$(git status --porcelain -- 'packages/*/src/**/*.js')" ]; then
             echo "Run npx tsc and commit the .js files it changes:"
-            git status --porcelain -- 'src/**/*.js'
+            git status --porcelain -- 'packages/*/src/**/*.js'
             exit 1
           fi
-          orphans=$(find src -name '*.js' | while read -r f; do [ -f "${f%.js}.ts" ] || echo "$f"; done)
+          orphans=$(find packages/*/src -name '*.js' | while read -r f; do [ -f "${f%.js}.ts" ] || echo "$f"; done)
           if [ -n "$orphans" ]; then
             echo "These .js files have no .ts source:"; echo "$orphans"; exit 1
           fi
 
       - name: Build PureScript
         run: npx spago build
+
+      - name: screamer-reactive builds with no web-* dependency, and versions match
+        run: |
+          npx spago build -p screamer-reactive
+          node scripts/check-packages.mjs
 
       - name: Bundle examples
         run: npm run build:examples
@@ -71,5 +76,5 @@ jobs:
       - name: Generated DOM modules are up to date
         run: |
           npm run codegen:dom
-          git diff --exit-code -- 'src/**/*.g.purs'
-          test -z "$(git status --porcelain -- 'src/**/*.g.purs')"
+          git diff --exit-code -- 'packages/screamer/src/**/*.g.purs'
+          test -z "$(git status --porcelain -- 'packages/screamer/src/**/*.g.purs')"

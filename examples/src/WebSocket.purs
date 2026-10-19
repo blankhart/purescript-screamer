@@ -16,7 +16,7 @@ import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Signal (read)
 import Screamer.Source (signalSource)
-import Screamer.Subscriptions.WebSocket (ConnectionState(..), connect)
+import Screamer.Web.WebSocket (ConnectionState(..), connect)
 import Web.Event.Event (preventDefault, target)
 import Web.HTML.HTMLInputElement as Input
 

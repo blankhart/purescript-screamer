@@ -1,5 +1,7 @@
 # Events, sources and combinators
 
+This page covers the core: `Screamer.Signal`, `Screamer.Event` and `Screamer.Source` in screamer-reactive. The add-on operators (`Screamer.Event.Extra`, `Screamer.Signal.Extra`, `Screamer.Time`, `Screamer.Flatten`) are described in [`packages/screamer-combinators/README.md`](../packages/screamer-combinators/README.md), with the same conventions.
+
 _Decided in #17, part of the combinator plan in #16. This file is authoritative for the event model and for combinator names; `docs/ownership-design.md` remains authoritative for signals, ownership and the reactive core, and links here._
 
 Screamer has two kinds of stream:
@@ -158,7 +160,7 @@ RxJS has no separate state type: its `BehaviorSubject` is closest to a signal so
 
 ## Transform, filter and accumulate (#19)
 
-All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`, `take`, `skip`, `takeWhile`, `skipWhile`, `first`, `count`) pause: they start from their seed when first observed and count or compare only occurrences seen while observed. A `take 3` that loses its observers and is observed again does not restart: it carries on from the count it had.
+All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`) pause: they start from their seed when first observed and count or compare only occurrences seen while observed. A `dropRepeats` that loses its observers and is observed again compares with the last occurrence it saw.
 
 | RxJS | Screamer | Notes |
 |---|---|---|
@@ -169,9 +171,8 @@ All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`, `take`,
 | `pairwise` | `Event.withPrevious :: Event a -> Event { previous :: a, current :: a }`, `Signal.withPrevious :: a -> Signal a -> Signal (Tuple a a)` | the event form starts at the second occurrence; the signal form starts as the seed and the current value; both pause |
 | `startWith` | `Event.startWith` (an alias of `stepper`) | |
 | `distinctUntilChanged`, `distinctUntilKeyChanged` | `dropRepeats`, `dropRepeatsBy`, `dropRepeatsOn` on both | `dropRepeatsOn :: Eq k => (a -> k) -> …`; the event forms pause |
-| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event` | pause |
+| `take`, `skip`, `takeWhile`, `skipWhile`, `first`, `count` | in `Screamer.Event.Extra` (screamer-combinators) | pause |
 | `last` | left out | an event never completes, so it has no last occurrence |
-| `count`, `reduce` | `Event.count :: Event a -> Signal Int`, `Event.fold` | pause |
 | `tap` | left out | an effect belongs in `subscribe`, which has an owner |
 | toggle, `gate` | `Event.gate :: Signal Boolean -> Event a -> Event a`; `Signal.gate :: Signal Boolean -> a -> Signal a -> Signal a` | the event form reads the condition at the end of the round; the signal form holds its last value while the condition is false, and pauses |
 | `filter` on a signal | `Signal.latestWhere :: (a -> Boolean) -> a -> Signal a -> Signal a` | the latest value that passed, starting at the seed; pauses |
@@ -182,15 +183,12 @@ All pure. The simultaneity rule for each: on signals, one step per batch and the
 
 | RxJS | Screamer | Simultaneity |
 |---|---|---|
-| `combineLatest` | `apply`, `sequence`, `sampleMany`, and `Signal.combine :: Array (Signal a) -> Signal (Array a)` | one value per batch; `combine` is one node instead of a chain of `apply`s |
+| `combineLatest` | `apply`, `sequence`, `sampleMany`; `Signal.Extra.combine` is one node instead of a chain of `apply`s | one value per batch |
 | `merge` on signals | `<|>`, `Signal.merge` | one value per batch, the left winning ties; pauses |
-| `withLatestFrom` | `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Signal (Tuple a b)` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; the first is observed with it, so a stateful signal there keeps advancing |
+| `withLatestFrom` | `Event.attachWith`; `Signal.Extra.withLatest` | see screamer-combinators |
 | `sample` | `Event.tag`; `Signal.sampleOn` | the signal is read at the end of the round |
 | `merge` | `<|>`, `Event.oneOf :: Array (Event a) -> Event a` | every occurrence, in fire order; `oneOf` is one node and agrees with folding `<|>` |
-| (Reflex `leftmost`) | `Event.leftmost :: Array (Event a) -> Event a` | only the leftmost input that fired in the round |
-| `mergeWith` keeping both | `Event.mergeWith :: (a -> b -> c) -> (a -> c) -> (b -> c) -> Event a -> Event b -> Event c` | occurrences with the same fire stamp (both derived from one fire) are combined; nothing is lost |
-| `zip` | `Event.zip`, `Event.zipWith` | pairs the nth occurrence of each, counting from observation; unpaired occurrences queue without bound; a paused zip drops its queues, because what they would pair with is missed; pauses |
-| `race` | `Event.race :: Array (Event a) -> Event a` | follows the first input to fire after first observation (the leftmost, on a tie); keeps that choice while paused; pauses |
+| `zip`, `race`, Reflex `leftmost`, `mergeWith` | in `Screamer.Event.Extra` (screamer-combinators) | |
 | `forkJoin`, `combineLatestAll` | left out | events never complete, so there is no last value to join; for a list of async results use `Remote`'s `Applicative` (#24) or `sequence` on signals |
 
 ## Flattening (#21)
@@ -199,22 +197,11 @@ For pure inner streams nothing needs an owner: `bind` on signals already switche
 
 | RxJS | Screamer | Notes |
 |---|---|---|
-| `switchAll` on signals | `Signal.switchLatest :: Signal (Signal a) -> Signal a` | `join`; the branch no longer read is released |
+| `switchAll` on signals | `join`, or `Signal.Extra.switchLatest` | the branch no longer read is released |
 | `switchMap` to events | `Event.switchEvent :: Signal (Event a) -> Event a` | follows the event the signal holds; a new event is followed from the next occurrence on, so nothing it fired before the switch is delivered |
 | `mergeMap`, `concatMap` over `Event (Event a)` | left out | an event of events has no owner for the inner events' lifetimes; use `switchEvent`, or the owned forms below |
 
-Inner work that needs an owner (timers, sockets, requests) runs in a child scope per inner value, like `dyn` for values other than elements. `Screamer.Flatten`:
-
-| RxJS | Screamer |
-|---|---|
-| `switchMap` | `switchOwned :: Signal a -> (a -> Owned b) -> Owned (Signal b)`: each new value disposes the running child first |
-| `mergeMap` | `mergeOwned :: Event a -> (a -> Effect Unit -> Owned (Event b)) -> Owned (Event b)`: every child runs at once |
-| `concatMap` | `concatOwned` (same type): occurrences queue while a child runs, without bound, and start in order |
-| `exhaustMap` | `exhaustOwned` (same type): occurrences are ignored while a child runs |
-
-A child of the event forms is *running* until it calls the `Effect Unit` it is given (`done`), which disposes it, or until the parent scope is disposed. The output merges the events the running children return, in fire order; an inner event delivers what it fires after its child's setup returns.
-
-For `Aff` requests, `Screamer.Resource` has the same four strategies as a `Strategy` (`Switch`, `Merge`, `Concat`, `Exhaust`). A request is running until it settles.
+Inner work that needs an owner (timers, sockets, requests) runs in a child scope per inner value: `Screamer.Flatten`, in screamer-combinators. For `Aff` requests, `Screamer.Resource` (screamer-resource) has the same four strategies as a `Strategy` (`Switch`, `Merge`, `Concat`, `Exhaust`). A request is running until it settles.
 
 ```purescript
 resourceWith :: forall a b. Strategy -> Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))
@@ -224,60 +211,17 @@ resource = resourceWith Switch
 
 `resourceWith` turns `Loading` when a request starts and shows each result its strategy keeps; under `Exhaust` that can be the result for an older input than the signal's current value. `request` fires one occurrence per kept result. Disposing the scope kills every running request, and a result that arrives after its request was killed is never shown.
 
-## Time (#22)
-
-`Screamer.Time`. Each combinator reads the `Screamer.Host` of its scope when it is instantiated, so a fake host drives it in tests. Its sources return state as a `Signal` and occurrences as an `Event`, and take no callbacks:
-
-```purescript
-clock    :: Milliseconds -> Owned (Signal Instant)   -- the current time, updated every interval
-interval :: Milliseconds -> Owned (Event Unit)       -- one occurrence every interval
-after    :: Milliseconds -> Owned (Event Unit)       -- one occurrence, once
-frames   :: Owned (Event Number)                     -- one occurrence per animation frame, with its timestamp
-```
-
-Each combinator needs a timer, so each returns `Owned` and cancels its timers when its scope is disposed; an occurrence still pending then is dropped. Timers start at instantiation: each combinator subscribes to its input when its scope runs and observes it for the scope's whole life, whether or not anything observes the output. `timeout` and `sampleEvery` count their first interval from instantiation.
-
-| RxJS | Screamer |
-|---|---|
-| `debounceTime` | `debounce :: Milliseconds -> Event a -> Owned (Event a)`; `debounceSignal :: Milliseconds -> Signal a -> Owned (Signal a)` holds the last settled value, starting at the current one |
-| `throttleTime` | `throttle :: { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)`; a trailing occurrence opens a new interval, as in RxJS |
-| `auditTime` | `audit :: Milliseconds -> Event a -> Owned (Event a)` |
-| `sampleTime` | `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)`; holds the signal so a stateful one keeps advancing |
-| `delay` | `delay :: Milliseconds -> Event a -> Owned (Event a)`; keeps order |
-| `timeout` | `timeout :: Milliseconds -> Event a -> Owned (Event (Either Unit a))`; a `Left unit` for each silence of the interval, from instantiation and after each occurrence, instead of an error |
-| `interval`, `timer` | `interval`, `after`; `clock` for the time itself |
-| animation-frame scheduling | `frames`; `onFrame :: Event a -> Owned (Event a)`: the latest occurrence on the next frame |
-
-Each timer callback runs in one `batch`, so what it fires arrives in one round. An occurrence passed on without a timer (a leading `throttle` edge, a `timeout`'s `Right`) is fired from a subscription, so it arrives one round after the input's.
-
-## Buffering (#23)
-
-| RxJS | Screamer | Pure? |
-|---|---|---|
-| `bufferCount(n, step)` | `Event.bufferCount :: Int -> Int -> Event a -> Event (Array a)` | pure; pauses |
-| `buffer(notifier)` | `Event.bufferOn :: Event b -> Event a -> Event (Array a)` | pure; pauses |
-| `bufferToggle`, `bufferWhen` | `Event.bufferWhile :: Signal Boolean -> Event a -> Event (Array a)` | pure; pauses |
-| `bufferTime` | `Time.bufferFor :: Milliseconds -> Event a -> Owned (Event (Array a))` | `Owned` |
-| `window*` | left out | a window is an event of events, which has no owner for the inner events (see #21); buffer, or use `switchEvent` |
-| (no RxJS name) | `Signal.history :: Int -> Signal a -> Signal (Array a)`: the last n values, oldest first, for sparklines and undo | pure; pauses |
-
-The pure buffers are stateful nodes: they collect only occurrences seen while observed, and **a paused buffer keeps what it held**, as every paused stateful node keeps its state; its next buffer continues from there. (`zip` is the exception, because a queue waiting for partners it will never see would pair the wrong occurrences.)
-
-- `bufferOn` fires on every notifier occurrence, even with nothing collected, as RxJS does. An occurrence fired in the same round as the notifier and before it goes into that buffer.
-- `bufferWhile` reads its signal at the end of each round, like `gate`: it collects the occurrences of rounds that end with the signal true, and fires the collection (possibly empty) in the round that ends with it false.
-- `bufferFor` fires every interval from instantiation, but skips an interval with nothing collected, unlike RxJS, so an idle buffer does not wake its observers. What it holds when its scope is disposed is dropped.
-
 ## Error handling (#24)
 
 | RxJS | Screamer | Pure? |
 |---|---|---|
 | `catchError` on a signal | `Signal.catching :: (Error -> a) -> Signal a -> Signal a` | pure |
 | `materialize` (errors only) | `Signal.attempt :: Signal a -> Signal (Either Error a)` | pure |
-| `retry({ count, delay })` | `Resource.retry :: RetryPolicy -> (a -> Aff b) -> a -> Aff b` | `Aff` |
+| `retry({ count, delay })` | `Resource.retry :: RetryPolicy -> (a -> Aff b) -> Owned (a -> Aff b)` | `Owned` |
 | error boundary | `Owned.onError` in a component's scope | `Owned` |
 
 - **Recovering a signal.** A derivation that throws makes every read of it throw. `catching` and `attempt` read the input inside a `try`, so the signal recovers on its own the next time the input changes. Dependents of the caught signal stay consistent: they see the fallback in the same batch.
-- **Retrying a request.** `retry policy request` is a request again, so it plugs into `resource`, `resourceWith` and `request` without new strategies. `type RetryPolicy = { retries :: Int, backoff :: Backoff }`, with `Backoff = Immediately | Fixed Milliseconds | Exponential { initial, max }`. The waits are `Aff` delays inside the request's fiber, so a new input under `Switch`, or disposing the scope, cancels a pending retry; the resource stays `Loading` until the last attempt settles.
+- **Retrying a request.** `retry policy request` gives a request again, so it plugs into `resource`, `resourceWith` and `request` without new strategies. `type RetryPolicy = { retries :: Int, backoff :: Backoff }`, with `Backoff = Immediately | Fixed Milliseconds | Exponential { initial, max }`. The waits are timers of the scope's `Screamer.Host` inside the request's fiber, so a new input under `Switch`, or disposing the scope, cancels a pending retry; the resource stays `Loading` until the last attempt settles.
 - **Combining remote data.** `Remote` is `Applicative`: `Failed` if any failed (the leftmost failure wins), else `Loading` if any loads, else `Loaded`. `withDefault`, `toMaybe` and `isLoading` read it; `keepLast :: Signal (Remote a) -> Signal (Remote a)` keeps showing the last `Loaded` value while the next request loads.
 - **Error boundaries.** An effect that throws (a DOM binding, `subscribe`, `Event.subscribe`) is reported to the nearest `onError` up its scope chain. A component that registers `onError` and puts the error in a signal source is a boundary: it can swap its body for a fallback with `dyn`.
 
@@ -314,7 +258,7 @@ RxJS needs `share`, `shareReplay` and `publish` because an observable is a recip
 
 ## Implementation
 
-The event nodes live in `src/Screamer/Runtime.ts` next to the signal nodes (#18). The combinators built from them (`oneOf`, `leftmost`, `mergeWith`, `zip`, `race`, `gate`, and `merge`, `latestWhere`, `gate`, `combine`, `withLatest` on signals) live in `src/Screamer/Event.ts` and `src/Screamer/Signal.ts` (#47).
+The event nodes live in `packages/screamer-reactive/src/Screamer/Runtime.ts` next to the signal nodes (#18). The combinators built from them live in the foreign modules of the modules that export them (#47): `oneOf`, `gate`, and `merge`, `latestWhere`, `gate` on signals in `Event.ts` and `Signal.ts` in screamer-reactive; `leftmost`, `mergeWith`, `zip`, `race`, `combine` and `withLatest` in `Event/Extra.ts` and `Signal/Extra.ts` in screamer-combinators (#49).
 
 - **Consumption by version.** An event node's value is the list of occurrences it produced when its version last increased, and the version increases only when a computation produces at least one occurrence. A consumer (a derived event, a stateful node or an effect) records the version of each input it read. On its next computation an input whose version changed contributes its current list, and any other input contributes nothing. So each consumer takes each occurrence once, however often it is read, and an event needs no per-round reset.
 - **Rounds.** `fire` queues an occurrence on its source. Each pass of the flush loop starts a round: the queued occurrences become their sources' values, one version step per source, and observers are notified. Fires made while a round runs are queued for the next one, so a `subscribe` callback that fires an event is followed by one more round.

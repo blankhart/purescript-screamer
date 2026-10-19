@@ -14,7 +14,7 @@ import Data.String as String
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Screamer.Element (Element, component, element, text)
-import Screamer.Examples.Formlet (Form, Validated(..), Wizard, build, checkbox, indent, mustBe, nonEmpty, number, password, prop, required, section, select, step, textbox, validated, wizard)
+import Screamer.Form (Form, Validated(..), Wizard, build, checkbox, indent, mustBe, nonEmpty, number, password, prop, required, section, select, step, textbox, validated, wizard)
 import Screamer.Examples.Harness as Harness
 import Screamer.Html as E
 import Screamer.Html.Attributes (InputType(..))

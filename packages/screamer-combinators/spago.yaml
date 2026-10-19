@@ -1,0 +1,34 @@
+package:
+  name: screamer-combinators
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - arrays
+    - datetime
+    - effect
+    - either
+    - foldable-traversable
+    - maybe
+    - prelude
+    - refs
+    - screamer-reactive
+    - tuples
+  test:
+    main: Test.Combinators.Main
+    dependencies:
+      - aff
+      - arrays
+      - datetime
+      - effect
+      - either
+      - filterable
+      - foldable-traversable
+      - maybe
+      - newtype
+      - quickcheck
+      - refs
+      - screamer-resource
+      - screamer-test
+      - spec
+      - tuples
