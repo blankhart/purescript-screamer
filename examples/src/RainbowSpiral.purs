@@ -14,14 +14,14 @@ import Data.Maybe (Maybe(..))
 import Data.Number (cos, pi, sin)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Core (Element, component, dyn, element, fragment_)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, component, dyn, element, fragment_)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Signal (Signal, filterOn, sampleManyWith, sampleOn)
+import Screamer.Source (SignalSource, signalSource)
 import Screamer.Subscriptions.AnimationFrame as AnimationFrame
-import Screamer.SignalSource (SignalSource, signalSource)
 import Web.DOM.Element as Element
 import Web.Event.Event (currentTarget, preventDefault)
 import Web.PointerEvent.PointerEvent (toMouseEvent)

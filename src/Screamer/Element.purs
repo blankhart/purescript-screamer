@@ -4,7 +4,7 @@
 -- | `component`. Instantiating it creates the nodes and runs everything once
 -- | per instance under a scope that disposes it. Two mounts of the same
 -- | `Element` are independent instances.
-module Screamer.Core
+module Screamer.Element
   ( Element(..)
   , Attribute
   , element_
@@ -136,7 +136,7 @@ foreign import on_ :: String -> (Event -> Effect Unit) -> Attribute
 
 -- | `on_` for a handler that expects a more specific event type. The caller
 -- | asserts that events of this name have that type; the generated handlers
--- | in `Screamer.DOM.EventHandler` are the intended users.
+-- | in `Screamer.Html.Handlers` are the intended users.
 foreign import unsafeOn_ :: forall e. String -> (e -> Effect Unit) -> Attribute
 
 -- | Attribute values: a constant of type `a`, or a `Signal a`.

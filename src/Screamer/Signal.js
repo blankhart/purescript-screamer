@@ -1,6 +1,6 @@
-// @ts-ignore: purs copies this file to output/Screamer.Signal/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
-const R = CoreRuntime;
+// @ts-ignore: purs copies this file to output/Screamer.Signal/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
+const R = runtime;
 export const mapImpl = (f) => (s) => R.map(f, s);
 export const applyImpl = (sf) => (sa) => R.apply(sf, sa);
 export const pureImpl = (a) => R.constant(a);

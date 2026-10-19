@@ -11,9 +11,9 @@ import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal)
+import Screamer.Source (signalSource)
 
 foreign import setIntervalImpl :: Number -> Effect Unit -> Effect (Effect Unit)
 

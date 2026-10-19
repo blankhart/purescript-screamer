@@ -1,9 +1,9 @@
 // Foreign module of Screamer.Resource.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Resource/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Resource/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
-export const keepLastImpl = <T>(isLoading: (r: T) => boolean) => (isLoaded: (r: T) => boolean) => (s: Core.Readable<T>) =>
+export const keepLastImpl = <T>(isLoading: (r: T) => boolean) => (isLoaded: (r: T) => boolean) => (s: Runtime.Readable<T>) =>
   R.stateful<T>([s], () => s.read(), (_, values, prev) => (isLoading(values[0]) && isLoaded(prev) ? prev : values[0]));

@@ -8,7 +8,7 @@ function main() {
   console.log("Code generation...");
 
   const sourceDir = `./codegen/templates/src`;
-  const targetDir = `./src/Screamer/DOM`;
+  const targetDir = `./src/Screamer`;
 
   const capitalize = (string: string) =>
     string[0].toUpperCase() + string.slice(1);
@@ -26,12 +26,19 @@ function main() {
     string.replace(/^on/, '').toLowerCase()
   );
 
-  fs.readdirSync(sourceDir).forEach(source => {
+  // Each template's path below the templates directory is its module's path
+  // below targetDir: `Html/Attributes.hbs` is `Screamer.Html.Attributes`.
+  const templates = (dir: string): string[] =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+      const rel = path.join(dir, entry.name);
+      return entry.isDirectory() ? templates(rel) : [rel];
+    });
 
-    const sourceFile = `${sourceDir}/${source}`;
+  templates(sourceDir).forEach(sourceFile => {
 
-    const target = path.parse(source).name;
-    const targetFile = `${targetDir}/${target}.g.purs`;
+    const relative = path.relative(sourceDir, sourceFile);
+    const parsed = path.parse(relative);
+    const targetFile = `${targetDir}/${path.join(parsed.dir, parsed.name)}.g.purs`;
 
     console.log(`Reading template ${sourceFile}.`);
     let template = fs.readFileSync(sourceFile, `utf8`);
@@ -39,6 +46,7 @@ function main() {
     let compiled = handlebars.compile(template);
 
     console.log(`Writing generated code to ${targetFile}.`);
+    fs.mkdirSync(path.dirname(targetFile), { recursive: true });
     fs.writeFileSync(targetFile, compiled(codegen));
 
   });

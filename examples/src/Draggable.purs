@@ -10,15 +10,15 @@ import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Screamer.Element (Element, component, element)
 import Screamer.Event as Event
-import Screamer.EventSource (eventSource)
-import Screamer.Core (Element, component, element)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.Svg as Svg
-import Screamer.DOM.EventHandler as H
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Signal (Signal)
+import Screamer.Source (eventSource)
+import Screamer.Svg as Svg
 import Web.PointerEvent.PointerEvent (PointerEvent, toMouseEvent)
 import Web.UIEvent.MouseEvent (clientX, clientY)
 

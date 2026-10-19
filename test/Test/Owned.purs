@@ -8,10 +8,10 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (message, try)
 import Effect.Ref as Ref
-import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, child, hold, onCleanup, runOwned, subscribe)
-import Screamer.Reactive.Core (readStats)
+import Screamer.Runtime (readStats)
 import Screamer.Signal (fold, read)
+import Screamer.Source (signalSource)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 

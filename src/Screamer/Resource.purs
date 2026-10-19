@@ -20,18 +20,17 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
-import Effect (Effect)
 import Data.Time.Duration (Milliseconds(..))
+import Effect (Effect)
 import Effect.Aff (Aff, Fiber, attempt, delay, error, killFiber, launchAff, launchAff_, throwError)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, message)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.EventSource (eventSource)
 import Screamer.Owned (Owned, onCleanup, subscribe)
 import Screamer.Signal (Signal)
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (eventSource, signalSource)
 
 data Remote b = Loading | Failed Error | Loaded b
 

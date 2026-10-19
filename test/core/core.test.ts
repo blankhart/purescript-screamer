@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   cell, derived, map, bind, scope, effect, batch, sample, stats, createScope, runInScope,
   Readable,
-} from '../../src/Screamer/Reactive/Core.ts';
+} from '../../src/Screamer/Runtime.ts';
 
 const gc = (globalThis as any).gc as () => void;
 

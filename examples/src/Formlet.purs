@@ -65,14 +65,14 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Prim.Row as Row
 import Record as Record
-import Screamer.SignalSource (SignalSource, batch, signalSource)
-import Screamer.Core (Element, attribute, dyn, element, fragment_, text)
-import Screamer.DOM.Attribute (InputType(..))
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, attribute, dyn, element, fragment_, text)
+import Screamer.Html as E
+import Screamer.Html.Attributes (InputType(..))
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Owned (Owned(..), child)
 import Screamer.Signal (Signal, read)
+import Screamer.Source (batch, SignalSource, signalSource)
 import Type.Proxy (Proxy)
 import Web.Event.Event (Event, target)
 import Web.HTML.HTMLInputElement as Input

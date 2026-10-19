@@ -6,8 +6,8 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Effect.Unsafe (unsafePerformEffect)
 import Screamer.Event as Event
-import Screamer.EventSource (eventSource)
 import Screamer.Owned (hold, runOwned)
+import Screamer.Source (eventSource)
 import Test.Event (observeE)
 import Test.Observe (observe)
 import Test.Spec (Spec, describe, it)
