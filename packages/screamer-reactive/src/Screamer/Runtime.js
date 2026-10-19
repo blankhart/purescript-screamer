@@ -362,11 +362,14 @@ export function derived(fn, eq) {
     return new Derived(fn, eq);
 }
 export class Stateful {
-    constructor(inputs, initial, step, eq = Object.is) {
+    constructor(inputs, initial, step, eq = Object.is, 
+    /** The operator that made the node, for development warnings. */
+    label = '') {
         this.inputs = inputs;
         this.initial = initial;
         this.step = step;
         this.eq = eq;
+        this.label = label;
         this.value = UNSET;
         this.version = 0;
         this.targets = new Set();
@@ -471,6 +474,10 @@ export class Stateful {
         }
     }
     read() {
+        // An untracked read of a node that was observed and is not now gets the
+        // state it kept when it paused. A tracked read is about to observe it.
+        if (DEV && current === null && this.started && !this.linked)
+            warnPausedRead(this);
         try {
             this.refresh();
         }
@@ -479,6 +486,16 @@ export class Stateful {
         }
         return this.value;
     }
+}
+const warnedPaused = new WeakSet();
+/** Warn, once per node, that a paused stateful node was read. */
+function warnPausedRead(n) {
+    if (warnedPaused.has(n))
+        return;
+    warnedPaused.add(n);
+    console.warn(`screamer: read of a paused stateful signal${n.label === '' ? '' : ` (${n.label})`}. ` +
+        'It keeps the state it had when its last observer left and does not step until observed again; ' +
+        'keep it observed (Signal.hold) if it must stay current.');
 }
 /** Run a pure function: untracked, with no owner, and with writes rejected. */
 function pure(fn) {
@@ -496,8 +513,8 @@ function pure(fn) {
         inDerived--;
     }
 }
-export function stateful(inputs, initial, step, eq) {
-    return new Stateful(inputs, initial, step, eq);
+export function stateful(inputs, initial, step, eq, label) {
+    return new Stateful(inputs, initial, step, eq, label);
 }
 /** Read without recording a dependency. */
 export function sample(s) {
@@ -1302,7 +1319,7 @@ export function stepper(seed, e) {
     return stateful([e], () => seed, (_, values) => {
         const os = values[0];
         return os[os.length - 1].v;
-    });
+    }, undefined, 'Event.stepper');
 }
 /** Accumulate from `seed`, one step per occurrence. */
 export function foldEvent(f, seed, e) {
@@ -1311,7 +1328,7 @@ export function foldEvent(f, seed, e) {
         for (let i = 0; i < os.length; i++)
             b = f(os[i].v, b);
         return b;
-    });
+    }, undefined, 'Event.fold');
 }
 /** Each occurrence combined with the signal's value at the end of the round. */
 export function attachWith(f, s, e) {

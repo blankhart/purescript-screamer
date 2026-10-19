@@ -138,7 +138,7 @@ A working prototype (153 lines, 23 checks, randomized glitch test) is attached t
 
 | Concern | Approach |
 |---|---|
-| Creating nodes | `createElement` / `createElementNS` for SVG; static children appended once |
+| Creating nodes | through the `Screamer.Renderer` backend in context (`createElement` / `createElementNS` for SVG in the browser); static children appended once. See `docs/ssr.md` |
 | Attributes | codegen records each name's kind (property, attribute, boolean attribute, style); constants set once; a `Signal` gets one owned effect calling the right setter |
 | Text | one text node per signal child, updated through `nodeValue` |
 | Events | `addEventListener` with the handler wrapped in `batch`; removal registered with `onCleanup` |
@@ -146,6 +146,10 @@ A working prototype (153 lines, 23 checks, randomized glitch test) is attached t
 | `each` | a row scope and row cell per key; kept keys update their cell; removed keys are disposed; moves use a longest-increasing-subsequence reconcile |
 | `foreign_` | create the host element with its attributes and no children, then run the setup on it in the instance's scope, before the host is inserted; Screamer never touches its children (#27) |
 | `mount` | root scope, instantiate into the mount point, return an action that disposes the scope and removes the nodes |
+| `portal` | instantiate in a child scope of the current one (so it sees the context and is disposed with its parent), append the nodes to the target, leave an empty comment in place; the child scope's cleanup removes the nodes from the target (#50) |
+| `catchError` | a pair of anchors around a child scope whose `onError` disposes it and instantiates the handler's element in a sibling scope, which has no handler, so its errors go to the enclosing scope (#50) |
+| `suspense` | the content builds detached in a child scope; while that scope's `Pending.settled` is false the fallback, in its own child scope, sits between anchors; one effect, in a scope it disposes when it fires, swaps the content in and disposes the fallback (#50) |
+| `withLeave` | provides a leave hook to the `dyn` and `each` inside. A removed branch or row's scope is disposed at once; its top-level nodes stay until the hook's `done`. The `dyn` or `each` registers a cleanup on its own scope that detaches every node still leaving, so disposing the enclosing scope removes them at once (#50) |
 
 ### Typed DOM
 

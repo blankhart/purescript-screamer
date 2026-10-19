@@ -6,6 +6,7 @@
         "core": {
           "dependencies": [
             "effect",
+            "exceptions",
             "prelude",
             "record",
             "screamer-reactive",
@@ -21,12 +22,16 @@
         },
         "test": {
           "dependencies": [
+            "aff",
             "arrays",
             "effect",
+            "either",
+            "exceptions",
             "foldable-traversable",
             "maybe",
             "quickcheck",
             "refs",
+            "screamer-resource",
             "screamer-test",
             "spec",
             "web-events",
@@ -147,6 +152,7 @@
             "filterable",
             "maybe",
             "prelude",
+            "record",
             "tuples",
             "typelevel-prelude",
             "unsafe-coerce"

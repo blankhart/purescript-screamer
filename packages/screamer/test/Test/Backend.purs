@@ -20,3 +20,9 @@ foreign import recordingBackend :: Boolean -> Effect Recording
 
 -- | Run the action with the global document's node operations throwing.
 foreign import guardDocument :: forall a. Effect a -> Effect a
+
+-- | Append an empty `<div>` with the id to the body.
+foreign import addTarget :: String -> Effect Unit
+
+-- | Throw an error from pure code.
+foreign import crash :: forall a. String -> a
