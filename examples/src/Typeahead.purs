@@ -87,8 +87,9 @@ typeahead = component do
   let
     queries = filter (\q -> String.length q >= 3) (Event.dropRepeats settled)
     policy = { retries: 3, backoff: Exponential { initial: Milliseconds 100.0, max: Milliseconds 1000.0 } }
+  searchWithRetry <- retry policy search
   raw <- resourceWith Switch (Event.stepper "" queries) \q ->
-    if q == "" then pure [] else retry policy search q
+    if q == "" then pure [] else searchWithRetry q
   let
     results = keepLast raw
     shown = results <#> case _ of

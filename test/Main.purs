@@ -12,12 +12,15 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (defaultConfig, evalSpecT)
 import Test.Spec.Summary (successful)
+import Test.Context as Context
 import Test.Dom as Dom
 import Test.Event as Event
 import Test.Errors as Errors
 import Test.Flatten as Flatten
+import Test.Host as Host
 import Test.Time as Time
 import Test.Owned as Owned
+import Test.Pending as Pending
 import Test.Sharing as Sharing
 import Test.Signal as Signal
 import Test.Subscriptions as Subscriptions
@@ -42,6 +45,9 @@ spec = do
   Sharing.spec
   Time.spec
   Owned.spec
+  Context.spec
+  Host.spec
+  Pending.spec
   Dom.spec
   TypedDom.spec
   Subscriptions.spec

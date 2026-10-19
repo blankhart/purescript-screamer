@@ -166,6 +166,20 @@ onInput_   :: (Event -> Effect Unit) -> Attribute            -- Web.Event.Event
 
 Handlers take the standard `Web.*` event types. Screamer's generated event classes, `eventCast` and `Event.g.purs` are deleted.
 
+## Context, Host and Pending
+
+Three seams on scopes carry what differs between platforms (the browser, a
+test, a server render) and what a parent needs to know about its subtree.
+None adds a platform-specific field to `Scope`; each default reproduces the
+browser behaviour.
+
+| Seam | API | How it works |
+|---|---|---|
+| Context | `Screamer.Context`: `key name default`, `provide key value body`, `ask key` | A scope's `ctx` is `null` unless it provides something; then it is an object whose prototype is the nearest context above it, so children inherit by lookup without copying. `ask` walks `parent` to the first non-null `ctx`. Keys are symbols, so two keys with the same name never collide. `dyn`, `each`, `component`, `child` and `Screamer.Flatten` scopes inherit through `parent` with no changes. FFI reads context through `contextOf` and `lookupContext` in `Screamer.Runtime.Unsafe`. |
+| Host | `Screamer.Host`: `Host`, `browserHost`, `hostKey`, `host`, `withHost` | The clock, timers and animation frames as a context value. `Screamer.Time` reads the host once when each combinator is instantiated and wraps its callbacks in `batch`; `Screamer.Resource.retry` waits on its timers. `browserHost` reads the globals inside each call, so it loads where they are missing. A test `withHost`s a fake host and moves time itself. |
+| Pending | `Screamer.Pending`: `pending`, `settled` | `pending` increments a lazily created count cell on the scope and every ancestor and returns an idempotent `done`; disposing the scope calls `done` for its outstanding work. `settled` is true when the scope's count is zero, that is when nothing in its subtree is pending. `resource`, `resourceWith` and `request` register each running request. |
+| Ids | `Screamer.Context.uniqueId` | A counter on the root scope's own context, giving `"s0"`, `"s1"`, … in instantiation order, so two instantiations of the same element under fresh roots get the same ids. |
+
 ## Decisions
 
 | Question | Decision |
@@ -182,6 +196,7 @@ Handlers take the standard `Web.*` event types. Screamer's generated event class
 | Names of sources | **Decided (#17):** `SignalSource` (`signalSource`, formerly `Channel`/`channel`) and `EventSource` (`eventSource`) |
 | Combinators that need timers or async work | **Decided (#17):** they return `Owned`; everything else is pure |
 | Escape hatch for JS widgets | **Decided (#27):** `foreign_ :: (Web.DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element` in `Screamer.Element`, not a `withNode_` attribute. A host element with no Screamer children makes "Screamer never touches its children" true by construction, while an attribute could be put on an element that also has Screamer children, and attributes have no ordering to say when it runs. |
+| Platform-specific behaviour | **Decided (#48):** Platform-specific behaviour goes through context, Host and Pending; no SSR-specific fields on `Scope` |
 
 ## Stages
 

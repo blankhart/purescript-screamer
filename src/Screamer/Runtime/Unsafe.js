@@ -26,6 +26,8 @@ export const scope = R.scope;
 export const getOwner = R.getOwner;
 export const onCleanup = R.onCleanup;
 export const reportError = R.reportError;
+export const contextOf = R.contextOf;
+export const lookupContext = R.lookupContext;
 // Batching and reading
 export const batch = R.batch;
 export const isBatching = R.isBatching;

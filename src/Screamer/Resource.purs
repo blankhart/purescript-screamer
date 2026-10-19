@@ -22,13 +22,15 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
-import Effect.Aff (Aff, Fiber, attempt, delay, error, killFiber, launchAff, launchAff_, throwError)
+import Effect.Aff (Aff, Fiber, attempt, effectCanceler, error, killFiber, launchAff, launchAff_, makeAff, throwError)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, message)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
+import Screamer.Host (Host, host)
 import Screamer.Owned (Owned, onCleanup)
+import Screamer.Pending (pendingIn)
 import Screamer.Signal (Signal, subscribe)
 import Screamer.Source (eventSource, signalSource)
 
@@ -108,24 +110,33 @@ data Backoff
 type RetryPolicy = { retries :: Int, backoff :: Backoff }
 
 -- | Run the request, and retry it on failure under the policy; the last
--- | failure is rethrown. The waits are `Aff` delays, so killing the request
--- | (a new input under `Switch`, or disposing the scope) cancels a pending
--- | retry. Pass `retry policy request` to `resourceWith` or `request`.
--- | (RxJS `retry` with a delay.)
-retry :: forall a b. RetryPolicy -> (a -> Aff b) -> a -> Aff b
-retry policy req a = go 0
+-- | failure is rethrown. The waits use the scope's `Screamer.Host` timers,
+-- | and killing the request (a new input under `Switch`, or disposing the
+-- | scope) cancels a pending retry. Pass the result to `resourceWith` or
+-- | `request`. (RxJS `retry` with a delay.)
+retry :: forall a b. RetryPolicy -> (a -> Aff b) -> Owned (a -> Aff b)
+retry policy req = host <#> \h a ->
+  let
+    go n = attempt (req a) >>= case _ of
+      Right b -> pure b
+      Left e
+        | n < policy.retries -> wait h n *> go (n + 1)
+        | otherwise -> throwError e
+  in
+    go 0
   where
-  go n = attempt (req a) >>= case _ of
-    Right b -> pure b
-    Left e
-      | n < policy.retries -> wait n *> go (n + 1)
-      | otherwise -> throwError e
-  wait n = case policy.backoff of
+  wait h n = case policy.backoff of
     Immediately -> pure unit
-    Fixed d -> delay d
+    Fixed d -> sleep h d
     Exponential { initial: Milliseconds i, max: Milliseconds m } ->
-      delay (Milliseconds (min m (i * pow2 n)))
+      sleep h (Milliseconds (min m (i * pow2 n)))
   pow2 n = if n <= 0 then 1.0 else 2.0 * pow2 (n - 1)
+
+-- | Wait on the host's timer; killing the fiber cancels it.
+sleep :: Host -> Milliseconds -> Aff Unit
+sleep h (Milliseconds ms) = makeAff \k -> do
+  cancel <- h.setTimeout ms (k (Right unit))
+  pure (effectCanceler cancel)
 
 -- | How requests that overlap are run. The names are RxJS's flattening
 -- | operators.
@@ -161,8 +172,11 @@ resource = resourceWith Switch
 -- | result can be for an older input than the signal's current value. A
 -- | request still running when the scope is disposed is killed.
 -- |
--- | To retry failed requests, pass `Screamer.Resource.retry policy request`
--- | as the request; its delays are killed with the request.
+-- | To retry failed requests, pass the request `Screamer.Resource.retry`
+-- | returns; its delays are killed with the request.
+-- |
+-- | Each running request is registered with `Screamer.Pending`, so
+-- | `settled` is false while it runs.
 resourceWith :: forall a b. Strategy -> Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))
 resourceWith strategy input req = do
   result <- liftEffect $ signalSource Loading
@@ -177,7 +191,8 @@ resourceWith strategy input req = do
 
 -- | Run the request for each occurrence, under a strategy, with one
 -- | occurrence per result kept. Requests still running when the scope is
--- | disposed are killed.
+-- | disposed are killed. Each running request is registered with
+-- | `Screamer.Pending`.
 request :: forall a b. Strategy -> Event a -> (a -> Aff b) -> Owned (Event (Either Error b))
 request strategy input req = do
   results <- liftEffect eventSource
@@ -193,9 +208,12 @@ runner
   -> { started :: Effect Unit, settled :: Either Error b -> Effect Unit }
   -> Owned (a -> Effect Unit)
 runner strategy req on = do
-  -- Requests whose results are still wanted, and their fibers once known.
+  register <- pendingIn
+  -- Requests whose results are still wanted, their fibers once known, and
+  -- the `done` of each one's pending work.
   live <- liftEffect $ Ref.new ([] :: Array Int)
   fibers <- liftEffect $ Ref.new ([] :: Array { id :: Int, fiber :: Fiber Unit })
+  dones <- liftEffect $ Ref.new ([] :: Array { id :: Int, done :: Effect Unit })
   queue <- liftEffect $ Ref.new ([] :: Array a)
   nextId <- liftEffect $ Ref.new 0
   let
@@ -203,13 +221,20 @@ runner strategy req on = do
     forget id = do
       Ref.modify_ (Array.delete id) live
       Ref.modify_ (Array.filter ((_ /= id) <<< _.id)) fibers
+    doneWith id = do
+      ds <- Ref.modify' (\ds -> { state: Array.filter ((_ /= id) <<< _.id) ds, value: ds }) dones
+      for_ ds \d -> when (d.id == id) d.done
     killAll = do
       Ref.write [] live
       running <- Ref.modify' (\fs -> { state: [], value: fs }) fibers
       for_ running \f -> launchAff_ (killFiber (error "request cancelled") f.fiber)
+      ds <- Ref.modify' (\ds -> { state: [], value: ds }) dones
+      for_ ds _.done
     launch a = do
       id <- Ref.modify' (\i -> { state: i + 1, value: i }) nextId
       Ref.modify_ (_ <> [ id ]) live
+      done <- register
+      Ref.modify_ (_ <> [ { id, done } ]) dones
       on.started
       fiber <- launchAff do
         outcome <- attempt (req a)
@@ -222,6 +247,7 @@ runner strategy req on = do
       when wanted do
         forget id
         on.settled outcome
+        doneWith id
         Ref.modify' (\q -> { state: Array.drop 1 q, value: Array.head q }) queue >>= case _ of
           Just a -> launch a
           Nothing -> pure unit

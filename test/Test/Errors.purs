@@ -85,7 +85,7 @@ spec = describe "Error handling" do
           pure mempty
         policy = { retries: 5, backoff: Exponential { initial: Milliseconds 100.0, max: Milliseconds 1000.0 } }
       input <- liftEffect $ signalSource unit
-      r <- liftEffect $ runOwned (resourceWith Switch input.signal (retry policy flaky))
+      r <- liftEffect $ runOwned (resourceWith Switch input.signal =<< retry policy flaky)
       yield
       liftEffect (Ref.read attempts) >>= shouldEqual 1
       liftEffect $ Fake.advance 100.0
@@ -105,7 +105,7 @@ spec = describe "Error handling" do
         fails _ = makeAff \cb -> cb (Left (error "down")) $> mempty
         policy = { retries: 2, backoff: Fixed (Milliseconds 50.0) }
       input <- liftEffect $ signalSource unit
-      r <- liftEffect $ runOwned (resourceWith Switch input.signal (retry policy fails))
+      r <- liftEffect $ runOwned (resourceWith Switch input.signal =<< retry policy fails)
       yield
       liftEffect $ Fake.advance 50.0
       yield
@@ -121,7 +121,7 @@ spec = describe "Error handling" do
         fails _ = makeAff \cb -> Ref.modify_ (_ + 1) attempts *> cb (Left (error "down")) $> mempty
         policy = { retries: 3, backoff: Fixed (Milliseconds 50.0) }
       input <- liftEffect $ signalSource unit
-      r <- liftEffect $ runOwned (resourceWith Switch input.signal (retry policy fails))
+      r <- liftEffect $ runOwned (resourceWith Switch input.signal =<< retry policy fails)
       yield
       liftEffect Fake.pendingTimers >>= shouldEqual 1
       liftEffect r.dispose
