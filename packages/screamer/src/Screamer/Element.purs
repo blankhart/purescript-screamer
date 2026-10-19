@@ -15,6 +15,11 @@ module Screamer.Element
   , foreign_
   , foreignWithFallback_
   , each
+  , portal
+  , catchError
+  , suspense
+  , withLeave
+  , LeaveHook
   , mount
   , instantiate
   , class IsElement
@@ -24,10 +29,12 @@ module Screamer.Element
 import Prelude
 
 import Effect (Effect)
+import Effect.Exception (Error)
 import Screamer.Attribute (Attribute)
-import Screamer.Context (ask, provide)
+import Screamer.Context (Key, ask, key, provide)
 import Screamer.Owned (Owned(..), Scope, runOwned)
-import Screamer.Renderer (Backend, browserBackend, interactive, rendererKey)
+import Screamer.Pending (settled)
+import Screamer.Renderer (Backend, Boundary, boundaryKey, browserBackend, interactive, rendererKey)
 import Screamer.Signal (Signal)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element as DOM
@@ -46,11 +53,12 @@ foreign import fragmentImpl :: Array Element -> Scope -> Effect Node
 
 foreign import textImpl :: Signal String -> Scope -> Effect Node
 
-foreign import dynImpl :: Signal Element -> Scope -> Effect Node
+foreign import dynImpl :: Key LeaveHook -> Signal Element -> Scope -> Effect Node
 
 foreign import eachImpl
   :: forall k a
-   . (k -> k -> Int)
+   . Key LeaveHook
+  -> (k -> k -> Int)
   -> (a -> k)
   -> Signal (Array a)
   -> (Signal a -> Element)
@@ -75,7 +83,7 @@ text s = Element (Owned (textImpl s))
 -- | Each new value disposes the previous element's scope and nodes, then
 -- | instantiates the new element in a fresh child scope.
 dyn :: Signal Element -> Element
-dyn s = Element (Owned (dynImpl s))
+dyn s = Element (Owned (dynImpl leaveKey s))
 
 -- | Run setup effects once per instance, in the element's scope.
 component :: Owned Element -> Element
@@ -115,12 +123,73 @@ foreignWithFallback_ setup tag attrs fallback = Element $ Owned \s -> do
 -- | update their signal in place, removed keys are disposed, and reorders
 -- | move as few rows as possible.
 each :: forall k a. Ord k => (a -> k) -> Signal (Array a) -> (Signal a -> Element) -> Element
-each key items row = Element (Owned (eachImpl cmp key items row))
+each key items row = Element (Owned (eachImpl leaveKey cmp key items row))
   where
   cmp a b = case compare a b of
     LT -> -1
     EQ -> 0
     GT -> 1
+
+foreign import portalImpl :: String -> Element -> Scope -> Effect Node
+
+-- | Instantiate the element in the current scope, so it sees the current
+-- | context and is disposed with its parent, but insert its nodes into the
+-- | first element matching the selector (a modal root, say), through the
+-- | backend. An empty comment stays in its place. Disposal removes the
+-- | nodes from the target.
+portal :: String -> Element -> Element
+portal selector el = Element (Owned (portalImpl selector el))
+
+foreign import catchErrorImpl :: (Error -> Element) -> Element -> Scope -> Effect Node
+
+-- | An error boundary. The element runs in a child scope; when it throws
+-- | while being built, or one of its effects throws later, that scope is
+-- | disposed and the handler's element is shown in its place. Errors thrown
+-- | by the handler's element propagate to the enclosing scope. Errors
+-- | thrown by event handlers are not caught; they are not effects.
+catchError :: (Error -> Element) -> Element -> Element
+catchError handler el = Element (Owned (catchErrorImpl handler el))
+
+foreign import suspenseImpl
+  :: (Scope -> Effect (Signal Boolean))
+  -> Key (Boundary -> Effect Unit)
+  -> Element
+  -> Element
+  -> Scope
+  -> Effect Node
+
+-- | `suspense fallback content` builds the content, detached, in a child
+-- | scope, and shows the fallback while that scope's `Pending.settled` is
+-- | false. When it becomes true, the content takes the fallback's place and
+-- | the fallback is disposed. Later pending work in the content does not
+-- | bring the fallback back. Content that has nothing pending is shown at
+-- | once, with no fallback built.
+suspense :: Element -> Element -> Element
+suspense fallback content = Element (Owned (suspenseImpl settledIn boundaryKey fallback content))
+  where
+  settledIn s = let Owned run = settled in run s
+
+-- | How a removed branch or row leaves: given each of its top-level nodes
+-- | and the action that detaches it.
+type LeaveHook = Node -> Effect Unit -> Effect Unit
+
+foreign import immediateLeave :: LeaveHook
+
+leaveKey :: Key LeaveHook
+leaveKey = key "leave" immediateLeave
+
+-- | Delay the removal of branches of `dyn` and rows of `each` inside the
+-- | element, for exit animations. When a branch or row is removed its scope
+-- | is disposed at once, and each of its top-level nodes stays in the
+-- | document until the hook calls the action it was given. When the scope
+-- | of the `dyn` or `each` itself is disposed, nodes still leaving are
+-- | removed at once.
+-- |
+-- | ```purescript
+-- | withLeave (\node done -> fadeOut node *> after 200 done) (each ...)
+-- | ```
+withLeave :: LeaveHook -> Element -> Element
+withLeave hook el = Element (provide leaveKey hook (instantiate el))
 
 foreign import withBackend :: forall a. Backend -> Effect a -> Effect a
 

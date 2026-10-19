@@ -32,6 +32,8 @@ export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A
     [s],
     () => ({ previous: seed, current: s.read() }),
     (_, values, p) => ({ previous: p.current, current: values[0] }),
+    undefined,
+    'Signal.withPrevious',
   );
   return R.map((p) => tuple(p.previous)(p.current), pair);
 };
@@ -55,7 +57,7 @@ export const attemptImpl = <A, T>(left: (e: Error) => T) => (right: (a: A) => T)
  * associative.
  */
 function mergeNode<A>(a: Runtime.Readable<A>, b: Runtime.Readable<A>): Runtime.Readable<A> {
-  return R.stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), never);
+  return R.stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), never, 'Signal.merge');
 }
 
 const never = () => false;
@@ -65,7 +67,7 @@ function latestWhereNode<A>(p: (a: A) => boolean, seed: A, s: Runtime.Readable<A
   return R.stateful([s], () => {
     const v = s.read();
     return p(v) ? v : seed;
-  }, (_, values, prev) => (p(values[0]) ? values[0] : prev));
+  }, (_, values, prev) => (p(values[0]) ? values[0] : prev), undefined, 'Signal.latestWhere');
 }
 
 /**
@@ -74,7 +76,7 @@ function latestWhereNode<A>(p: (a: A) => boolean, seed: A, s: Runtime.Readable<A
  * `s` if `cond` is true at the start, otherwise at `seed`.
  */
 function gateSignal<A>(cond: Runtime.Readable<boolean>, seed: A, s: Runtime.Readable<A>): Runtime.Readable<A> {
-  return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev));
+  return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev), undefined, 'Signal.gate');
 }
 
 export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => mergeNode(a, b);

@@ -117,13 +117,65 @@ function instantiateIn(b, parent, el) {
     const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => el(scope)())));
     return { scope, node };
 }
-function removeBetween(b, start, end) {
+function removeBetween(b, start, end, r = null) {
     const parent = b.parentNode(end);
     let n = b.nextSibling(start);
     while (n !== null && n !== end) {
         const next = b.nextSibling(n);
-        b.removeChild(parent, n);
+        if (r === null)
+            b.removeChild(parent, n);
+        else
+            r.remove(parent, n);
         n = next;
+    }
+}
+/** The default leave hook: detach at once. `dyn` and `each` skip the hook when it is this one. */
+export const immediateLeave = () => (done) => () => done();
+/**
+ * Detaches the nodes of removed branches or rows. With a leave hook, each
+ * top-level node stays in place until the hook calls its `done`, or until
+ * the owning scope is disposed, whichever comes first.
+ */
+class Remover {
+    constructor(b, hook) {
+        this.b = b;
+        this.hook = hook;
+        this.leaving = new Set();
+    }
+    static of(b, s, k) {
+        const hook = R.lookupContext(s, k.id, k.dflt);
+        const r = new Remover(b, hook === immediateLeave ? null : hook);
+        if (r.hook !== null)
+            s.cleanups.push(() => r.flush());
+        return r;
+    }
+    get delayed() {
+        return this.hook !== null;
+    }
+    isLeaving(n) {
+        return this.hook !== null && this.leaving.has(n);
+    }
+    remove(parent, n) {
+        if (this.hook === null) {
+            this.b.removeChild(parent, n);
+            return;
+        }
+        if (this.leaving.has(n))
+            return;
+        this.leaving.add(n);
+        this.hook(n)(() => this.finish(n))();
+    }
+    finish(n) {
+        if (!this.leaving.delete(n))
+            return;
+        const p = this.b.parentNode(n);
+        if (p !== null)
+            this.b.removeChild(p, n);
+    }
+    /** Detach every node still leaving. */
+    flush() {
+        for (const n of Array.from(this.leaving))
+            this.finish(n);
     }
 }
 /** A fragment holding a pair of anchors, for a range that changes. */
@@ -135,11 +187,12 @@ function anchors(b) {
     b.appendChild(f, end);
     return { start, end, f };
 }
-export const dynImpl = (sig) => (s) => () => {
+export const dynImpl = (leave) => (sig) => (s) => () => {
     if (R.isConstant(sig))
         return sig.value(s)();
     const b = B;
     const { start, end, f } = anchors(b);
+    const remover = Remover.of(b, s, leave);
     let child = null;
     R.effectIn(s, () => {
         const el = sig.read();
@@ -147,7 +200,7 @@ export const dynImpl = (sig) => (s) => () => {
             if (child !== null)
                 child.dispose();
             child = null;
-            removeBetween(b, start, end);
+            removeBetween(b, start, end, remover);
             const made = instantiateIn(b, s, el);
             child = made.scope;
             b.insertBefore(b.parentNode(end), made.node, end);
@@ -234,19 +287,20 @@ function moveBefore(b, parent, row, next) {
         n = after;
     }
 }
-function removeRow(b, parent, row) {
+function removeRow(b, parent, row, r) {
     let n = row.first;
     for (;;) {
         const after = b.nextSibling(n);
-        b.removeChild(parent, n);
+        r.remove(parent, n);
         if (n === row.last || after === null)
             break;
         n = after;
     }
 }
-export const eachImpl = (compare) => (keyOf) => (items) => (render) => (s) => () => {
+export const eachImpl = (leave) => (compare) => (keyOf) => (items) => (render) => (s) => () => {
     const b = B;
     const { start, end, f } = anchors(b);
+    const remover = Remover.of(b, s, leave);
     let rows = [];
     const makeRow = (key, item, into, before) => {
         const cell = R.cell(item);
@@ -278,7 +332,11 @@ export const eachImpl = (compare) => (keyOf) => (items) => (render) => (s) => ()
         for (let i = rows.length - 1; i >= 0; i--)
             rows[i].scope.dispose();
         const parent = b.parentNode(end);
-        if (b.firstChild(parent) === start && b.lastChild(parent) === end && b.nodeType(parent) !== FRAGMENT) {
+        if (remover.delayed) {
+            for (let i = 0; i < rows.length; i++)
+                removeRow(b, parent, rows[i], remover);
+        }
+        else if (b.firstChild(parent) === start && b.lastChild(parent) === end && b.nodeType(parent) !== FRAGMENT) {
             // The list owns its parent: replace the children wholesale.
             b.clearChildren(parent);
             b.appendChild(parent, start);
@@ -319,7 +377,7 @@ export const eachImpl = (compare) => (keyOf) => (items) => (render) => (s) => ()
             // Only removals in the middle.
             for (let j = head; j < tailOld; j++) {
                 rows[j].scope.dispose();
-                removeRow(b, parent, rows[j]);
+                removeRow(b, parent, rows[j], remover);
             }
             if (tailOld > head)
                 rows.splice(head, tailOld - head);
@@ -365,7 +423,7 @@ export const eachImpl = (compare) => (keyOf) => (items) => (render) => (s) => ()
         for (let j = 0; j < rows.length; j++) {
             if (used[j] === 0) {
                 rows[j].scope.dispose();
-                removeRow(b, parent, rows[j]);
+                removeRow(b, parent, rows[j], remover);
             }
         }
         const stay = longestIncreasingSubsequence(oldIndex);
@@ -388,6 +446,75 @@ export const eachImpl = (compare) => (keyOf) => (items) => (render) => (s) => ()
     R.effectIn(s, () => {
         const list = items.read();
         R.untracked(() => reconcile(list));
+    });
+    return f;
+};
+// ---------------------------------------------------------------------------
+// Portals, error boundaries and suspense
+export const portalImpl = (selector) => (el) => (s) => () => {
+    const b = B;
+    const target = b.select(selector);
+    if (target === null)
+        throw new Error(`portal: no element matches "${selector}"`);
+    const { scope, node } = instantiateIn(b, s, el);
+    scope.cleanups.push(attachRange(b, target, node));
+    return b.createComment('');
+};
+const toError = (e) => (e instanceof Error ? e : new Error(String(e)));
+export const catchErrorImpl = (handler) => (el) => (s) => () => {
+    const b = B;
+    const { start, end, f } = anchors(b);
+    const scope = R.createScope(s);
+    let failed = false;
+    // Replace the child with the handler's element. Errors from the handler's
+    // element are not caught here: its scope is a sibling of the child's.
+    const recover = (e) => {
+        failed = true;
+        scope.onError = null;
+        scope.dispose();
+        removeBetween(b, start, end);
+        const made = instantiateIn(b, s, handler(toError(e)));
+        b.insertBefore(b.parentNode(end), made.node, end);
+    };
+    scope.onError = recover;
+    let node = null;
+    try {
+        node = withB(b, () => R.untracked(() => R.runInScope(scope, () => el(scope)())));
+    }
+    catch (e) {
+        // Once an effect has failed and been recovered from, the rest of the
+        // build fails on the disposed scope; that is not a new error.
+        if (!failed)
+            recover(e);
+    }
+    if (!failed)
+        b.insertBefore(f, node, end);
+    return f;
+};
+export const suspenseImpl = (settledIn) => (boundary) => (fallback) => (content) => (s) => () => {
+    const b = B;
+    const { start, end, f } = anchors(b);
+    const scope = R.createScope(s);
+    const settled = settledIn(scope)();
+    R.lookupContext(s, boundary.id, boundary.dflt)({ start, end, settled })();
+    // The content builds detached, so its pending work starts at once.
+    const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => content(scope)())));
+    if (R.sample(settled)) {
+        b.insertBefore(f, node, end);
+        return f;
+    }
+    const shown = instantiateIn(b, s, fallback);
+    b.insertBefore(f, shown.node, end);
+    const watch = R.createScope(s);
+    R.effectIn(watch, () => {
+        if (!settled.read())
+            return;
+        R.untracked(() => {
+            watch.dispose();
+            shown.scope.dispose();
+            removeBetween(b, start, end);
+            b.insertBefore(b.parentNode(end), node, end);
+        });
     });
     return f;
 };

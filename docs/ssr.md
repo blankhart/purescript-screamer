@@ -2,7 +2,7 @@
 
 Rendering a Screamer `Element` to HTML on a server, and letting the client take that HTML over without rebuilding it. The tracking issue is #33; this document records its decisions (#34).
 
-**Server rendering lives outside the core**, in a library such as the planned `screamer-ssr`, built on general seams that the core packages expose: context, `Host` and `Pending` (#48), the renderer backend and a low-level root API (#35), the router env (#36), and the property reflection table (#37). `suspense` (#50) is to add the boundary hook that streaming (#42) needs. Nothing in the core names the server, and nothing in the core imports the library. The renderer itself (the server tree, serialization, hydration, state transfer, mismatch recovery, event replay and streaming) is the library's work.
+**Server rendering lives outside the core**, in a library such as the planned `screamer-ssr`, built on general seams that the core packages expose: context, `Host` and `Pending` (#48), the renderer backend and a low-level root API (#35), the router env (#36), the property reflection table (#37) and the `suspense` boundary hook (#50). Nothing in the core names the server, and nothing in the core imports the library. The renderer itself (the server tree, serialization, hydration, state transfer, mismatch recovery, event replay and streaming) is the library's work.
 
 ## Where the pieces live
 
@@ -14,6 +14,7 @@ Rendering a Screamer `Element` to HTML on a server, and letting the client take 
 | `Screamer.Html.Reflect`: property reflection table from codegen (#37) | `transfer`, `resourceT` (#39) |
 | `foreignWithFallback_`; `on_` and `foreign_` honour `interactive` (#35) | `clientOnly`, an inert server `Host`, the server context keys and `withServerEnv` (#36) |
 | `Screamer.Router`: `RouterEnv`, `routerKey`, `browserRouter`, `staticRouter` (#36) | `renderToStream` (#42) |
+| `suspense` and `Screamer.Renderer.boundaryKey` (#50) | |
 
 ## Decisions
 
@@ -34,8 +35,8 @@ Rendering a Screamer `Element` to HTML on a server, and letting the client take 
 
 - `interactive`: when false, `on_` attaches nothing and `foreign_` runs no setup. Add-ons that start listeners or observers check `Screamer.Renderer.interactive` first (`screamer-web` does).
 - `enter(el)` and `leave(el)`, around building each element's children, also for an element with none. The browser backend does nothing; a hydrating backend moves its cursor into the element and then past it.
-- `createAnchor(open)`, for the comments that open and close a range that changes: the anchors of `dyn` and `each`. The browser backend makes an empty comment; a server backend can mark it `[` or `]` (decision 8), and a hydrating backend can recognise ranges by it.
-- `select(selector)`, for `mount`.
+- `createAnchor(open)`, for the comments that open and close a range that changes: the anchors of `dyn`, `each`, `catchError` and `suspense`. The browser backend makes an empty comment; a server backend can mark it `[` or `]` (decision 8), and a hydrating backend can recognise ranges by it.
+- `select(selector)`, for `mount` and `portal`.
 
 The backend is held in context under `rendererKey` (default `browserBackend`), not on `Scope`. `instantiate` looks it up once and the nodes built in that instantiation use it; `dyn` and `each` keep it for the ranges they build later, so the lookup is per instantiation, not per node. The browser backend reads `document` only when it makes a node, so the module loads in Node.
 
@@ -67,6 +68,10 @@ The browser backend owns the delegation registry: one `document` listener per de
 
 `codegen/data.ts` lists every property the generated attributes set. `npm run codegen:dom` writes `packages/screamer/src/Screamer/Html/Reflect.g.ts`, the foreign module of `Screamer.Html.Reflect`, mapping each property to its HTML form: `value` to the `value` attribute, but to the text of a `<textarea>` and to `selected` on the matching `<option>` of a `<select>`; `checked`, `selected` and `muted` to boolean attributes; `contentEditable`, `draggable` and `spellcheck` to `"true"`/`"false"`; `translate` to `"yes"`/`"no"`; `className` to `class` and `htmlFor` to `for`. A property not in the table has no HTML form. CI checks that the generated file is current.
 
+### Suspense boundaries (#50, for #42)
+
+`suspense fallback content` shows the fallback until the content's `Pending.settled` is true. Before building the content it calls the `Screamer.Renderer.boundaryKey` hook (default: nothing) with the boundary's anchors and its content's `settled` signal, so a streaming renderer can send the fallback first and the content when it settles, without the core importing anything from SSR.
+
 ## What the library does
 
 The issues #37 to #43 describe it; in short:
@@ -75,4 +80,4 @@ The issues #37 to #43 describe it; in short:
 - `renderToString { url, timeout } el`: `instantiateWith serverTree (withServerEnv ...) el`, wait for the root's `settled` or the timeout, serialize, dispose. `withServerEnv` provides an inert host, `staticRouter url sink` and the library's keys.
 - `hydrate`: `instantiateWith` a hydrating backend that claims the server's nodes (using `enter`/`leave` and the anchors), then passes every later operation to `browserBackend`.
 - `transfer` and `resourceT`, keyed by `uniqueId`; clock reads recorded and replayed through the `Host`.
-- Mismatch detection and recovery inside the hydrating backend, and capture and replay of the `delegated` events through `browserBackend.dispatch`.
+- Mismatch detection and recovery inside the hydrating backend, capture and replay of the `delegated` events through `browserBackend.dispatch`, and streaming through `boundaryKey`.

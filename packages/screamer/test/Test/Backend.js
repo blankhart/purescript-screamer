@@ -75,3 +75,13 @@ export const guardDocument = (action) => () => {
     }
   }
 };
+
+export const addTarget = (id) => () => {
+  const el = document.createElement('div');
+  el.id = id;
+  document.body.appendChild(el);
+};
+
+export const crash = (message) => {
+  throw new Error(message);
+};
