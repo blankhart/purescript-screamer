@@ -9,11 +9,14 @@ package:
     - maybe
     - prelude
     - refs
+    - screamer
     - screamer-reactive
+    - web-dom
   test:
     main: Test.Web.Main
     dependencies:
+      - aff
       - effect
-      - screamer
+      - refs
       - screamer-test
       - spec
