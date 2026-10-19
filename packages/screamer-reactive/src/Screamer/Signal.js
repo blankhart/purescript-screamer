@@ -11,7 +11,7 @@ export const sampleOn = (a) => (b) => R.derived(() => {
 });
 export const dropRepeatsByImpl = (eq) => (s) => R.dropRepeatsBy((x, y) => eq(x)(y), s);
 export const withPreviousImpl = (tuple) => (seed) => (s) => {
-    const pair = R.stateful([s], () => ({ previous: seed, current: s.read() }), (_, values, p) => ({ previous: p.current, current: values[0] }));
+    const pair = R.stateful([s], () => ({ previous: seed, current: s.read() }), (_, values, p) => ({ previous: p.current, current: values[0] }), undefined, 'Signal.withPrevious');
     return R.map((p) => tuple(p.previous)(p.current), pair);
 };
 export const attemptImpl = (left) => (right) => (s) => R.derived(() => {
@@ -31,7 +31,7 @@ export const attemptImpl = (left) => (right) => (s) => R.derived(() => {
  * associative.
  */
 function mergeNode(a, b) {
-    return R.stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), never);
+    return R.stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), never, 'Signal.merge');
 }
 const never = () => false;
 /** Values of `s` that satisfy `p`, starting at `seed` unless `s` satisfies `p` at the start. */
@@ -39,7 +39,7 @@ function latestWhereNode(p, seed, s) {
     return R.stateful([s], () => {
         const v = s.read();
         return p(v) ? v : seed;
-    }, (_, values, prev) => (p(values[0]) ? values[0] : prev));
+    }, (_, values, prev) => (p(values[0]) ? values[0] : prev), undefined, 'Signal.latestWhere');
 }
 /**
  * Follows `s` while `cond` is true and holds its last value while `cond` is
@@ -47,7 +47,7 @@ function latestWhereNode(p, seed, s) {
  * `s` if `cond` is true at the start, otherwise at `seed`.
  */
 function gateSignal(cond, seed, s) {
-    return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev));
+    return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev), undefined, 'Signal.gate');
 }
 export const merge = (a) => (b) => mergeNode(a, b);
 export const latestWhere = (p) => (seed) => (s) => latestWhereNode(p, seed, s);

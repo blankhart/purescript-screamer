@@ -6,7 +6,7 @@ The reactive core: signals, events, sources and scopes, with no DOM. It builds w
 |---|---|
 | `Screamer.Signal` | `Signal`, its instances, `sampleOn`, `dropRepeats*`, `withPrevious`, `merge`, `latestWhere`, `gate`, `catching`, `attempt`, `read`, `subscribe`, `hold` |
 | `Screamer.Event` | `Event`, its instances, `changes`, `stepper`, `fold`, `tag`, `attach*`, `mapAccum`, `withPrevious`, `startWith`, `dropRepeats*`, `gate`, `oneOf`, `switchEvent`, `subscribe`, `hold` |
-| `Screamer.Source` | `signalSource`, `eventSource`, `batch` |
+| `Screamer.Source` | `signalSource`, `eventSource`, `batch`, and `focus` and `prop` for a source over part of another's value |
 | `Screamer.Owned` | `Owned`, `onCleanup`, `child`, `runOwned`, `onError` |
 | `Screamer.Context` | `key`, `provide`, `ask`, `uniqueId` |
 | `Screamer.Host` | the clock, timers and frames as a context value |
@@ -14,6 +14,6 @@ The reactive core: signals, events, sources and scopes, with no DOM. It builds w
 | `Screamer.Runtime` | `readStats`, for leak checks |
 | `Screamer.Runtime.Unsafe` | no PureScript API: its foreign module is the JavaScript API add-ons build nodes with |
 
-Depends on: prelude, effect, control, either, maybe, tuples, exceptions, filterable, typelevel-prelude, unsafe-coerce.
+Depends on: prelude, effect, control, either, maybe, tuples, exceptions, filterable, record, typelevel-prelude, unsafe-coerce.
 
 The semantics are in [`docs/combinators.md`](../../docs/combinators.md) and [`docs/ownership-design.md`](../../docs/ownership-design.md). `test/core/` has the TypeScript tests of the runtime (`npm run test:core`).

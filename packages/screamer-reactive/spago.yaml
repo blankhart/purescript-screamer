@@ -16,6 +16,7 @@ package:
     - filterable
     - maybe
     - prelude
+    - record
     - tuples
     - typelevel-prelude
     - unsafe-coerce

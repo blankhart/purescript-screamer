@@ -429,6 +429,8 @@ export class Stateful<S> implements Source<S>, Target, Settle {
     private initial: () => S,
     private step: Step<S>,
     private eq: Eq<S> = Object.is,
+    /** The operator that made the node, for development warnings. */
+    public label: string = '',
   ) {
     this.last = inputs.map(() => -1);
     this.settles = inputs.some(isEvent);
@@ -516,6 +518,9 @@ export class Stateful<S> implements Source<S>, Target, Settle {
   }
 
   read(): S {
+    // An untracked read of a node that was observed and is not now gets the
+    // state it kept when it paused. A tracked read is about to observe it.
+    if (DEV && current === null && this.started && !this.linked) warnPausedRead(this);
     try {
       this.refresh();
     } finally {
@@ -523,6 +528,19 @@ export class Stateful<S> implements Source<S>, Target, Settle {
     }
     return this.value;
   }
+}
+
+const warnedPaused: WeakSet<object> = new WeakSet();
+
+/** Warn, once per node, that a paused stateful node was read. */
+function warnPausedRead(n: Stateful<any>): void {
+  if (warnedPaused.has(n)) return;
+  warnedPaused.add(n);
+  console.warn(
+    `screamer: read of a paused stateful signal${n.label === '' ? '' : ` (${n.label})`}. ` +
+      'It keeps the state it had when its last observer left and does not step until observed again; ' +
+      'keep it observed (Signal.hold) if it must stay current.',
+  );
 }
 
 /** Run a pure function: untracked, with no owner, and with writes rejected. */
@@ -541,8 +559,8 @@ function pure<T>(fn: () => T): T {
   }
 }
 
-export function stateful<S>(inputs: Source<any>[], initial: () => S, step: Step<S>, eq?: Eq<S>): Stateful<S> {
-  return new Stateful(inputs, initial, step, eq);
+export function stateful<S>(inputs: Source<any>[], initial: () => S, step: Step<S>, eq?: Eq<S>, label?: string): Stateful<S> {
+  return new Stateful(inputs, initial, step, eq, label);
 }
 
 // ---------------------------------------------------------------------------
@@ -1391,7 +1409,7 @@ export function stepper<A>(seed: A, e: EventLike<A>): Readable<A> {
   return stateful([e], () => seed, (_, values) => {
     const os: Occ<A>[] = values[0];
     return os[os.length - 1].v;
-  });
+  }, undefined, 'Event.stepper');
 }
 
 /** Accumulate from `seed`, one step per occurrence. */
@@ -1400,7 +1418,7 @@ export function foldEvent<A, B>(f: (a: A, b: B) => B, seed: B, e: EventLike<A>):
     const os: Occ<A>[] = values[0];
     for (let i = 0; i < os.length; i++) b = f(os[i].v, b);
     return b;
-  });
+  }, undefined, 'Event.fold');
 }
 
 /** Each occurrence combined with the signal's value at the end of the round. */

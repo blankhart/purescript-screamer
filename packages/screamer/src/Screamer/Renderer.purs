@@ -16,6 +16,8 @@ module Screamer.Renderer
   , rendererKey
   , interactive
   , delegated
+  , Boundary
+  , boundaryKey
   ) where
 
 import Prelude
@@ -23,6 +25,8 @@ import Prelude
 import Effect (Effect)
 import Screamer.Context (Key, ask, key)
 import Screamer.Owned (Owned)
+import Screamer.Signal (Signal)
+import Web.DOM.Node (Node)
 
 -- | The node operations of one renderer.
 foreign import data Backend :: Type
@@ -51,3 +55,14 @@ interactive = interactiveImpl <$> ask rendererKey
 
 -- | The event types the browser backend delegates to the document.
 foreign import delegated :: Array String
+
+-- | A `suspense` boundary: its anchors (what it shows lies between them)
+-- | and its content's `Pending.settled` signal.
+type Boundary = { start :: Node, end :: Node, settled :: Signal Boolean }
+
+-- | Told about each `suspense` boundary when it is instantiated, before its
+-- | content is built; the default does nothing. A streaming renderer
+-- | provides one to learn which ranges to send late: those whose `settled`
+-- | is still false when it flushes the page.
+boundaryKey :: Key (Boundary -> Effect Unit)
+boundaryKey = key "boundary" \_ -> pure unit

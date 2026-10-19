@@ -64,7 +64,6 @@ import Data.Symbol (class IsSymbol)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Prim.Row as Row
-import Record as Record
 import Screamer.Attribute (attribute)
 import Screamer.Element (Element, dyn, element, fragment_, text)
 import Screamer.Html as E
@@ -74,6 +73,7 @@ import Screamer.Html.Handlers as H
 import Screamer.Owned (Owned(..), child)
 import Screamer.Signal (Signal, read)
 import Screamer.Source (SignalSource, batch, signalSource)
+import Screamer.Source as Source
 import Type.Proxy (Proxy)
 import Web.Event.Event (Event, target)
 import Web.HTML.HTMLInputElement as Input
@@ -83,12 +83,12 @@ import Web.HTML.HTMLSelectElement as Select
 type Errors = Array String
 
 -- | What a form is given when it is built: the form-wide props, its part of
--- | the state, a way to change that part, and whether every validation
--- | message should be shown whether or not its field was edited.
+-- | the state as a source (focused from the whole with
+-- | `Screamer.Source.focus`), and whether every validation message should
+-- | be shown whether or not its field was edited.
 type Context props i =
   { props :: props
-  , value :: Signal i
-  , modify :: (i -> i) -> Effect Unit
+  , state :: SignalSource i
   , reveal :: Signal Boolean
   }
 
@@ -128,8 +128,7 @@ instance Applicative (Form props i) where
 
 -- | A form over part of a larger state.
 focus :: forall props s a o. (s -> a) -> (a -> s -> s) -> Form props a o -> Form props s o
-focus get set (Form f) = Form \c ->
-  f c { value = get <$> c.value, modify = \g -> c.modify \s -> set (g (get s)) s }
+focus get set (Form f) = Form \c -> f c { state = Source.focus { get, set } c.state }
 
 -- | A form over one field of a record state.
 prop
@@ -139,7 +138,7 @@ prop
   => Proxy l
   -> Form props a o
   -> Form props (Record r) o
-prop l = focus (Record.get l) (Record.set l)
+prop l (Form f) = Form \c -> f c { state = Source.prop l c.state }
 
 -- | A form that depends on the props.
 withProps :: forall props i o. (props -> Form props i o) -> Form props i o
@@ -204,13 +203,13 @@ isModified = case _ of
 -- | fields.
 validated :: forall props i a b. Validator a b -> Form props i a -> Form props (Validated i) b
 validated v (Form f) = Form \c -> do
-  r <- f c { value = fromValidated <$> c.value, modify = \g -> c.modify (Modified <<< g <<< fromValidated) }
+  r <- f c { state = Source.focus { get: fromValidated, set: \a _ -> Modified a } c.state }
   let
     checked = r.result <#> map v
     message = checked <#> case _ of
       Right (Left m) -> Just m
       _ -> Nothing
-    touched = (||) <$> (isModified <$> c.value) <*> c.reveal
+    touched = (||) <$> (isModified <$> c.state.signal) <*> c.reveal
     shown = (\t m -> if t then m else Nothing) <$> touched <*> message
   pure
     { fields: r.fields <>
@@ -230,16 +229,16 @@ password = textInput InputPassword
 
 textInput :: forall props. InputType -> Form props String String
 textInput t = Form \c -> pure
-  { fields: [ E.input_ [ A.type_ t, A.value_ c.value, H.onInput_ (inputValue (c.modify <<< const)) ] [] ]
-  , result: Right <$> c.value
+  { fields: [ E.input_ [ A.type_ t, A.value_ c.state.signal, H.onInput_ (inputValue (c.state.modify <<< const)) ] [] ]
+  , result: Right <$> c.state.signal
   }
 
 -- | A number input. The state is the text as entered; the result is
 -- | `Nothing` when it is blank or not a number.
 number :: forall props. Form props String (Maybe Number)
 number = Form \c -> pure
-  { fields: [ E.input_ [ A.type_ InputNumber, A.value_ c.value, H.onInput_ (inputValue (c.modify <<< const)) ] [] ]
-  , result: c.value <#> \s -> Right (Number.fromString (String.trim s))
+  { fields: [ E.input_ [ A.type_ InputNumber, A.value_ c.state.signal, H.onInput_ (inputValue (c.state.modify <<< const)) ] [] ]
+  , result: c.state.signal <#> \s -> Right (Number.fromString (String.trim s))
   }
 
 -- | A checkbox.
@@ -248,12 +247,12 @@ checkbox = Form \c -> pure
   { fields:
       [ E.input_
           [ A.type_ InputCheckbox
-          , A.checked_ c.value
-          , H.onChange_ \e -> for_ (target e >>= Input.fromEventTarget) \i -> Input.checked i >>= c.modify <<< const
+          , A.checked_ c.state.signal
+          , H.onChange_ \e -> for_ (target e >>= Input.fromEventTarget) \i -> Input.checked i >>= c.state.modify <<< const
           ]
           []
       ]
-  , result: Right <$> c.value
+  , result: Right <$> c.state.signal
   }
 
 type SelectOption a = { label :: String, value :: a }
@@ -265,15 +264,15 @@ select placeholder options = Form \c -> pure
       [ E.select_
           [ H.onChange_ \e -> for_ (target e >>= Select.fromEventTarget) \s -> do
               index <- Select.selectedIndex s
-              c.modify \_ -> _.value <$> Array.index options (index - 1)
+              c.state.modify \_ -> _.value <$> Array.index options (index - 1)
           ]
-          ( [ E.option_ [ A.value_ "", A.selected_ (isNothing <$> c.value) ] [ element placeholder ] ]
+          ( [ E.option_ [ A.value_ "", A.selected_ (isNothing <$> c.state.signal) ] [ element placeholder ] ]
               <> Array.mapWithIndex
-                (\i o -> E.option_ [ A.value_ (show i), A.selected_ (c.value <#> (_ == Just o.value)) ] [ element o.label ])
+                (\i o -> E.option_ [ A.value_ (show i), A.selected_ (c.state.signal <#> (_ == Just o.value)) ] [ element o.label ])
                 options
           )
       ]
-  , result: Right <$> c.value
+  , result: Right <$> c.state.signal
   }
 
 inputValue :: (String -> Effect Unit) -> Event -> Effect Unit
@@ -295,7 +294,7 @@ build :: forall props i o. props -> i -> Form props i o -> Owned (Built i o)
 build props initial (Form f) = do
   state <- liftEffect $ signalSource initial
   revealed <- liftEffect $ signalSource false
-  r <- f { props, value: state.signal, modify: state.modify, reveal: revealed.signal }
+  r <- f { props, state, reveal: revealed.signal }
   pure
     { element: E.div_ [ A.class_ "screamer-form" ] r.fields
     , state
