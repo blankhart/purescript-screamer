@@ -15,7 +15,7 @@ This issue is the specification. Stage 0 copies it into `docs/ownership-design.m
 - **Commits:** prefix each with `stage N:`. Every commit must build (`npm run build`) and pass the tests (`npm test`) on its own. New modules go alongside old ones until stage 8 deletes the old ones, so the branch stays green throughout.
 - **Finishing a stage:** push, wait for CI to pass on the branch, tick the stage in the PR description with its commit range, and comment on the stage issue with what was done and any deviation from the spec. Do not close stage issues; the PR closes them on merge.
 - **Deviations:** if the spec is wrong or ambiguous, pick the option closest to the spec's intent, record it in a comment on this issue, and update `docs/ownership-design.md` in the same stage. If the change would alter a public PureScript type or a decision listed below as decided, stop and ask on this issue instead.
-- **Out of scope:** a PSX preprocessor backend and server rendering. Do not build toward them.
+- **Out of scope:** a PSX preprocessor backend. (Server rendering was out of scope for the stages; it now lives in a separate library on the core's seams, see the Decisions table and `docs/ssr.md`.)
 
 ## Why
 
@@ -197,6 +197,7 @@ browser behaviour.
 | Combinators that need timers or async work | **Decided (#17):** they return `Owned`; everything else is pure |
 | Escape hatch for JS widgets | **Decided (#27):** `foreign_ :: (Web.DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element` in `Screamer.Element`, not a `withNode_` attribute. A host element with no Screamer children makes "Screamer never touches its children" true by construction, while an attribute could be put on an element that also has Screamer children, and attributes have no ordering to say when it runs. |
 | Platform-specific behaviour | **Decided (#48):** Platform-specific behaviour goes through context, Host and Pending; no SSR-specific fields on `Scope` |
+| Server rendering | **Decided (#34):** Server rendering lives in `screamer-ssr`, on the core's context, Host, Pending and renderer seams; see `docs/ssr.md` |
 
 ## Stages
 

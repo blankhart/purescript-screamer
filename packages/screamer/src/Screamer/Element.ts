@@ -3,19 +3,47 @@
 // An Element is an `Owned Node`; at run time that is a function from a scope
 // to an effect producing the node. Instantiating it creates the DOM nodes and
 // the effects that keep them up to date, all owned by that scope.
+//
+// Every node operation goes through a renderer backend (`Renderer.ts`). The
+// backend in use while an element is built is `B`: `instantiate` sets it from
+// the scope's context, and each range that builds later (`dyn`, `each`)
+// captures it, so building costs one context lookup per instantiation rather
+// than one per node.
 import type { Attr } from './Attribute.js';
+import type * as Renderer from './Renderer.js';
 import type * as Runtime from '../../../screamer-reactive/src/Screamer/Runtime/Unsafe.js';
 // @ts-ignore: purs copies this file to output/Screamer.Element/foreign.js, next to the runtime's.
 import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
+// @ts-ignore: likewise output/Screamer.Renderer/foreign.js.
+import * as renderer from '../Screamer.Renderer/foreign.js';
 
 const R: typeof Runtime = runtime;
+const Rn: typeof Renderer = renderer;
+
+type Backend = Renderer.Backend;
 
 type Scope = Runtime.Scope;
 type Sig<T> = Runtime.Readable<T>;
-type El = (s: Scope) => () => Node;
+type N = any;
+type El = (s: Scope) => () => N;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const FRAGMENT = 11;
+
+let B: Backend = Rn.browserBackend;
+
+/** Run `f` with `b` as the backend that new nodes are built with. */
+function withB<T>(b: Backend, f: () => T): T {
+  const prev = B;
+  B = b;
+  try {
+    return f();
+  } finally {
+    B = prev;
+  }
+}
+
+export const withBackend = (b: Backend) => <A>(e: () => A) => (): A => withB(b, e);
 
 // ---------------------------------------------------------------------------
 // Attributes, as `Screamer.Attribute` builds them. The kinds must match
@@ -30,100 +58,36 @@ const GROUP = 5;
 
 type Handler = (e: Event) => () => void;
 
-// Bubbling events are delegated: one listener per event type on the document
-// dispatches to the handlers stored on the elements between the target and
-// the document. Elements need no listener of their own, so creating and
-// disposing them adds and removes none. A handler stops firing once the scope
-// that bound it is disposed.
-const DELEGATED = new Set([
-  'beforeinput', 'click', 'contextmenu', 'dblclick', 'focusin', 'focusout', 'input',
-  'keydown', 'keyup', 'mousedown', 'mousemove', 'mouseout', 'mouseover', 'mouseup',
-  'pointerdown', 'pointermove', 'pointerout', 'pointerover', 'pointerup',
-  'touchend', 'touchmove', 'touchstart',
-]);
-
-const HANDLERS = '$$screamer';
-
-interface Delegating extends Element {
-  [HANDLERS]?: { scope: Scope; on: Record<string, Handler> };
-}
-
-const delegated = new Set<string>();
-
-function delegate(name: string): void {
-  if (delegated.has(name)) return;
-  delegated.add(name);
-  document.addEventListener(name, dispatch);
-}
-
-function dispatch(e: Event): void {
-  const name = e.type;
-  let node = e.target as Node | null;
-  Object.defineProperty(e, 'currentTarget', { configurable: true, get: () => node });
-  try {
-    R.batch(() => {
-      while (node !== null) {
-        const h = (node as Delegating)[HANDLERS];
-        if (h !== undefined && !h.scope.disposed) {
-          const handler = h.on[name];
-          if (handler !== undefined) {
-            handler(e)();
-            if (e.cancelBubble) return;
-          }
-        }
-        node = node.parentNode ?? ((node as ShadowRoot).host || null);
-      }
-    });
-  } finally {
-    delete (e as any).currentTarget;
-  }
-}
-
 /** Set once for a constant, or with one owned effect for a signal. */
 function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
   if (R.isConstant(sig)) set(sig.value);
   else R.effectIn(s, () => set(sig.read()));
 }
 
-function bindAttr(s: Scope, el: Element, a: Attr): void {
+function bindAttr(b: Backend, s: Scope, el: N, a: Attr): void {
   const name = a.name;
   switch (a.kind) {
     case PROPERTY:
-      // Skip writes that would not change the property, so an input's caret
-      // and partial entry survive the value it just reported being written back.
-      bindValue(s, a.value, (v) => { if ((el as any)[name] !== v) (el as any)[name] = v; });
+      bindValue(s, a.value, (v) => { b.setProperty(el, name, v); });
       break;
     case ATTRIBUTE:
-      bindValue(s, a.value, (v: string) => { el.setAttribute(name, v); });
+      bindValue(s, a.value, (v: string) => { b.setAttribute(el, name, v); });
       break;
     case BOOLEAN:
       bindValue(s, a.value, (v: boolean) => {
-        if (v) el.setAttribute(name, '');
-        else el.removeAttribute(name);
+        if (v) b.setAttribute(el, name, '');
+        else b.removeAttribute(el, name);
       });
       break;
-    case STYLE: {
-      const style = (el as HTMLElement).style;
-      bindValue(s, a.value, (v: string) => { style.setProperty(name, v); });
+    case STYLE:
+      bindValue(s, a.value, (v: string) => { b.setStyle(el, name, v); });
       break;
-    }
-    case EVENT: {
-      const handler = a.value as Handler;
-      if (DELEGATED.has(name)) {
-        delegate(name);
-        let h = (el as Delegating)[HANDLERS];
-        if (h === undefined) h = (el as Delegating)[HANDLERS] = { scope: s, on: Object.create(null) };
-        h.on[name] = handler;
-      } else {
-        const listener = (e: Event) => R.batch(() => handler(e)());
-        el.addEventListener(name, listener);
-        s.cleanups.push(() => el.removeEventListener(name, listener));
-      }
+    case EVENT:
+      if (b.interactive) b.listen(el, name, a.value as Handler, s);
       break;
-    }
     case GROUP: {
       const list = a.value as Attr[];
-      for (let i = 0; i < list.length; i++) bindAttr(s, el, list[i]);
+      for (let i = 0; i < list.length; i++) bindAttr(b, s, el, list[i]);
       break;
     }
   }
@@ -132,65 +96,91 @@ function bindAttr(s: Scope, el: Element, a: Attr): void {
 // ---------------------------------------------------------------------------
 // Elements
 
-function build(el: Element, attrs: Attr[], children: El[], s: Scope): Element {
-  for (let i = 0; i < children.length; i++) el.appendChild(children[i](s)());
-  for (let i = 0; i < attrs.length; i++) bindAttr(s, el, attrs[i]);
+function build(b: Backend, el: N, attrs: Attr[], children: El[], s: Scope): N {
+  b.enter(el);
+  for (let i = 0; i < children.length; i++) b.appendChild(el, children[i](s)());
+  b.leave(el);
+  for (let i = 0; i < attrs.length; i++) bindAttr(b, s, el, attrs[i]);
   return el;
 }
 
-export const elementImpl = (tag: string) => (attrs: Attr[]) => (children: El[]) => (s: Scope) => (): Node =>
-  build(document.createElement(tag), attrs, children, s);
+export const elementImpl = (tag: string) => (attrs: Attr[]) => (children: El[]) => (s: Scope) => (): N =>
+  build(B, B.createElement(tag), attrs, children, s);
 
-export const svgElementImpl = (tag: string) => (attrs: Attr[]) => (children: El[]) => (s: Scope) => (): Node =>
-  build(document.createElementNS(SVG_NS, tag), attrs, children, s);
+export const svgElementImpl = (tag: string) => (attrs: Attr[]) => (children: El[]) => (s: Scope) => (): N =>
+  build(B, B.createElementNS(SVG_NS, tag), attrs, children, s);
 
-export const fragmentImpl = (children: El[]) => (s: Scope) => (): Node => {
-  const f = document.createDocumentFragment();
-  for (let i = 0; i < children.length; i++) f.appendChild(children[i](s)());
+/**
+ * The host element of `foreign_`: its attributes, and no children. Any it
+ * already has (a hydrating backend claims the server's fallback) are
+ * cleared before the widget's setup runs.
+ */
+export const foreignHostImpl = (tag: string) => (attrs: Attr[]) => (s: Scope) => (): N => {
+  const b = B;
+  const el = b.createElement(tag);
+  b.enter(el);
+  if (b.firstChild(el) !== null) b.clearChildren(el);
+  b.leave(el);
+  for (let i = 0; i < attrs.length; i++) bindAttr(b, s, el, attrs[i]);
+  return el;
+};
+
+export const fragmentImpl = (children: El[]) => (s: Scope) => (): N => {
+  const b = B;
+  const f = b.createFragment();
+  for (let i = 0; i < children.length; i++) b.appendChild(f, children[i](s)());
   return f;
 };
 
-export const textImpl = (sig: Sig<string>) => (s: Scope) => (): Node => {
-  if (R.isConstant(sig)) return document.createTextNode(sig.value);
-  const node = document.createTextNode('');
-  R.effectIn(s, () => { node.data = sig.read(); });
+export const textImpl = (sig: Sig<string>) => (s: Scope) => (): N => {
+  const b = B;
+  if (R.isConstant(sig)) return b.createText(sig.value);
+  const node = b.createText('');
+  R.effectIn(s, () => { b.setText(node, sig.read()); });
   return node;
 };
 
-/** Instantiate `el` in a fresh child scope of `parent`, untracked. */
-function instantiateIn(parent: Scope, el: El): { scope: Scope; node: Node } {
+/** Instantiate `el` with backend `b` in a fresh child scope of `parent`, untracked. */
+function instantiateIn(b: Backend, parent: Scope, el: El): { scope: Scope; node: N } {
   const scope = R.createScope(parent);
-  const node = R.untracked(() => R.runInScope(scope, () => el(scope)()));
+  const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => el(scope)())));
   return { scope, node };
 }
 
-function removeBetween(start: Node, end: Node): void {
-  const parent = end.parentNode!;
-  let n = start.nextSibling;
+function removeBetween(b: Backend, start: N, end: N): void {
+  const parent = b.parentNode(end)!;
+  let n = b.nextSibling(start);
   while (n !== null && n !== end) {
-    const next: ChildNode | null = n.nextSibling;
-    parent.removeChild(n);
+    const next = b.nextSibling(n);
+    b.removeChild(parent, n);
     n = next;
   }
 }
 
-export const dynImpl = (sig: Sig<El>) => (s: Scope) => (): Node => {
+/** A fragment holding a pair of anchors, for a range that changes. */
+function anchors(b: Backend): { start: N; end: N; f: N } {
+  const start = b.createAnchor(true);
+  const end = b.createAnchor(false);
+  const f = b.createFragment();
+  b.appendChild(f, start);
+  b.appendChild(f, end);
+  return { start, end, f };
+}
+
+export const dynImpl = (sig: Sig<El>) => (s: Scope) => (): N => {
   if (R.isConstant(sig)) return sig.value(s)();
-  const start = document.createComment('');
-  const end = document.createComment('');
-  const f = document.createDocumentFragment();
-  f.appendChild(start);
-  f.appendChild(end);
+  const b = B;
+  const { start, end, f } = anchors(b);
   let child: Scope | null = null;
   R.effectIn(s, () => {
     const el = sig.read();
     R.untracked(() => {
       if (child !== null) child.dispose();
       child = null;
-      removeBetween(start, end);
-      const made = instantiateIn(s, el);
+      removeBetween(b, start, end);
+      const made = instantiateIn(b, s, el);
       child = made.scope;
-      end.parentNode!.insertBefore(made.node, end);
+      b.insertBefore(b.parentNode(end)!, made.node, end);
     });
   });
   return f;
@@ -203,8 +193,8 @@ interface Row<A> {
   key: any;
   cell: Runtime.Cell<A>;
   scope: Scope;
-  first: Node;
-  last: Node;
+  first: N;
+  last: N;
 }
 
 /** Indices of a longest strictly increasing subsequence of `xs`, ignoring negative entries. */
@@ -265,26 +255,26 @@ function keyLookup(rows: Row<any>[], compare: (a: any) => (b: any) => number): (
   };
 }
 
-function moveBefore(parent: Node, row: Row<any>, next: Node): void {
-  if (row.last.nextSibling === next) return;
+function moveBefore(b: Backend, parent: N, row: Row<any>, next: N): void {
+  if (b.nextSibling(row.last) === next) return;
   if (row.first === row.last) {
-    parent.insertBefore(row.first, next);
+    b.insertBefore(parent, row.first, next);
     return;
   }
-  let n: Node = row.first;
+  let n: N = row.first;
   for (;;) {
-    const after = n.nextSibling!;
-    parent.insertBefore(n, next);
+    const after = b.nextSibling(n);
+    b.insertBefore(parent, n, next);
     if (n === row.last) break;
     n = after;
   }
 }
 
-function removeRow(parent: Node, row: Row<any>): void {
-  let n: Node = row.first;
+function removeRow(b: Backend, parent: N, row: Row<any>): void {
+  let n: N = row.first;
   for (;;) {
-    const after = n.nextSibling;
-    parent.removeChild(n);
+    const after = b.nextSibling(n);
+    b.removeChild(parent, n);
     if (n === row.last || after === null) break;
     n = after;
   }
@@ -296,49 +286,46 @@ export const eachImpl =
   (items: Sig<A[]>) =>
   (render: (s: Sig<A>) => El) =>
   (s: Scope) =>
-  (): Node => {
-    const start = document.createComment('');
-    const end = document.createComment('');
-    const f = document.createDocumentFragment();
-    f.appendChild(start);
-    f.appendChild(end);
+  (): N => {
+    const b = B;
+    const { start, end, f } = anchors(b);
     let rows: Row<A>[] = [];
 
-    const makeRow = (key: K, item: A, into: Node, before: Node | null): Row<A> => {
+    const makeRow = (key: K, item: A, into: N, before: N | null): Row<A> => {
       const cell = R.cell(item);
-      const { scope, node } = instantiateIn(s, render(cell));
-      let first: Node;
-      let last: Node;
-      if (node.nodeType === FRAGMENT) {
-        if (node.firstChild === null) node.appendChild(document.createComment(''));
-        first = node.firstChild!;
-        last = node.lastChild!;
+      const { scope, node } = instantiateIn(b, s, render(cell));
+      let first: N;
+      let last: N;
+      if (b.nodeType(node) === FRAGMENT) {
+        if (b.firstChild(node) === null) b.appendChild(node, b.createComment(''));
+        first = b.firstChild(node);
+        last = b.lastChild(node);
       } else {
         first = node;
         last = node;
       }
-      into.insertBefore(node, before);
+      b.insertBefore(into, node, before);
       return { key, cell, scope, first, last };
     };
 
     const createAll = (list: A[]): Row<A>[] => {
-      const frag = document.createDocumentFragment();
+      const frag = b.createFragment();
       const made = new Array<Row<A>>(list.length);
       for (let i = 0; i < list.length; i++) made[i] = makeRow(keyOf(list[i]), list[i], frag, null);
-      end.parentNode!.insertBefore(frag, end);
+      b.insertBefore(b.parentNode(end)!, frag, end);
       return made;
     };
 
     const clearAll = () => {
       for (let i = rows.length - 1; i >= 0; i--) rows[i].scope.dispose();
-      const parent = end.parentNode!;
-      if (parent.firstChild === start && parent.lastChild === end && parent.nodeType !== FRAGMENT) {
+      const parent = b.parentNode(end)!;
+      if (b.firstChild(parent) === start && b.lastChild(parent) === end && b.nodeType(parent) !== FRAGMENT) {
         // The list owns its parent: replace the children wholesale.
-        (parent as Element).textContent = '';
-        parent.appendChild(start);
-        parent.appendChild(end);
+        b.clearChildren(parent);
+        b.appendChild(parent, start);
+        b.appendChild(parent, end);
       } else {
-        removeBetween(start, end);
+        removeBetween(b, start, end);
       }
       rows = [];
     };
@@ -353,7 +340,7 @@ export const eachImpl =
         rows = createAll(list);
         return;
       }
-      const parent = end.parentNode!;
+      const parent = b.parentNode(end)!;
       // Common prefix and suffix: rows that stay in place.
       const m = rows.length;
       let head = 0;
@@ -372,7 +359,7 @@ export const eachImpl =
         // Only removals in the middle.
         for (let j = head; j < tailOld; j++) {
           rows[j].scope.dispose();
-          removeRow(parent, rows[j]);
+          removeRow(b, parent, rows[j]);
         }
         if (tailOld > head) rows.splice(head, tailOld - head);
         return;
@@ -380,10 +367,10 @@ export const eachImpl =
       if (head === tailOld) {
         // Only insertions in the middle.
         const anchor = tailOld < m ? rows[tailOld].first : end;
-        const frag = document.createDocumentFragment();
+        const frag = b.createFragment();
         const made = new Array<Row<A>>(tailNew - head);
         for (let i = head; i < tailNew; i++) made[i - head] = makeRow(keyOf(list[i]), list[i], frag, null);
-        parent.insertBefore(frag, anchor);
+        b.insertBefore(parent, frag, anchor);
         rows = rows.slice(0, head).concat(made, rows.slice(head));
         return;
       }
@@ -415,11 +402,11 @@ export const eachImpl =
       for (let j = 0; j < rows.length; j++) {
         if (used[j] === 0) {
           rows[j].scope.dispose();
-          removeRow(parent, rows[j]);
+          removeRow(b, parent, rows[j]);
         }
       }
       const stay = longestIncreasingSubsequence(oldIndex);
-      let anchor: Node = end;
+      let anchor: N = end;
       for (let i = n - 1; i >= 0; i--) {
         let row = next[i];
         if (row === null) {
@@ -427,7 +414,7 @@ export const eachImpl =
           next[i] = row;
         } else {
           row.cell.write(list[i]);
-          if (stay[i] === 0) moveBefore(parent, row, anchor);
+          if (stay[i] === 0) moveBefore(b, parent, row, anchor);
         }
         anchor = row.first;
       }
@@ -444,30 +431,33 @@ export const eachImpl =
 // ---------------------------------------------------------------------------
 // Mounting
 
-export const findMountPoint = (selector: string) => (): Node => {
-  const target = document.querySelector(selector);
+export const findMountPoint = (b: Backend) => (selector: string) => (): N => {
+  const target = b.select(selector);
   if (target === null) throw new Error(`mount: no element matches "${selector}"`);
   return target;
 };
 
 /** Append `node` to `target`; the returned action removes what was appended. */
-export const attach = (target: Node) => (node: Node) => (): (() => void) => {
-  let first: Node | null = node;
-  let last: Node | null = node;
-  if (node.nodeType === FRAGMENT) {
-    first = node.firstChild;
-    last = node.lastChild;
+function attachRange(b: Backend, target: N, node: N): () => void {
+  let first: N = node;
+  let last: N = node;
+  if (b.nodeType(node) === FRAGMENT) {
+    first = b.firstChild(node);
+    last = b.lastChild(node);
   }
-  target.appendChild(node);
+  b.appendChild(target, node);
   return () => {
     // Remove the whole range, including content a list or `dyn` added
     // between top-level anchors.
     let n = first;
     while (n !== null) {
-      const after: Node | null = n.nextSibling;
-      n.parentNode?.removeChild(n);
+      const after = b.nextSibling(n);
+      const parent = b.parentNode(n);
+      if (parent !== null) b.removeChild(parent, n);
       if (n === last) break;
       n = after;
     }
   };
-};
+}
+
+export const attach = (b: Backend) => (target: N) => (node: N) => (): (() => void) => attachRange(b, target, node);

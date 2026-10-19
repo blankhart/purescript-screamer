@@ -22,12 +22,16 @@ function main() {
     uncapitalize(s.split('-').map(capitalize).join(''))
   );
 
+  handlebars.registerHelper('json', (value: unknown) => JSON.stringify(value, null, 2));
+
   handlebars.registerHelper('handlerize', (string: string) =>
     string.replace(/^on/, '').toLowerCase()
   );
 
   // Each template's path below the templates directory is its module's path
-  // below targetDir: `Html/Attributes.hbs` is `Screamer.Html.Attributes`.
+  // below targetDir: `Html/Attributes.hbs` is `Screamer.Html.Attributes`,
+  // written to `Html/Attributes.g.purs`. A template named `*.ts.hbs` is a
+  // foreign module, written to `*.g.ts`.
   const templates = (dir: string): string[] =>
     fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
       const rel = path.join(dir, entry.name);
@@ -38,7 +42,9 @@ function main() {
 
     const relative = path.relative(sourceDir, sourceFile);
     const parsed = path.parse(relative);
-    const targetFile = `${targetDir}/${path.join(parsed.dir, parsed.name)}.g.purs`;
+    const foreign = parsed.name.endsWith('.ts');
+    const base = foreign ? parsed.name.slice(0, -3) : parsed.name;
+    const targetFile = `${targetDir}/${path.join(parsed.dir, base)}.g.${foreign ? 'ts' : 'purs'}`;
 
     console.log(`Reading template ${sourceFile}.`);
     let template = fs.readFileSync(sourceFile, `utf8`);

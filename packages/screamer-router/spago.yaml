@@ -18,5 +18,6 @@ package:
     main: Test.Router.Main
     dependencies:
       - effect
+      - refs
       - screamer-test
       - spec

@@ -76,5 +76,6 @@ jobs:
       - name: Generated DOM modules are up to date
         run: |
           npm run codegen:dom
-          git diff --exit-code -- 'packages/screamer/src/**/*.g.purs'
-          test -z "$(git status --porcelain -- 'packages/screamer/src/**/*.g.purs')"
+          npx tsc
+          git diff --exit-code -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts' 'packages/screamer/src/**/*.g.js'
+          test -z "$(git status --porcelain -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts' 'packages/screamer/src/**/*.g.js')"
