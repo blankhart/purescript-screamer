@@ -1,5 +1,5 @@
 // @ts-ignore: purs copies this file to output/Screamer.Owned/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 const R = runtime;
 /** Run an `Owned` body (a function of the scope) in `s`, inside a batch. */
 const runIn = (s, body) => R.batch(() => R.runInScope(s, () => body(s)()));

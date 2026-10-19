@@ -1,6 +1,9 @@
 // @ts-ignore: purs copies this file to output/Screamer.Flatten/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
+// @ts-ignore: next to it, too, is Screamer.Event's, which merges the children's events.
+import * as eventModule from '../Screamer.Event/foreign.js';
 const R = runtime;
+const Ev = eventModule;
 /** Run an `Owned` in a new child scope of `parent`, in a batch, untracked. */
 function runChild(parent, o) {
     const scope = R.createScope(parent);
@@ -74,7 +77,7 @@ const flattenImpl = (strategy) => (s) => (e) => (f) => () => {
             start(a);
     });
     s.cleanups.push(() => { queue.length = 0; });
-    return R.mergeAll(R.map((cs) => cs.map((c) => c.event), live));
+    return Ev.mergeAll(R.derived(() => live.read().map((c) => c.event)));
 };
 export const mergeOwnedImpl = flattenImpl(MERGE);
 export const concatOwnedImpl = flattenImpl(CONCAT);

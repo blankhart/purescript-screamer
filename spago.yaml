@@ -1,5 +1,10 @@
 package:
   name: screamer
+  build:
+    censorProjectWarnings:
+      # Its foreign module is a JavaScript API for add-on FFI, which no
+      # PureScript code imports.
+      - byPrefix: "The following definitions in the foreign module for module Screamer.Runtime.Unsafe are unused"
   dependencies:
     - aff
     - arrays

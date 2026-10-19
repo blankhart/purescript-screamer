@@ -18,7 +18,7 @@
     "serve:bench": "node examples/serve.mjs . /bench/index.html",
     "bench:measure": "npm run bench && node bench/measure.mjs",
     "test": "npm run test:core && npm run test:purs && npm run test:compile-fail",
-    "test:core": "node --import tsx --expose-gc --test \"test/core/**/*.test.ts\"",
+    "test:core": "tsc && spago build && node --import tsx --expose-gc --test \"test/core/**/*.test.ts\"",
     "test:purs": "tsc && NODE_OPTIONS=\"--import ./test/setup-dom.mjs\" spago test",
     "test:compile-fail": "node compile-fail/run.mjs",
     "test:smoke": "node examples/smoke.mjs"

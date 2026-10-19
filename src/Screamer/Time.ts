@@ -1,8 +1,8 @@
 // Foreign module of Screamer.Time. Each function returns the action that
 // cancels what it scheduled; cancelling twice, or after it ran, is a no-op.
-import type * as Runtime from './Runtime.js';
+import type * as Runtime from './Runtime/Unsafe.js';
 // @ts-ignore: purs copies this file to output/Screamer.Time/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 
 const R: typeof Runtime = runtime;
 
