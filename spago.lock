@@ -2,28 +2,13 @@
   "workspace": {
     "packages": {
       "screamer": {
-        "path": "./",
+        "path": "packages/screamer",
         "core": {
           "dependencies": [
-            "aff",
-            "arrays",
-            "control",
-            "datetime",
             "effect",
-            "either",
-            "exceptions",
-            "filterable",
-            "foldable-traversable",
-            "maybe",
-            "now",
-            "nullable",
-            "numbers",
             "prelude",
             "record",
-            "refs",
-            "strings",
-            "tuples",
-            "typelevel-prelude",
+            "screamer-reactive",
             "unsafe-coerce",
             "web-clipboard",
             "web-dom",
@@ -36,24 +21,52 @@
         },
         "test": {
           "dependencies": [
+            "arrays",
+            "effect",
+            "foldable-traversable",
+            "maybe",
+            "quickcheck",
+            "refs",
+            "screamer-test",
+            "spec",
+            "web-events",
+            "web-uievents"
+          ]
+        }
+      },
+      "screamer-combinators": {
+        "path": "packages/screamer-combinators",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "datetime",
+            "effect",
+            "either",
+            "foldable-traversable",
+            "maybe",
+            "prelude",
+            "refs",
+            "screamer-reactive",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": [
             "aff",
             "arrays",
             "datetime",
             "effect",
             "either",
-            "exceptions",
+            "filterable",
             "foldable-traversable",
-            "identity",
-            "integers",
             "maybe",
             "newtype",
             "quickcheck",
             "refs",
+            "screamer-resource",
+            "screamer-test",
             "spec",
-            "strings",
-            "web-dom",
-            "web-events",
-            "web-uievents"
+            "tuples"
           ]
         }
       },
@@ -77,6 +90,12 @@
             "random",
             "refs",
             "screamer",
+            "screamer-combinators",
+            "screamer-forms",
+            "screamer-reactive",
+            "screamer-resource",
+            "screamer-router",
+            "screamer-web",
             "st",
             "strings",
             "unfoldable",
@@ -91,6 +110,159 @@
         },
         "test": {
           "dependencies": []
+        }
+      },
+      "screamer-forms": {
+        "path": "packages/screamer-forms",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "bifunctors",
+            "effect",
+            "either",
+            "foldable-traversable",
+            "maybe",
+            "numbers",
+            "prelude",
+            "record",
+            "screamer",
+            "screamer-reactive",
+            "strings",
+            "web-events",
+            "web-html"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "screamer-reactive": {
+        "path": "packages/screamer-reactive",
+        "core": {
+          "dependencies": [
+            "control",
+            "effect",
+            "either",
+            "exceptions",
+            "filterable",
+            "maybe",
+            "prelude",
+            "tuples",
+            "typelevel-prelude",
+            "unsafe-coerce"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "exceptions",
+            "foldable-traversable",
+            "integers",
+            "maybe",
+            "quickcheck",
+            "refs",
+            "screamer-test",
+            "spec",
+            "strings"
+          ]
+        }
+      },
+      "screamer-resource": {
+        "path": "packages/screamer-resource",
+        "core": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "effect",
+            "either",
+            "exceptions",
+            "foldable-traversable",
+            "maybe",
+            "prelude",
+            "refs",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "aff",
+            "effect",
+            "either",
+            "exceptions",
+            "maybe",
+            "refs",
+            "screamer-test",
+            "spec"
+          ]
+        }
+      },
+      "screamer-router": {
+        "path": "packages/screamer-router",
+        "core": {
+          "dependencies": [
+            "effect",
+            "either",
+            "maybe",
+            "prelude",
+            "screamer",
+            "screamer-reactive",
+            "strings",
+            "web-events",
+            "web-uievents",
+            "windrose-router"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "effect",
+            "screamer-test",
+            "spec"
+          ]
+        }
+      },
+      "screamer-test": {
+        "path": "packages/screamer-test",
+        "core": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "effect",
+            "foldable-traversable",
+            "identity",
+            "maybe",
+            "newtype",
+            "prelude",
+            "refs",
+            "screamer-reactive",
+            "spec",
+            "web-dom",
+            "web-events"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "screamer-web": {
+        "path": "packages/screamer-web",
+        "core": {
+          "dependencies": [
+            "effect",
+            "foldable-traversable",
+            "maybe",
+            "prelude",
+            "refs",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "effect",
+            "screamer",
+            "screamer-test",
+            "spec"
+          ]
         }
       }
     },

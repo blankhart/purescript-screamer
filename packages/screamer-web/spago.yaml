@@ -1,0 +1,19 @@
+package:
+  name: screamer-web
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - effect
+    - foldable-traversable
+    - maybe
+    - prelude
+    - refs
+    - screamer-reactive
+  test:
+    main: Test.Web.Main
+    dependencies:
+      - effect
+      - screamer
+      - screamer-test
+      - spec
