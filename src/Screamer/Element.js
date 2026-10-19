@@ -1,5 +1,5 @@
 // @ts-ignore: purs copies this file to output/Screamer.Element/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 const R = runtime;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const FRAGMENT = 11;
@@ -63,7 +63,7 @@ function dispatch(e) {
 }
 /** Set once for a constant, or with one owned effect for a signal. */
 function bindValue(s, sig, set) {
-    if (sig instanceof R.Constant)
+    if (R.isConstant(sig))
         set(sig.value);
     else
         R.effectIn(s, () => set(sig.read()));
@@ -135,7 +135,7 @@ export const fragmentImpl = (children) => (s) => () => {
     return f;
 };
 export const textImpl = (sig) => (s) => () => {
-    if (sig instanceof R.Constant)
+    if (R.isConstant(sig))
         return document.createTextNode(sig.value);
     const node = document.createTextNode('');
     R.effectIn(s, () => { node.data = sig.read(); });
@@ -157,7 +157,7 @@ function removeBetween(start, end) {
     }
 }
 export const dynImpl = (sig) => (s) => () => {
-    if (sig instanceof R.Constant)
+    if (R.isConstant(sig))
         return sig.value(s)();
     const start = document.createComment('');
     const end = document.createComment('');

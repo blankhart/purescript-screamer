@@ -261,6 +261,10 @@ foreign import race :: forall a. Array (Event a) -> Event a
 -- | is delivered. (RxJS `switchMap` over events, `switchAll`.)
 foreign import switchEvent :: forall a. Signal (Event a) -> Event a
 
+-- | The occurrences of every event in the signal's array, in fire order.
+-- | Not exported: `Screamer.Flatten`'s foreign module uses it.
+foreign import mergeAll :: forall a. Signal (Array (Event a)) -> Event a
+
 -- Buffering (#23). Each is stateful: it collects only occurrences seen
 -- while observed, and a paused buffer keeps what it holds. The timed form,
 -- `bufferFor`, is in `Screamer.Time`.

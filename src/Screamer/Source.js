@@ -1,5 +1,5 @@
 // @ts-ignore: purs copies this file to output/Screamer.Source/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 const R = runtime;
 export const signalSource = (a) => () => {
     const c = R.cell(a);

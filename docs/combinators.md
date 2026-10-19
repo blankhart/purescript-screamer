@@ -314,7 +314,7 @@ RxJS needs `share`, `shareReplay` and `publish` because an observable is a recip
 
 ## Implementation
 
-The event nodes live in `src/Screamer/Runtime.ts` next to the signal nodes (#18).
+The event nodes live in `src/Screamer/Runtime.ts` next to the signal nodes (#18). The combinators built from them (`oneOf`, `leftmost`, `mergeWith`, `zip`, `race`, `gate`, and `merge`, `latestWhere`, `gate`, `combine`, `withLatest` on signals) live in `src/Screamer/Event.ts` and `src/Screamer/Signal.ts` (#47).
 
 - **Consumption by version.** An event node's value is the list of occurrences it produced when its version last increased, and the version increases only when a computation produces at least one occurrence. A consumer (a derived event, a stateful node or an effect) records the version of each input it read. On its next computation an input whose version changed contributes its current list, and any other input contributes nothing. So each consumer takes each occurrence once, however often it is read, and an event needs no per-round reset.
 - **Rounds.** `fire` queues an occurrence on its source. Each pass of the flush loop starts a round: the queued occurrences become their sources' values, one version step per source, and observers are notified. Fires made while a round runs are queued for the next one, so a `subscribe` callback that fires an event is followed by one more round.
