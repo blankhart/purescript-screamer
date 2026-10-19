@@ -1,9 +1,14 @@
 // Foreign module of Screamer.Flatten: one child scope per inner value.
-import type * as Runtime from './Runtime.js';
+import type * as Runtime from './Runtime/Unsafe.js';
 // @ts-ignore: purs copies this file to output/Screamer.Flatten/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
+
+// @ts-ignore: next to it, too, is Screamer.Event's, which merges the children's events.
+import * as eventModule from '../Screamer.Event/foreign.js';
+import type * as EventModule from './Event.js';
 
 const R: typeof Runtime = runtime;
+const Ev: typeof EventModule = eventModule;
 
 type Scope = Runtime.Scope;
 type Eff<A> = () => A;
@@ -83,7 +88,7 @@ const flattenImpl =
       else start(a);
     });
     s.cleanups.push(() => { queue.length = 0; });
-    return R.mergeAll(R.map((cs: Child<B>[]) => cs.map((c) => c.event), live));
+    return Ev.mergeAll(R.derived(() => live.read().map((c) => c.event)));
   };
 
 export const mergeOwnedImpl = flattenImpl(MERGE);

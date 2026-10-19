@@ -1,5 +1,5 @@
 // @ts-ignore: purs copies this file to output/Screamer.Time/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 const R = runtime;
 /** Run `action` once after `ms`, inside a batch. */
 export const timeoutImpl = (ms) => (action) => () => {

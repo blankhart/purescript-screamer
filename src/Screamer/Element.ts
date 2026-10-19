@@ -3,9 +3,9 @@
 // An Element is an `Owned Node`; at run time that is a function from a scope
 // to an effect producing the node. Instantiating it creates the DOM nodes and
 // the effects that keep them up to date, all owned by that scope.
-import type * as Runtime from './Runtime.js';
+import type * as Runtime from './Runtime/Unsafe.js';
 // @ts-ignore: purs copies this file to output/Screamer.Element/foreign.js, next to the runtime's.
-import * as runtime from '../Screamer.Runtime/foreign.js';
+import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 
 const R: typeof Runtime = runtime;
 
@@ -99,7 +99,7 @@ function dispatch(e: Event): void {
 
 /** Set once for a constant, or with one owned effect for a signal. */
 function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
-  if (sig instanceof R.Constant) set(sig.value);
+  if (R.isConstant(sig)) set(sig.value);
   else R.effectIn(s, () => set(sig.read()));
 }
 
@@ -169,7 +169,7 @@ export const fragmentImpl = (children: El[]) => (s: Scope) => (): Node => {
 };
 
 export const textImpl = (sig: Sig<string>) => (s: Scope) => (): Node => {
-  if (sig instanceof R.Constant) return document.createTextNode(sig.value);
+  if (R.isConstant(sig)) return document.createTextNode(sig.value);
   const node = document.createTextNode('');
   R.effectIn(s, () => { node.data = sig.read(); });
   return node;
@@ -193,7 +193,7 @@ function removeBetween(start: Node, end: Node): void {
 }
 
 export const dynImpl = (sig: Sig<El>) => (s: Scope) => (): Node => {
-  if (sig instanceof R.Constant) return sig.value(s)();
+  if (R.isConstant(sig)) return sig.value(s)();
   const start = document.createComment('');
   const end = document.createComment('');
   const f = document.createDocumentFragment();
