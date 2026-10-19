@@ -260,13 +260,16 @@
             "maybe",
             "prelude",
             "refs",
-            "screamer-reactive"
+            "screamer",
+            "screamer-reactive",
+            "web-dom"
           ]
         },
         "test": {
           "dependencies": [
+            "aff",
             "effect",
-            "screamer",
+            "refs",
             "screamer-test",
             "spec"
           ]

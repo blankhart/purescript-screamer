@@ -60,6 +60,7 @@ The browser backend owns the delegation registry: one `document` listener per de
 | `Time.clock`, `interval`, `after`, `frames`, `Resource.retry` | Whatever the provided host does; an inert host never fires | `Screamer.Host` |
 | `Time.debounce`, `throttle`, `delay`, ... | Start timers only on occurrences, and the server fires none | `Screamer.Host` |
 | `Resource.*` | Runs, registered with `Pending` so the renderer can wait | `Screamer.Pending` |
+| `Screamer.Web.*` sources, `WebSocket.connect` | Open nothing; hold their documented defaults | `interactive` |
 | `foreign_`, `on_` | No setup, no listener | `interactive` |
 
 `Screamer.Router.RouterEnv` is a general seam: tests and an in-memory router use `staticRouter` or their own env too. `navigate` and `redirect` are `Owned`, reading the env; event handlers use the `push` and `replace` of the env that `Router.router` returns.
