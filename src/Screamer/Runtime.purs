@@ -1,8 +1,7 @@
--- | The reactive core's runtime. Its foreign module is
--- | `src/Screamer/Reactive/Core.ts`, which the other foreign modules import
--- | at run time as `../Screamer.Reactive.Core/foreign.js`, so every module
--- | shares one graph.
-module Screamer.Reactive.Core
+-- | The reactive runtime. Its foreign module is `src/Screamer/Runtime.ts`,
+-- | which the other foreign modules import at run time as
+-- | `../Screamer.Runtime/foreign.js`, so every module shares one graph.
+module Screamer.Runtime
   ( Stats
   , readStats
   ) where

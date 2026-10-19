@@ -1,4 +1,4 @@
-import * as R from '../Screamer.Reactive.Core/foreign.js';
+import * as R from '../Screamer.Runtime/foreign.js';
 
 export const observe = (s) => () => {
   const trace = [];

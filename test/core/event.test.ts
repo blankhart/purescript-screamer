@@ -5,7 +5,7 @@ import {
   eventSource, mapEvent, filterEvent, alt, neverEvent, changes, stepper, foldEvent, attachWith,
   subscribeEvent, holdEvent, EventLike, touch, accumEvent, gate,
   oneOf, leftmost, mergeWith, zip, race, combine, withLatest, switchEvent, mergeAll,
-} from '../../src/Screamer/Reactive/Core.ts';
+} from '../../src/Screamer/Runtime.ts';
 
 /** Record each occurrence of `e` until stopped. */
 function record<A>(e: EventLike<A>) {

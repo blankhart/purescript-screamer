@@ -4,8 +4,8 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Data.Time.Duration (Milliseconds(..))
+import Data.Tuple (Tuple(..))
 import Effect.Aff (delay, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error, message, throw)
@@ -14,7 +14,7 @@ import Screamer.Owned (child, onError, runOwned, subscribe)
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry, toMaybe, withDefault)
 import Screamer.Signal (read)
 import Screamer.Signal as Signal
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (signalSource)
 import Test.Fakes as Fake
 import Test.Observe (observe)
 import Test.Spec (Spec, after_, before_, describe, it)

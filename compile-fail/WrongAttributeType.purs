@@ -3,9 +3,9 @@
 -- `rows_` takes an Int, not a String.
 module Test.CompileFail.WrongAttributeType where
 
-import Screamer.Core (Element)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
+import Screamer.Element (Element)
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
 
 bad :: Element
 bad = E.textarea_ [ A.rows_ "three" ] []

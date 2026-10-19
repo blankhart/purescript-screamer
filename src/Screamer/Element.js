@@ -1,6 +1,6 @@
-// @ts-ignore: purs copies this file to output/Screamer.Core/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
-const R = CoreRuntime;
+// @ts-ignore: purs copies this file to output/Screamer.Element/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
+const R = runtime;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const FRAGMENT = 11;
 // ---------------------------------------------------------------------------

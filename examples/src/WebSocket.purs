@@ -7,15 +7,15 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (Element, component, each, element, text)
-import Screamer.DOM.Attribute (InputType(..))
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
-import Screamer.Examples.Harness as Harness
+import Screamer.Element (Element, component, each, element, text)
 import Screamer.Event as Event
+import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes (InputType(..))
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Signal (read)
+import Screamer.Source (signalSource)
 import Screamer.Subscriptions.WebSocket (ConnectionState(..), connect)
 import Web.Event.Event (preventDefault, target)
 import Web.HTML.HTMLInputElement as Input

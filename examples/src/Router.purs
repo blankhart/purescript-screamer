@@ -12,10 +12,10 @@ import Data.Either (Either, either)
 import Data.Maybe (fromMaybe)
 import Data.String (Pattern(..), stripPrefix)
 import Effect (Effect)
-import Screamer.Core (Element, component, dyn, element)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
+import Screamer.Element (Element, component, dyn, element)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
 import Screamer.Signal (Signal)
 import Screamer.Subscriptions.Router (Location, link, location)
 import Windrose.Router (type (:<|>), type (:>), C, P, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)

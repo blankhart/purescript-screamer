@@ -5,12 +5,12 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (Element, component, element, text)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, component, element, text)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
+import Screamer.Source (signalSource)
 
 main :: Effect Unit
 main = Harness.run "main" counter

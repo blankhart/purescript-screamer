@@ -1,13 +1,13 @@
 // Foreign module of Screamer.Event. Allocating an event node has no effect
 // on the graph, so everything here is pure except `subscribeImpl`.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Event/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Event/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
-type E<T> = Core.EventLike<T>;
-type S<T> = Core.Readable<T>;
+type E<T> = Runtime.EventLike<T>;
+type S<T> = Runtime.Readable<T>;
 
 export const mapImpl = <A, B>(f: (a: A) => B) => (e: E<A>): E<B> => R.mapEvent(f, e);
 
@@ -29,16 +29,16 @@ export const fold = <A, B>(f: (a: A) => (b: B) => B) => (seed: B) => (e: E<A>): 
 export const attachWith = <A, B, C>(f: (b: B) => (a: A) => C) => (s: S<B>) => (e: E<A>): E<C> =>
   R.attachWith((b: B, a: A) => f(b)(a), s, e);
 
-export const holdImpl = <A>(s: Core.Scope) => (e: E<A>) => (): E<A> => R.runInScope(s, () => R.holdEvent(e));
+export const holdImpl = <A>(s: Runtime.Scope) => (e: E<A>) => (): E<A> => R.runInScope(s, () => R.holdEvent(e));
 
-export const subscribeImpl = <A>(s: Core.Scope) => (e: E<A>) => (cb: (a: A) => () => void) => () => {
+export const subscribeImpl = <A>(s: Runtime.Scope) => (e: E<A>) => (cb: (a: A) => () => void) => () => {
   R.subscribeEvent(s, e, (a) => cb(a)());
 };
 
 // Transform, filter and accumulate (#19). Each stateful combinator is an
 // `accumEvent` state machine; `seed` makes a fresh state when first observed.
 
-type Accum<S, B> = Core.Accum<S, B>;
+type Accum<S, B> = Runtime.Accum<S, B>;
 const accum = <A, S, B>(f: (a: A, s: S) => Accum<S, B>, seed: () => S) => (e: E<A>): E<B> =>
   R.accumEvent(f, seed, e);
 
@@ -120,9 +120,9 @@ export const bufferCount = (n: number) => (step: number) => <A>(e: E<A>): E<A[]>
 
 export const bufferOn = <B>(notifier: E<B>) => <A>(e: E<A>): E<A[]> =>
   R.eventStateful<A[], A[]>([e, notifier], () => [], (changed, values, held) => {
-    const as: Core.Occ<A>[] = changed[0] ? values[0] : [];
-    const ns: Core.Occ<B>[] = changed[1] ? values[1] : [];
-    const out: Core.Occ<A[]>[] = [];
+    const as: Runtime.Occ<A>[] = changed[0] ? values[0] : [];
+    const ns: Runtime.Occ<B>[] = changed[1] ? values[1] : [];
+    const out: Runtime.Occ<A[]>[] = [];
     let buf = held;
     let i = 0;
     for (let j = 0; j < ns.length; j++) {
@@ -142,7 +142,7 @@ export const bufferWhile = (cond: S<boolean>) => <A>(e: E<A>): E<A[]> =>
     () => ({ open: cond.read(), buf: [] }),
     (changed, values, st) => {
       const open: boolean = values[0];
-      const os: Core.Occ<A>[] = changed[1] ? values[1] : [];
+      const os: Runtime.Occ<A>[] = changed[1] ? values[1] : [];
       if (open) return { state: { open, buf: st.buf.concat(os.map((o) => o.v)) }, out: [] };
       // Closed at the end of the round: emit what the window held, if it was open.
       const out = st.open ? [{ s: R.signalStamp(), v: st.buf }] : [];

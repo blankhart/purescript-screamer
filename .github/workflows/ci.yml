@@ -38,6 +38,18 @@ jobs:
       - name: Type-check TypeScript
         run: npx tsc
 
+      - name: Compiled .js is committed and matches its .ts
+        run: |
+          if [ -n "$(git status --porcelain -- 'src/**/*.js')" ]; then
+            echo "Run npx tsc and commit the .js files it changes:"
+            git status --porcelain -- 'src/**/*.js'
+            exit 1
+          fi
+          orphans=$(find src -name '*.js' | while read -r f; do [ -f "${f%.js}.ts" ] || echo "$f"; done)
+          if [ -n "$orphans" ]; then
+            echo "These .js files have no .ts source:"; echo "$orphans"; exit 1
+          fi
+
       - name: Build PureScript
         run: npx spago build
 
@@ -59,5 +71,5 @@ jobs:
       - name: Generated DOM modules are up to date
         run: |
           npm run codegen:dom
-          git diff --exit-code -- 'src/Screamer/DOM/*.g.purs'
-          test -z "$(git status --porcelain -- 'src/Screamer/DOM/*.g.purs')"
+          git diff --exit-code -- 'src/**/*.g.purs'
+          test -z "$(git status --porcelain -- 'src/**/*.g.purs')"

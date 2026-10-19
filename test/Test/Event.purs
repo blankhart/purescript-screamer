@@ -3,6 +3,7 @@ module Test.Event (spec, observeE, EventObserver) where
 import Prelude
 
 import Control.Alt ((<|>))
+import Control.Alternative (guard)
 import Control.Plus (empty)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmpty
@@ -10,7 +11,6 @@ import Data.Either (Either(..))
 import Data.Filterable (filter, filterMap, partition)
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (Maybe(..))
-import Control.Alternative (guard)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -18,12 +18,11 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.EventSource (batch, eventSource)
 import Screamer.Owned (hold, runOwned)
-import Screamer.Reactive.Core (readStats)
+import Screamer.Runtime (readStats)
 import Screamer.Signal (read)
 import Screamer.Signal as Signal
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (batch, eventSource, signalSource)
 import Test.Observe (observe)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
 import Test.Spec (Spec, describe, it)

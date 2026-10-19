@@ -6,11 +6,10 @@ import Data.Either (Either(..))
 import Data.Foldable (traverse_)
 import Data.Time.Duration (Milliseconds(..))
 import Effect.Class (liftEffect)
-import Screamer.EventSource (batch, eventSource)
 import Screamer.Owned (runOwned)
-import Screamer.Reactive.Core (readStats)
+import Screamer.Runtime (readStats)
 import Screamer.Signal (read)
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (batch, eventSource, signalSource)
 import Screamer.Time as Time
 import Test.Event (observeE)
 import Test.Fakes as Fake

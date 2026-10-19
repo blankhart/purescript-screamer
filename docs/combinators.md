@@ -14,17 +14,17 @@ Before this decision, occurrences were encoded as signals. That loses informatio
 Change enters the graph through two kinds of source, both created in `Effect` and neither needing an owner:
 
 ```purescript
--- Screamer.SignalSource (formerly Screamer.Channel)
+-- Screamer.Source (formerly Screamer.Channel, then two modules until #45)
 type SignalSource a = { signal :: Signal a, put :: a -> Effect Unit, modify :: (a -> a) -> Effect Unit }
 signalSource :: forall a. a -> Effect (SignalSource a)
 batch        :: forall a. Effect a -> Effect a
 
--- Screamer.EventSource (#18)
+-- Screamer.Source, event sources (#18)
 type EventSource a = { event :: Event a, fire :: a -> Effect Unit }
 eventSource :: forall a. Effect (EventSource a)
 ```
 
-`put` replaces a value; `fire` adds an occurrence. Both follow the write rules in `docs/ownership-design.md`: allowed in handlers, `subscribe` callbacks and `component` setup, rejected inside derivations. `Screamer.EventSource` re-exports `batch`.
+`put` replaces a value; `fire` adds an occurrence. Both follow the write rules in `docs/ownership-design.md`: allowed in handlers, `subscribe` callbacks and `component` setup, rejected inside derivations. `Screamer.Source` exports both kinds and `batch`.
 
 A typed DOM handler already takes `e -> Effect Unit`, so an event source plugs into it with no new DOM API:
 
@@ -67,7 +67,7 @@ subscribe  :: forall a. Event a -> (a -> Effect Unit) -> Owned Unit
 
 `changes s` fires at most once per round, with the final value, because a signal's own writes coalesce within a batch.
 
-`Screamer.Event` reuses the names `fold`, `filter` and `subscribe` from `Screamer.Signal` and `Screamer.Owned`, so it is meant to be imported qualified: `import Screamer.Event as Event`. Its type also shares a name with `Web.Event.Event.Event`, the type DOM handlers receive. Code that needs both imports one of them qualified or under an alias. The typed handlers in `Screamer.DOM.EventHandler` take specific event types (`MouseEvent`, `KeyboardEvent`), so the clash comes up rarely.
+`Screamer.Event` reuses the names `fold`, `filter` and `subscribe` from `Screamer.Signal` and `Screamer.Owned`, so it is meant to be imported qualified: `import Screamer.Event as Event`. Its type also shares a name with `Web.Event.Event.Event`, the type DOM handlers receive. Code that needs both imports one of them qualified or under an alias. The typed handlers in `Screamer.Html.Handlers` take specific event types (`MouseEvent`, `KeyboardEvent`), so the clash comes up rarely.
 
 ## Pure or `Owned`
 
@@ -275,7 +275,7 @@ RxJS needs `share`, `shareReplay` and `publish` because an observable is a recip
 
 ## Implementation
 
-The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes (#18).
+The event nodes live in `src/Screamer/Runtime.ts` next to the signal nodes (#18).
 
 - **Consumption by version.** An event node's value is the list of occurrences it produced when its version last increased, and the version increases only when a computation produces at least one occurrence. A consumer (a derived event, a stateful node or an effect) records the version of each input it read. On its next computation an input whose version changed contributes its current list, and any other input contributes nothing. So each consumer takes each occurrence once, however often it is read, and an event needs no per-round reset.
 - **Rounds.** `fire` queues an occurrence on its source. Each pass of the flush loop starts a round: the queued occurrences become their sources' values, one version step per source, and observers are notified. Fires made while a round runs are queued for the next one, so a `subscribe` callback that fires an event is followed by one more round.
@@ -288,5 +288,5 @@ The event nodes live in `src/Screamer/Reactive/Core.ts` next to the signal nodes
 
 ## What changed in this decision
 
-- `Screamer.Channel` is now `Screamer.SignalSource`, with `Channel` renamed `SignalSource` and `channel` renamed `signalSource`. This names the two kinds of source in parallel. "Channel" also suggested a queue of messages, which is closer to what an event source is.
+- `Screamer.Channel` became the signal-source module (now `Screamer.Source`), with `Channel` renamed `SignalSource` and `channel` renamed `signalSource`. This names the two kinds of source in parallel. "Channel" also suggested a queue of messages, which is closer to what an event source is.
 - `Event` and `EventSource` are specified here and implemented in #18.

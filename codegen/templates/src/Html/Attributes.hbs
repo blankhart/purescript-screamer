@@ -2,7 +2,7 @@
 -- |
 -- | Each attribute takes a constant or a `Signal` of its type. A constant is
 -- | set once; a signal gets one owned effect.
-module Screamer.DOM.Attribute where
+module Screamer.Html.Attributes where
 
 import Prelude
 
@@ -10,7 +10,7 @@ import Data.Symbol (class IsSymbol, reflectSymbol)
 import Prim.Row as Row
 import Prim.RowList (class RowToList, Cons, Nil, RowList)
 import Record as Record
-import Screamer.Core (class AttrValue, Attribute, attribute, attributes, booleanAttribute, property, styleProperty, toSignal)
+import Screamer.Element (class AttrValue, Attribute, attribute, attributes, booleanAttribute, property, styleProperty, toSignal)
 import Type.Proxy (Proxy(..))
 
 {{#each EnumTypes}}

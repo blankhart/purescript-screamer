@@ -23,8 +23,8 @@ module Screamer.Time
 
 import Prelude
 
-import Data.Either (Either(..))
 import Data.Array as Array
+import Data.Either (Either(..))
 import Data.Foldable (for_, sequence_, traverse_)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Time.Duration (Milliseconds(..))
@@ -33,10 +33,9 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.EventSource (eventSource)
 import Screamer.Owned (Owned, hold, onCleanup)
 import Screamer.Signal (Signal, read)
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (eventSource, signalSource)
 
 foreign import timeoutImpl :: Number -> Effect Unit -> Effect (Effect Unit)
 

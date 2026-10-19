@@ -15,10 +15,9 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
-import Screamer.EventSource (eventSource)
-import Screamer.SignalSource (batch, signalSource)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal, read)
+import Screamer.Source (batch, eventSource, signalSource)
 
 data ConnectionState = Connecting | Open | Closing | Closed
 

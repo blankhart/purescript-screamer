@@ -24,9 +24,9 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them 
 
 **Stateful signals advance only while observed.** `fold`, `merge`, `filter` and `filterOn` keep state. That state starts from the seed when the first observer arrives, and it pauses when the last observer leaves. On resuming it starts again from the inputs' current values, and changes made while it was paused are not replayed.
 
-**Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.SignalSource`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
+**Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.Source`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
 
-**Events sit next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (`Screamer.Event`, imported qualified) carries occurrences instead, such as clicks or messages, and delivers every one, in fire order, even repeats and several in one batch. `eventSource` (in `Effect`, from `Screamer.EventSource`) gives `{ event, fire }`, and a typed handler takes `fire` directly. `Event.fold`, `stepper`, `changes`, `tag`, `attachWith` and `Event.subscribe` connect events and signals. The semantics, and every combinator next to its RxJS counterpart, are in `docs/combinators.md`.
+**Events sit next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (`Screamer.Event`, imported qualified) carries occurrences instead, such as clicks or messages, and delivers every one, in fire order, even repeats and several in one batch. `eventSource` (in `Effect`, from `Screamer.Source`) gives `{ event, fire }`, and a typed handler takes `fire` directly. `Event.fold`, `stepper`, `changes`, `tag`, `attachWith` and `Event.subscribe` connect events and signals. The semantics, and every combinator next to its RxJS counterpart, are in `docs/combinators.md`.
 
 **Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `subscribe`, `hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
 
@@ -36,9 +36,9 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them 
 
 **Subscriptions and resources are owned too.** `Screamer.Subscriptions.Timer` (`every`, `after`), `AnimationFrame` (`frames`, `every`), `WebSocket` (`connect`) and `Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Router` only tracks the location; the Router example matches it, and builds its links, with [windrose-router](https://github.com/blankhart/purescript-windrose-router), whose routes are a type. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
 
-**Typed DOM.** `Screamer.DOM.Element`, `Attribute`, `EventHandler` and `Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
+**Typed DOM.** `Screamer.Html`, `Screamer.Html.Attributes`, `Screamer.Html.Handlers` and `Screamer.Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
 
-**Formlets.** `Screamer.Formlet` builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state source in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
+**Formlets.** `Screamer.Examples.Formlet` (in `examples/src/Formlet.purs`) builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state source in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
 
 The full specification, including the rules for ordering, errors and loops, is in `docs/ownership-design.md`.
 
@@ -64,8 +64,8 @@ Most RxJS operators have a counterpart, pure where it can be and `Owned` where i
 
 | Before | Now |
 |---|---|
-| `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.SignalSource` (`signalSource`, `batch`) |
-| `Screamer.Channel`, `Channel`, `channel` | `Screamer.SignalSource`, `SignalSource`, `signalSource` |
+| `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.Source` (`signalSource`, `batch`) |
+| `Screamer.Channel`, `Channel`, `channel` | `Screamer.Source`, `SignalSource`, `signalSource` |
 | `get` | `read` |
 | `elements_` | `each key` (keyed rows, each row receives a `Signal` of its item) |
 | `distinct`, `nonequal` | `dropRepeats` (or nothing: every signal already cuts off by `Object.is`) |
@@ -75,13 +75,28 @@ Most RxJS operators have a counterpart, pure where it can be and `Owned` where i
 | `S.mount` returning `Unit` | `mount` returning the unmount action |
 | `Screamer.DOM.Event` | the `Web.*` event types, passed to handlers directly |
 
+### Renamed modules
+
+Nothing is called `Core` any more, the two source modules are one, and the generated modules are named for what they contain. `import Screamer` brings in what most components need: `Element`, `text`, `dyn`, `each`, `component`, `mount`, the `Signal` and `Event` types, `signalSource`, `eventSource`, `batch`, `Owned`, `onCleanup` and `liftEffect`.
+
+| Before | Now |
+|---|---|
+| `Screamer.Reactive.Core` | `Screamer.Runtime` |
+| `Screamer.Core` | `Screamer.Element` |
+| `Screamer.SignalSource`, `Screamer.EventSource` | `Screamer.Source` |
+| `Screamer.DOM.Element` | `Screamer.Html` |
+| `Screamer.DOM.Attribute` | `Screamer.Html.Attributes` |
+| `Screamer.DOM.EventHandler` | `Screamer.Html.Handlers` |
+| `Screamer.DOM.Svg` | `Screamer.Svg` |
+| `Screamer.Internal` | removed (unused) |
+
 ## Background
 
 Efficient JS frameworks trace state changes to the view changes they cause, and then mutate only the affected sections of the DOM. Virtual DOM frameworks instead build a parallel representation of the DOM from the new state, diff it against the previous one, and apply the differences as patches. See [You Might Not Need The Virtual DOM](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html), and [`purescript-halogen-vdom`](https://github.com/purescript-halogen/purescript-halogen-vdom) and [`purescript-sdom`](https://github.com/paf31/purescript-sdom) for the two approaches in PureScript.
 
 ## History
 
-Screamer first rendered through [sinuous](https://github.com/luwes/sinuous). There, a node's owner was whatever computation happened to be running when the node was created. Derived signals went stale, observers leaked, `merge` stopped listening, and nothing could be unmounted. The reactive core is now Screamer's own (`src/Screamer/Reactive/Core.ts`). `docs/ownership-design.md` records the redesign and the deviations from its specification. The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral), and `bench/` drives the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations.
+Screamer first rendered through [sinuous](https://github.com/luwes/sinuous). There, a node's owner was whatever computation happened to be running when the node was created. Derived signals went stale, observers leaked, `merge` stopped listening, and nothing could be unmounted. The reactive core is now Screamer's own (`src/Screamer/Runtime.ts`). `docs/ownership-design.md` records the redesign and the deviations from its specification. The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral), and `bench/` drives the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations.
 
 ## References
 

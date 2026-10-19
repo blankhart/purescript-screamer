@@ -1,11 +1,11 @@
 // Foreign module of Screamer.Owned.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Owned/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Owned/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
-type Scope = Core.Scope;
+type Scope = Runtime.Scope;
 type Eff<A> = () => A;
 
 /** Run an `Owned` body (a function of the scope) in `s`, inside a batch. */
@@ -17,7 +17,7 @@ export const onCleanupImpl = (s: Scope) => (e: Eff<void>) => () => {
   s.cleanups.push(e);
 };
 
-export const subscribeImpl = <A>(s: Scope) => (sig: Core.Readable<A>) => (cb: (a: A) => Eff<void>) => () => {
+export const subscribeImpl = <A>(s: Scope) => (sig: Runtime.Readable<A>) => (cb: (a: A) => Eff<void>) => () => {
   R.runInScope(s, () => {
     R.effect(() => {
       const v = sig.read();
@@ -26,7 +26,7 @@ export const subscribeImpl = <A>(s: Scope) => (sig: Core.Readable<A>) => (cb: (a
   });
 };
 
-export const holdImpl = <A>(s: Scope) => (sig: Core.Readable<A>) => (): Core.Readable<A> =>
+export const holdImpl = <A>(s: Scope) => (sig: Runtime.Readable<A>) => (): Runtime.Readable<A> =>
   R.runInScope(s, () => R.hold(sig));
 
 const result = <A>(value: A, s: Scope) => ({ value, dispose: () => R.batch(() => s.dispose()) });

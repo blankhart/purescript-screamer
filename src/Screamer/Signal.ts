@@ -1,12 +1,12 @@
 // Foreign module of Screamer.Signal. Allocating a lazy node has no effect on
 // the graph, so everything here is pure except `read`.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Signal/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Signal/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
-type S<T> = Core.Readable<T>;
+type S<T> = Runtime.Readable<T>;
 
 export const mapImpl = <A, B>(f: (a: A) => B) => (s: S<A>): S<B> => R.map(f, s);
 
