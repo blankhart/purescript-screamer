@@ -16,6 +16,8 @@
 // - `subscribeEvent`: the one way an effect consumes each occurrence once;
 //   its version bookkeeping is internal to the runtime.
 // - `Cell`: the type `cell` returns.
+// - `contextOf`, `lookupContext` and the `Context` type (#48): how FFI
+//   reads the values `Screamer.Context.provide` puts on scopes.
 // - `development` is `DEV`: an FFI module may export only names that are
 //   valid PureScript identifiers, and this one is also the module's foreign
 //   import (purs emits `foreign.js` only for modules that have one).
@@ -52,6 +54,8 @@ export const scope = R.scope;
 export const getOwner = R.getOwner;
 export const onCleanup = R.onCleanup;
 export const reportError = R.reportError;
+export const contextOf = R.contextOf;
+export const lookupContext = R.lookupContext;
 
 // Batching and reading
 export const batch = R.batch;
@@ -69,5 +73,6 @@ export type Inputs = Runtime.Inputs;
 export type Step<S> = Runtime.Step<S>;
 export type EventStep<S, T> = Runtime.EventStep<S, T>;
 export type Scope = Runtime.Scope;
+export type Context = Runtime.Context;
 export type Cell<T> = Runtime.Cell<T>;
 export type Constant<T> = Runtime.Constant<T>;
