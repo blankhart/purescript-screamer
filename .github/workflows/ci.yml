@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches-ignore: [release]
   pull_request:
 
 jobs:
@@ -38,12 +39,12 @@ jobs:
       - name: Type-check TypeScript
         run: npx tsc
 
-      - name: Compiled .js is committed and matches its .ts
+      - name: Compiled .js is not committed
         run: |
-          if [ -n "$(git status --porcelain -- 'packages/*/src/**/*.js')" ]; then
-            echo "Run npx tsc and commit the .js files it changes:"
-            git status --porcelain -- 'packages/*/src/**/*.js'
-            exit 1
+          tracked=$(git ls-files 'packages/*/src/**/*.js')
+          if [ -n "$tracked" ]; then
+            echo "Only the release branch commits compiled .js; git rm --cached these:"
+            echo "$tracked"; exit 1
           fi
           orphans=$(find packages/*/src -name '*.js' | while read -r f; do [ -f "${f%.js}.ts" ] || echo "$f"; done)
           if [ -n "$orphans" ]; then
@@ -76,6 +77,5 @@ jobs:
       - name: Generated DOM modules are up to date
         run: |
           npm run codegen:dom
-          npx tsc
-          git diff --exit-code -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts' 'packages/screamer/src/**/*.g.js'
-          test -z "$(git status --porcelain -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts' 'packages/screamer/src/**/*.g.js')"
+          git diff --exit-code -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts'
+          test -z "$(git status --porcelain -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts')"

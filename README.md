@@ -41,6 +41,30 @@ package:
 
 `npm run build` builds them all, `npm test` runs every package's tests, and [`CHANGELOG.md`](CHANGELOG.md) lists what moved.
 
+### Installing from the release branch
+
+The FFI is written in TypeScript, and `tsc` compiles each `.ts` to the `.js` beside it that spago builds against. Only the `release` branch commits that `.js`, so an app depends on a release tag, listing `screamer-reactive` and each add-on it uses:
+
+```yaml
+workspace:
+  extraPackages:
+    screamer-reactive:
+      git: https://github.com/blankhart/purescript-screamer.git
+      ref: v0.1.0
+      subdir: packages/screamer-reactive
+    screamer:
+      git: https://github.com/blankhart/purescript-screamer.git
+      ref: v0.1.0
+      subdir: packages/screamer
+```
+
+### Releasing
+
+1. `npm run set-version -- 0.2.0` sets the version in every `packages/*/spago.yaml` and in `package.json`. Commit that to master.
+2. Run the **Release** workflow from the Actions tab with the same version. It runs `scripts/release.mjs`, which builds and tests, commits master's tree plus the compiled `.js` onto `release`, tags it `v0.2.0` and pushes both.
+
+`npm run release -- 0.2.0` does the same locally, and pushes only with `--push`.
+
 The examples are in `examples/src`. Run `npm run build:examples` to bundle them into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
 
 ## How ownership works
