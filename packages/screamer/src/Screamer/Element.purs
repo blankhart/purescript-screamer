@@ -13,6 +13,7 @@ module Screamer.Element
   , dyn
   , component
   , foreign_
+  , foreignWithFallback_
   , each
   , mount
   , instantiate
@@ -24,7 +25,9 @@ import Prelude
 
 import Effect (Effect)
 import Screamer.Attribute (Attribute)
+import Screamer.Context (ask, provide)
 import Screamer.Owned (Owned(..), Scope, runOwned)
+import Screamer.Renderer (Backend, browserBackend, interactive, rendererKey)
 import Screamer.Signal (Signal)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element as DOM
@@ -34,6 +37,8 @@ import Web.DOM.Node (Node)
 newtype Element = Element (Owned Node)
 
 foreign import elementImpl :: String -> Array Attribute -> Array Element -> Scope -> Effect Node
+
+foreign import foreignHostImpl :: String -> Array Attribute -> Scope -> Effect Node
 
 foreign import svgElementImpl :: String -> Array Attribute -> Array Element -> Scope -> Effect Node
 
@@ -84,13 +89,27 @@ component (Owned setup) = Element $ Owned \s -> do
 -- | widget there, destroy it in `onCleanup`, and keep it in sync with
 -- | `subscribe` and event handlers that write in `batch`. Screamer never
 -- | touches the host's children. The host is not yet in the document while
--- | the setup runs; defer measuring to a frame.
+-- | the setup runs; defer measuring to a frame. When the backend is not
+-- | interactive (`Screamer.Renderer.interactive`, false on a server) the
+-- | setup does not run and the host is empty.
 foreign_ :: (DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element
-foreign_ setup tag attrs = Element $ Owned \s -> do
-  host <- elementImpl tag attrs [] s
-  let Owned run = setup (unsafeCoerce host)
-  run s
-  pure host
+foreign_ setup tag attrs = foreignWithFallback_ setup tag attrs []
+
+-- | `foreign_` with children to show where the widget cannot run: when the
+-- | backend is not interactive, the host holds the fallback instead and the
+-- | setup does not run. When it is interactive, the host's children are
+-- | cleared (a hydrating renderer finds the server's fallback there) before
+-- | the setup runs.
+foreignWithFallback_ :: (DOM.Element -> Owned Unit) -> String -> Array Attribute -> Array Element -> Element
+foreignWithFallback_ setup tag attrs fallback = Element $ Owned \s -> do
+  let Owned live = interactive
+  isLive <- live s
+  if isLive then do
+    host <- foreignHostImpl tag attrs s
+    let Owned run = setup (unsafeCoerce host)
+    run s
+    pure host
+  else elementImpl tag attrs fallback s
 
 -- | A keyed list. Each key gets a row scope and a row signal; kept keys
 -- | update their signal in place, removed keys are disposed, and reorders
@@ -103,22 +122,30 @@ each key items row = Element (Owned (eachImpl cmp key items row))
     EQ -> 0
     GT -> 1
 
--- | The element's nodes, built in the current scope.
+foreign import withBackend :: forall a. Backend -> Effect a -> Effect a
+
+-- | The element's nodes, built in the current scope with the backend its
+-- | context provides (`Screamer.Renderer.rendererKey`).
 instantiate :: Element -> Owned Node
-instantiate (Element o) = o
+instantiate (Element (Owned build)) = Owned \s -> do
+  let Owned backend = ask rendererKey
+  b <- backend s
+  withBackend b (build s)
 
-foreign import findMountPoint :: String -> Effect Node
+foreign import findMountPoint :: Backend -> String -> Effect Node
 
-foreign import attach :: Node -> Node -> Effect (Effect Unit)
+foreign import attach :: Backend -> Node -> Node -> Effect (Effect Unit)
 
 -- | Instantiate an element under a fresh root scope and append it to the
 -- | first element matching the selector. Returns an action that disposes the
--- | scope and removes the nodes.
+-- | scope and removes the nodes. This is
+-- | `Screamer.Element.Unsafe.instantiateWith browserBackend identity`
+-- | followed by appending the node.
 mount :: String -> Element -> Effect (Effect Unit)
 mount selector el = do
-  target <- findMountPoint selector
-  r <- runOwned (instantiate el)
-  detach <- attach target r.value
+  target <- findMountPoint browserBackend selector
+  r <- runOwned (provide rendererKey browserBackend (instantiate el))
+  detach <- attach browserBackend target r.value
   pure (r.dispose *> detach)
 
 -- | Types that can stand for an element.

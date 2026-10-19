@@ -216,6 +216,7 @@
         "test": {
           "dependencies": [
             "effect",
+            "refs",
             "screamer-test",
             "spec"
           ]
