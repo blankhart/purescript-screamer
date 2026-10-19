@@ -79,3 +79,8 @@ Server rendering will live in a separate library; the core gains the seams it ne
 - New: `Screamer.Source.focus` and `prop`. `Screamer.Form`'s `Context` is now `{ props, state :: SignalSource i, reveal }` (was `value` and `modify`), built with them.
 - New: `Screamer.Renderer.boundaryKey`, which `suspense` reports its boundaries to.
 - Development builds warn once per node when a paused stateful signal is read, naming the operator. A write inside a derivation was already an error in development builds and stays one.
+
+### Browser sources (#51)
+
+- New in screamer-web: `Screamer.Web.Storage` (`localStorage`, `sessionStorage`), `Screamer.Web.MediaQuery` (`matches`), `Screamer.Web.Observers` (`resize`, `intersecting`) and `Screamer.Web.Page` (`visible`, `online`).
+- Every screamer-web source, `WebSocket.connect` included, creates nothing when `Screamer.Renderer.interactive` is false. screamer-web now depends on screamer.
