@@ -1,4 +1,4 @@
--- | A search box over a slow, flaky fake server. The query is debounced,
+-- | A search box over a slow, flaky fake server. The query is held until typing pauses,
 -- | deduplicated and filtered to three or more characters; each query is
 -- | sent with `resourceWith Switch` and `retry`, so a slow answer to an old
 -- | query is never shown; `keepLast` keeps the previous results on screen
@@ -27,9 +27,8 @@ import Screamer.Html as E
 import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
-import Screamer.Owned (hold)
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry)
-import Screamer.Signal (read)
+import Screamer.Signal (hold, read)
 import Screamer.Source (eventSource, signalSource)
 import Screamer.Time as Time
 import Web.Event.Event (preventDefault, target)

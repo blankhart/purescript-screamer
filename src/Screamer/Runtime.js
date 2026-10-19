@@ -499,10 +499,6 @@ function pure(fn) {
 export function stateful(inputs, initial, step, eq) {
     return new Stateful(inputs, initial, step, eq);
 }
-/** Accumulate `s` from `seed`, one step per batch in which `s` changed, while observed. */
-export function fold(f, seed, s) {
-    return stateful([s], () => seed, (_, values, b) => f(values[0], b));
-}
 /**
  * The latest of `a` and `b`, starting at `a`'s current value; `a` wins when
  * both change in one batch. A merge reports every step, even one that repeats
@@ -514,7 +510,7 @@ export function merge(a, b) {
 }
 const never = () => false;
 /** Values of `s` that satisfy `p`, starting at `seed` unless `s` satisfies `p` at the start. */
-export function filter(p, seed, s) {
+export function latestWhere(p, seed, s) {
     return stateful([s], () => {
         const v = s.read();
         return p(v) ? v : seed;
@@ -525,7 +521,7 @@ export function filter(p, seed, s) {
  * false. When `cond` becomes true, it takes `s`'s current value. Starts at
  * `s` if `cond` is true at the start, otherwise at `seed`.
  */
-export function filterOn(cond, seed, s) {
+export function gateSignal(cond, seed, s) {
     return stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev));
 }
 /** Read without recording a dependency. */

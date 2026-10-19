@@ -388,7 +388,7 @@ export function derived<T>(fn: () => T, eq?: Eq<T>): Derived<T> {
 // - Start. State begins at the seed (for `merge`, the left input's current
 //   value). Values the input held before observation are not stepped over.
 // - Step. One step per propagation in which an input changed. Writes inside
-//   one batch coalesce, so two writes in one handler step a `fold` once.
+//   one batch coalesce, so two writes in one handler step a node once.
 // - Pause. When the last observer goes, the node unlinks and keeps its state.
 //   `read` returns that state. When observed again it resynchronizes with its
 //   inputs without stepping, then continues.
@@ -545,11 +545,6 @@ export function stateful<S>(inputs: Source<any>[], initial: () => S, step: Step<
   return new Stateful(inputs, initial, step, eq);
 }
 
-/** Accumulate `s` from `seed`, one step per batch in which `s` changed, while observed. */
-export function fold<A, B>(f: (a: A, b: B) => B, seed: B, s: Readable<A>): Readable<B> {
-  return stateful([s], () => seed, (_, values, b) => f(values[0], b));
-}
-
 /**
  * The latest of `a` and `b`, starting at `a`'s current value; `a` wins when
  * both change in one batch. A merge reports every step, even one that repeats
@@ -563,7 +558,7 @@ export function merge<A>(a: Readable<A>, b: Readable<A>): Readable<A> {
 const never = () => false;
 
 /** Values of `s` that satisfy `p`, starting at `seed` unless `s` satisfies `p` at the start. */
-export function filter<A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readable<A> {
+export function latestWhere<A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readable<A> {
   return stateful([s], () => {
     const v = s.read();
     return p(v) ? v : seed;
@@ -575,7 +570,7 @@ export function filter<A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readab
  * false. When `cond` becomes true, it takes `s`'s current value. Starts at
  * `s` if `cond` is true at the start, otherwise at `seed`.
  */
-export function filterOn<A>(cond: Readable<boolean>, seed: A, s: Readable<A>): Readable<A> {
+export function gateSignal<A>(cond: Readable<boolean>, seed: A, s: Readable<A>): Readable<A> {
   return stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev));
 }
 

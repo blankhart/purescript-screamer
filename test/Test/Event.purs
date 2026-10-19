@@ -18,9 +18,9 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.Owned (hold, runOwned)
+import Screamer.Owned (runOwned)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (read)
+import Screamer.Signal (hold, read)
 import Screamer.Signal as Signal
 import Screamer.Source (batch, eventSource, signalSource)
 import Test.Observe (observe)
@@ -396,7 +396,7 @@ spec = describe "Screamer.Event" do
     it "hold keeps a fold over events advancing for the scope" do
       src <- liftEffect eventSource
       let total = Event.fold (+) 0 src.event
-      r <- liftEffect $ runOwned (hold total)
+      r <- liftEffect $ runOwned $ hold total
       liftEffect $ src.fire 1
       liftEffect $ src.fire 2
       liftEffect (read total) >>= shouldEqual 3

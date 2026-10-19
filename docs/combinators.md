@@ -48,26 +48,54 @@ This differs from `<|>` on signals, which keeps the left value when both change 
 
 **Retention.** A round's occurrences are kept until that round's effects have run, then dropped. A stateful node records the last round it consumed, so it steps over each round once, however many targets read it.
 
-**Stateful nodes over events pause.** `Event.fold`, `stepper` and the counting and queueing combinators (#19, #20) follow the signal rules. They start from the seed when first observed, step only while observed, and keep their state when the last observer leaves. Unlike a stateful signal they do not resynchronize on return, because an event has no current value to resynchronize with: occurrences fired while paused are simply missed. Use `Owned.hold` to keep one observing for a scope's lifetime.
+**Stateful nodes over events pause.** `Event.fold`, `stepper` and the counting and queueing combinators (#19, #20) follow the signal rules. They start from the seed when first observed, step only while observed, and keep their state when the last observer leaves. Unlike a stateful signal they do not resynchronize on return, because an event has no current value to resynchronize with: occurrences fired while paused are simply missed. Use `Signal.hold` or `Event.hold` to keep one observing for a scope's lifetime. Every operator that keeps state is marked **pauses** below.
+
+## Naming
+
+A `Signal` says what is true now; an `Event` says what happened. Operators that exist on both types follow one convention:
+
+- **Same name, same meaning.** `map`, `subscribe`, `hold`, `dropRepeats`, `withPrevious`, `gate` and `<|>` mean the same thing on both types, adjusted only for what each type is (an event's `gate` drops occurrences; a signal's `gate` holds its last value).
+- **Different shape, different name.** When the signal version has a different shape, it gets its own name instead of borrowing the event's. `Event.filter` drops occurrences; a signal cannot drop its value, so the signal version that keeps the last value that passed is `Signal.latestWhere`.
+- **Different input type only, `Signal` suffix.** When the two do the same thing and differ only in taking a `Signal` instead of an `Event`, the event version keeps the plain name and the signal version takes a `Signal` suffix: `Time.debounce` and `Time.debounceSignal`.
+
+## If you are accumulating, you are holding an event
+
+There is no `Signal.fold`. A fold counts or collects things that happened, so its input is an event. When the things that happened are a signal's changes, say so with `Event.changes`:
+
+```purescript
+-- Before
+let count = Signal.fold (\_ n -> n + 1) 0 clicks.signal
+
+-- After: fold the event, or the signal's changes
+let count = Event.fold (\_ n -> n + 1) 0 clicks.event
+let count = Event.fold (\_ n -> n + 1) 0 (Event.changes clicks.signal)
+```
+
+The result is still a `Signal`, the state the occurrences built up. Accumulating over a signal's changes is the same as `Signal.fold` was while observed: one step per round in which the signal changed. The difference is on resuming after a pause, where the event fold misses the changes made meanwhile instead of resynchronizing.
 
 ## Bridges between signals and events
 
 ```purescript
 -- Screamer.Event (#18)
 changes    :: forall a. Signal a -> Event a                    -- one occurrence per round in which the value changed
-stepper    :: forall a. a -> Event a -> Signal a               -- the latest occurrence; stateful, pauses
-fold       :: forall a b. (a -> b -> b) -> b -> Event a -> Signal b  -- one step per occurrence
+stepper    :: forall a. a -> Event a -> Signal a               -- the latest occurrence; pauses
+fold       :: forall a b. (a -> b -> b) -> b -> Event a -> Signal b  -- one step per occurrence; pauses
 tag        :: forall a b. Signal b -> Event a -> Event b
 attach     :: forall a b. Signal b -> Event a -> Event (Tuple b a)
 attachWith :: forall a b c. (b -> a -> c) -> Signal b -> Event a -> Event c
 subscribe  :: forall a. Event a -> (a -> Effect Unit) -> Owned Unit
+hold       :: forall a. Event a -> Owned (Event a)
+
+-- Screamer.Signal (#46): the same two, for signals
+subscribe  :: forall a. Signal a -> (a -> Effect Unit) -> Owned Unit
+hold       :: forall a. Signal a -> Owned (Signal a)
 ```
 
 `tag`, `attach` and `attachWith` read the signal's value at the end of the round, which is the consistent value every effect in that round sees. They do not read the value at the moment of the fire. So a handler that fires an event and then writes a signal is read the same as one that writes first.
 
 `changes s` fires at most once per round, with the final value, because a signal's own writes coalesce within a batch.
 
-`Screamer.Event` reuses the names `fold`, `filter` and `subscribe` from `Screamer.Signal` and `Screamer.Owned`, so it is meant to be imported qualified: `import Screamer.Event as Event`. Its type also shares a name with `Web.Event.Event.Event`, the type DOM handlers receive. Code that needs both imports one of them qualified or under an alias. The typed handlers in `Screamer.Html.Handlers` take specific event types (`MouseEvent`, `KeyboardEvent`), so the clash comes up rarely.
+`Screamer.Event` reuses names from `Screamer.Signal` (`subscribe`, `hold`, `gate`, `withPrevious`, `dropRepeats`), so it is meant to be imported qualified: `import Screamer.Event as Event`. Its type also shares a name with `Web.Event.Event.Event`, the type DOM handlers receive. Code that needs both imports one of them qualified or under an alias. The typed handlers in `Screamer.Html.Handlers` take specific event types (`MouseEvent`, `KeyboardEvent`), so the clash comes up rarely.
 
 ## Pure or `Owned`
 
@@ -80,7 +108,7 @@ A combinator is pure when all it needs is its inputs, whatever state it keeps. I
 | Needs time | `debounce`, `throttle`, `delay`, `audit`, `bufferFor` | `Owned` |
 | Needs async work | `resource`, `request`, `switchOwned`, `retry` | `Owned` |
 
-The time-based combinators could have been pure, with a timer that starts when the node is first observed and stops when it is released. That was rejected. Timer callbacks would become writes that belong to no scope, and the rule that only effects need owners would grow an exception. Starting the timer in `Owned` also gives the combinator a definite start time, which matches `Timer.every`.
+The time-based combinators could have been pure, with a timer that starts when the node is first observed and stops when it is released. That was rejected. Timer callbacks would become writes that belong to no scope, and the rule that only effects need owners would grow an exception. Starting the timer in `Owned` also gives the combinator a definite start time, which matches `Time.clock`.
 
 ## Instances
 
@@ -91,7 +119,7 @@ The time-based combinators could have been pure, with a timer that starts when t
 | `Alt` | left wins on ties | interleaves by fire order |
 | `Plus` | no (a signal needs a value) | `empty` never fires |
 | `Semigroup`, `Monoid` | lifted over the values | no, to keep `<>` from meaning merge |
-| `Compactable`, `Filterable` | no: a signal needs a seed to filter, so `filter p seed` stays | yes: `filter`, `filterMap`, `partition`, `compact` |
+| `Compactable`, `Filterable` | no: a signal needs a seed to filter, so `latestWhere p seed` takes one | yes: `filter`, `filterMap`, `partition`, `compact` |
 
 ## RxJS names
 
@@ -102,10 +130,10 @@ RxJS has no separate state type: its `BehaviorSubject` is closest to a signal so
 | `BehaviorSubject`, `next` | `signalSource`, `put` | exists |
 | `Subject`, `next` | `eventSource`, `fire` | #18 |
 | `fromEvent` | a typed handler given `source.fire` | #18 |
-| `subscribe` | `Owned.subscribe` (signal), `Event.subscribe` (event) | exists / #18 |
+| `subscribe` | `Signal.subscribe`, `Event.subscribe` | exists / #18 |
 | `map`, `mapTo` | `map`, `(<$)` | exists / #18 |
-| `filter` | `Event.filter`, `filterMap`, `partition`; `Signal.filter p seed`, `filterOn` | #18 / exists |
-| `scan` | `Signal.fold`, `Event.fold`, `mapAccum` | exists / #18 / #19 |
+| `filter` | `Event.filter`, `filterMap`, `partition`; `Signal.latestWhere p seed`, `Signal.gate` | #18 / #46 |
+| `scan` | `Event.fold`, `mapAccum` | #18 / #19 |
 | `pairwise` | `withPrevious` | #19 |
 | `startWith` | `stepper` | #18 |
 | `distinctUntilChanged` | automatic on signals; `dropRepeats`, `dropRepeatsBy`, `dropRepeatsOn` | exists / #19 |
@@ -122,30 +150,31 @@ RxJS has no separate state type: its `BehaviorSubject` is closest to a signal so
 | `mergeMap`, `concatMap`, `exhaustMap` | `mergeOwned`, `concatOwned`, `exhaustOwned`; `request` strategies | #21 |
 | `debounceTime`, `throttleTime`, `auditTime`, `delay`, `timeout` | `debounce`, `throttle`, `audit`, `delay`, `timeout` (all `Owned`) | #22 |
 | `sampleTime` | `sampleEvery` | #22 |
-| `interval`, `timer` | `Timer.every`, `Timer.after` | exists |
+| `interval`, `timer` | `Time.interval`, `Time.after`, `Time.clock` | #46 |
 | `bufferCount`, `buffer`, `bufferTime` | `bufferCount`, `bufferOn`, `bufferFor` | #23 |
 | `catchError`, `retry` | `catching`, `attempt`, `retry`, `Remote` combinators | #24 |
-| `share`, `shareReplay(1)` | sharing by reference; `Owned.hold` | #25 |
+| `share`, `shareReplay(1)` | sharing by reference; `Signal.hold`, `Event.hold` | #25 |
 | `forkJoin`, `window*`, `publish`, `connectable`, schedulers | left out | #16 |
 
 ## Transform, filter and accumulate (#19)
 
-All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`, `take`, `skip`, `takeWhile`, `skipWhile`, `first`, `count`) start from their seed when first observed and count or compare only occurrences seen while observed. A `take 3` that loses its observers and is observed again does not restart: it carries on from the count it had.
+All pure. The stateful ones (`mapAccum`, `withPrevious`, `dropRepeats*`, `take`, `skip`, `takeWhile`, `skipWhile`, `first`, `count`) pause: they start from their seed when first observed and count or compare only occurrences seen while observed. A `take 3` that loses its observers and is observed again does not restart: it carries on from the count it had.
 
 | RxJS | Screamer | Notes |
 |---|---|---|
 | `map`, `mapTo` | `map`, `(<$)` | `Functor` on both |
 | `filter` | `Event.filter`, `filterMap`, `partition`, `compact`, `separate` | `Filterable`, `Compactable` on `Event` |
-| `scan` | `Event.fold`, `Signal.fold` | one step per occurrence on events, per change on signals |
-| `scan` with an output | `Event.mapAccum :: (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Event b` | |
-| `pairwise` | `Event.withPrevious :: Event a -> Event { previous :: a, current :: a }`, `Signal.withPrevious :: a -> Signal a -> Signal (Tuple a a)` | the event form starts at the second occurrence; the signal form starts as the seed and the current value |
+| `scan` | `Event.fold`; over a signal, `Event.fold f seed (Event.changes s)` | one step per occurrence; pauses |
+| `scan` with an output | `Event.mapAccum :: (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Event b` | pauses |
+| `pairwise` | `Event.withPrevious :: Event a -> Event { previous :: a, current :: a }`, `Signal.withPrevious :: a -> Signal a -> Signal (Tuple a a)` | the event form starts at the second occurrence; the signal form starts as the seed and the current value; both pause |
 | `startWith` | `Event.startWith` (an alias of `stepper`) | |
-| `distinctUntilChanged`, `distinctUntilKeyChanged` | `dropRepeats`, `dropRepeatsBy`, `dropRepeatsOn` on both | `dropRepeatsOn :: Eq k => (a -> k) -> …` |
-| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event` | |
+| `distinctUntilChanged`, `distinctUntilKeyChanged` | `dropRepeats`, `dropRepeatsBy`, `dropRepeatsOn` on both | `dropRepeatsOn :: Eq k => (a -> k) -> …`; the event forms pause |
+| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event` | pause |
 | `last` | left out | an event never completes, so it has no last occurrence |
-| `count`, `reduce` | `Event.count :: Event a -> Signal Int`, `fold` | |
+| `count`, `reduce` | `Event.count :: Event a -> Signal Int`, `Event.fold` | pause |
 | `tap` | left out | an effect belongs in `subscribe`, which has an owner |
-| toggle, `gate` | `Event.gate :: Signal Boolean -> Event a -> Event a` | the event form of `filterOn`; reads the condition at the end of the round |
+| toggle, `gate` | `Event.gate :: Signal Boolean -> Event a -> Event a`; `Signal.gate :: Signal Boolean -> a -> Signal a -> Signal a` | the event form reads the condition at the end of the round; the signal form holds its last value while the condition is false, and pauses |
+| `filter` on a signal | `Signal.latestWhere :: (a -> Boolean) -> a -> Signal a -> Signal a` | the latest value that passed, starting at the seed; pauses |
 
 ## Combining several streams (#20)
 
@@ -154,13 +183,14 @@ All pure. The simultaneity rule for each: on signals, one step per batch and the
 | RxJS | Screamer | Simultaneity |
 |---|---|---|
 | `combineLatest` | `apply`, `sequence`, `sampleMany`, and `Signal.combine :: Array (Signal a) -> Signal (Array a)` | one value per batch; `combine` is one node instead of a chain of `apply`s |
+| `merge` on signals | `<|>`, `Signal.merge` | one value per batch, the left winning ties; pauses |
 | `withLatestFrom` | `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Signal (Tuple a b)` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; the first is observed with it, so a stateful signal there keeps advancing |
 | `sample` | `Event.tag`; `Signal.sampleOn` | the signal is read at the end of the round |
 | `merge` | `<|>`, `Event.oneOf :: Array (Event a) -> Event a` | every occurrence, in fire order; `oneOf` is one node and agrees with folding `<|>` |
 | (Reflex `leftmost`) | `Event.leftmost :: Array (Event a) -> Event a` | only the leftmost input that fired in the round |
 | `mergeWith` keeping both | `Event.mergeWith :: (a -> b -> c) -> (a -> c) -> (b -> c) -> Event a -> Event b -> Event c` | occurrences with the same fire stamp (both derived from one fire) are combined; nothing is lost |
-| `zip` | `Event.zip`, `Event.zipWith` | pairs the nth occurrence of each, counting from observation; unpaired occurrences queue without bound; a paused zip drops its queues, because what they would pair with is missed |
-| `race` | `Event.race :: Array (Event a) -> Event a` | follows the first input to fire after first observation (the leftmost, on a tie); keeps that choice while paused |
+| `zip` | `Event.zip`, `Event.zipWith` | pairs the nth occurrence of each, counting from observation; unpaired occurrences queue without bound; a paused zip drops its queues, because what they would pair with is missed; pauses |
+| `race` | `Event.race :: Array (Event a) -> Event a` | follows the first input to fire after first observation (the leftmost, on a tie); keeps that choice while paused; pauses |
 | `forkJoin`, `combineLatestAll` | left out | events never complete, so there is no last value to join; for a list of async results use `Remote`'s `Applicative` (#24) or `sequence` on signals |
 
 ## Flattening (#21)
@@ -196,18 +226,27 @@ resource = resourceWith Switch
 
 ## Time (#22)
 
-`Screamer.Time`. Each combinator needs a timer, so each returns `Owned` and cancels its timers when its scope is disposed; an occurrence still pending then is dropped. Timers start at instantiation: each combinator subscribes to its input when its scope runs and observes it for the scope's whole life, whether or not anything observes the output. `timeout` and `sampleEvery` count their first interval from instantiation.
+`Screamer.Time`. Its sources return state as a `Signal` and occurrences as an `Event`, and take no callbacks:
+
+```purescript
+clock    :: Milliseconds -> Owned (Signal Instant)   -- the current time, updated every interval
+interval :: Milliseconds -> Owned (Event Unit)       -- one occurrence every interval
+after    :: Milliseconds -> Owned (Event Unit)       -- one occurrence, once
+frames   :: Owned (Event Number)                     -- one occurrence per animation frame, with its timestamp
+```
+
+Each combinator needs a timer, so each returns `Owned` and cancels its timers when its scope is disposed; an occurrence still pending then is dropped. Timers start at instantiation: each combinator subscribes to its input when its scope runs and observes it for the scope's whole life, whether or not anything observes the output. `timeout` and `sampleEvery` count their first interval from instantiation.
 
 | RxJS | Screamer |
 |---|---|
-| `debounceTime` | `debounce :: Milliseconds -> Event a -> Owned (Event a)`; `debounced :: Milliseconds -> Signal a -> Owned (Signal a)` holds the last settled value, starting at the current one |
+| `debounceTime` | `debounce :: Milliseconds -> Event a -> Owned (Event a)`; `debounceSignal :: Milliseconds -> Signal a -> Owned (Signal a)` holds the last settled value, starting at the current one |
 | `throttleTime` | `throttle :: { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)`; a trailing occurrence opens a new interval, as in RxJS |
 | `auditTime` | `audit :: Milliseconds -> Event a -> Owned (Event a)` |
 | `sampleTime` | `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)`; holds the signal so a stateful one keeps advancing |
 | `delay` | `delay :: Milliseconds -> Event a -> Owned (Event a)`; keeps order |
 | `timeout` | `timeout :: Milliseconds -> Event a -> Owned (Event (Either Unit a))`; a `Left unit` for each silence of the interval, from instantiation and after each occurrence, instead of an error |
-| `interval`, `timer` | `Timer.every`, `Timer.after` |
-| animation-frame scheduling | `onFrame :: Event a -> Owned (Event a)`: the latest occurrence on the next frame |
+| `interval`, `timer` | `interval`, `after`; `clock` for the time itself |
+| animation-frame scheduling | `frames`; `onFrame :: Event a -> Owned (Event a)`: the latest occurrence on the next frame |
 
 Each timer callback runs in one `batch`, so what it fires arrives in one round. An occurrence passed on without a timer (a leading `throttle` edge, a `timeout`'s `Right`) is fired from a subscription, so it arrives one round after the input's.
 
@@ -215,12 +254,12 @@ Each timer callback runs in one `batch`, so what it fires arrives in one round. 
 
 | RxJS | Screamer | Pure? |
 |---|---|---|
-| `bufferCount(n, step)` | `Event.bufferCount :: Int -> Int -> Event a -> Event (Array a)` | pure |
-| `buffer(notifier)` | `Event.bufferOn :: Event b -> Event a -> Event (Array a)` | pure |
-| `bufferToggle`, `bufferWhen` | `Event.bufferWhile :: Signal Boolean -> Event a -> Event (Array a)` | pure |
+| `bufferCount(n, step)` | `Event.bufferCount :: Int -> Int -> Event a -> Event (Array a)` | pure; pauses |
+| `buffer(notifier)` | `Event.bufferOn :: Event b -> Event a -> Event (Array a)` | pure; pauses |
+| `bufferToggle`, `bufferWhen` | `Event.bufferWhile :: Signal Boolean -> Event a -> Event (Array a)` | pure; pauses |
 | `bufferTime` | `Time.bufferFor :: Milliseconds -> Event a -> Owned (Event (Array a))` | `Owned` |
 | `window*` | left out | a window is an event of events, which has no owner for the inner events (see #21); buffer, or use `switchEvent` |
-| (no RxJS name) | `Signal.history :: Int -> Signal a -> Signal (Array a)`: the last n values, oldest first, for sparklines and undo | pure |
+| (no RxJS name) | `Signal.history :: Int -> Signal a -> Signal (Array a)`: the last n values, oldest first, for sparklines and undo | pure; pauses |
 
 The pure buffers are stateful nodes: they collect only occurrences seen while observed, and **a paused buffer keeps what it held**, as every paused stateful node keeps its state; its next buffer continues from there. (`zip` is the exception, because a queue waiting for partners it will never see would pair the wrong occurrences.)
 
@@ -260,13 +299,13 @@ RxJS needs `share`, `shareReplay` and `publish` because an observable is a recip
 
 - **One value, one node.** `let total = Event.fold (+) 0 clicks` observed by two effects is one stateful node. It steps once per occurrence and both effects see the same value in the same batch.
 - **Two evaluations, two nodes.** Writing `Event.fold (+) 0 clicks` twice (or calling a function that builds it twice) makes two nodes with separate state. They agree only if both are observed for the same occurrences; one created later starts from its seed. Bind the value once with `let` and pass it around.
-- **Paused state.** A stateful node steps only while observed. When its last observer leaves it keeps its state and misses what fires meanwhile (a stateful *signal* resynchronizes from its input's current value when it returns; a stateful *event* node cannot, since events have no current value). To keep one stepping for a scope's lifetime, pin it: `Owned.hold` for a signal, `Event.hold :: Event a -> Owned (Event a)` for an event (`take`, `mapAccum`, `dropRepeats`, ...).
+- **Paused state.** A stateful node steps only while observed. When its last observer leaves it keeps its state and misses what fires meanwhile (a stateful *signal* resynchronizes from its input's current value when it returns; a stateful *event* node cannot, since events have no current value). To keep one stepping for a scope's lifetime, pin it: `Signal.hold` for a signal, `Event.hold :: Event a -> Owned (Event a)` for an event (`take`, `mapAccum`, `dropRepeats`, ...).
 
 | RxJS | Screamer |
 |---|---|
 | `share()` | bind the value once (`let`); every observer shares the node |
-| `shareReplay(1)` | a signal: `Event.stepper` or `Event.fold`, plus `Owned.hold` if it must not pause |
-| `publish()` / `connect()` | `Event.hold` (or `Owned.hold`) starts it for the scope; disposing the scope disconnects |
+| `shareReplay(1)` | a signal: `Event.stepper` or `Event.fold`, plus `Signal.hold` if it must not pause |
+| `publish()` / `connect()` | `Event.hold` (or `Signal.hold`) starts it for the scope; disposing the scope disconnects |
 | cold vs hot | every node is hot while observed and inert otherwise; there is no per-subscriber execution to make cold |
 
 - **`replay` is left out.** A replay buffer would hand late observers occurrences from earlier batches, which breaks "an occurrence happens at one moment". No example needed it: what a late observer wants is almost always a current value (`stepper`, `Signal.history n` for the last n).
@@ -280,13 +319,22 @@ The event nodes live in `src/Screamer/Runtime.ts` next to the signal nodes (#18)
 - **Consumption by version.** An event node's value is the list of occurrences it produced when its version last increased, and the version increases only when a computation produces at least one occurrence. A consumer (a derived event, a stateful node or an effect) records the version of each input it read. On its next computation an input whose version changed contributes its current list, and any other input contributes nothing. So each consumer takes each occurrence once, however often it is read, and an event needs no per-round reset.
 - **Rounds.** `fire` queues an occurrence on its source. Each pass of the flush loop starts a round: the queued occurrences become their sources' values, one version step per source, and observers are notified. Fires made while a round runs are queued for the next one, so a `subscribe` callback that fires an event is followed by one more round.
 - **Resynchronizing.** A derived event that gains its first observer records its inputs' versions and produces nothing, so occurrences from before it was observed are never delivered. A stateful node over events records versions the same way, which is why it misses what was fired while it was paused.
-- **Settling.** A stateful node over events steps at the end of the round in which its inputs fired, even when no effect read it in that round, because the next round replaces its inputs' occurrences. `stepper` and `Event.fold` therefore advance whenever they are observed, as `fold` on signals does.
+- **Settling.** A stateful node over events steps at the end of the round in which its inputs fired, even when no effect read it in that round, because the next round replaces its inputs' occurrences. `stepper` and `Event.fold` therefore advance whenever they are observed, as stateful signals do.
 - **Errors.** A throwing `Event.subscribe` callback is reported to the scope's `onError` (or rethrown at the end of the flush) and the round's later occurrences are still delivered.
-- `Owned.hold` keeps a stateful signal over events advancing, as for any signal. `holdEvent` keeps an event itself observed (#25).
+- `Signal.hold` keeps a stateful signal over events advancing, as for any signal. `holdEvent` keeps an event itself observed (#25).
 
-`WebSocket.connect` gives `messages :: Event String` (#18). The indexed `message :: Signal (Maybe Message)` stays for one release and is deprecated.
+`WebSocket.connect` gives `state :: Signal ConnectionState` and `messages :: Event String` (#18). The indexed `message :: Signal (Maybe Message)` was removed in #46.
 
 ## What changed in this decision
 
 - `Screamer.Channel` became the signal-source module (now `Screamer.Source`), with `Channel` renamed `SignalSource` and `channel` renamed `signalSource`. This names the two kinds of source in parallel. "Channel" also suggested a queue of messages, which is closer to what an event source is.
 - `Event` and `EventSource` are specified here and implemented in #18.
+
+## What changed in #46
+
+- `Signal.fold` is removed: fold an event (`Event.fold f seed (Event.changes s)`).
+- `subscribe` and `hold` for signals moved from `Screamer.Owned` to `Screamer.Signal`, next to `Event.subscribe` and `Event.hold`.
+- `Signal.filter` is `Signal.latestWhere`, and `Signal.filterOn` is `Signal.gate`.
+- The timer and frame sources moved to `Screamer.Time` and return values instead of taking callbacks: `Subscriptions.Timer.every` is `Time.clock`, `Timer.after` is `Time.after :: Milliseconds -> Owned (Event Unit)`, `Time.interval` is new, and `AnimationFrame.frames` and `AnimationFrame.every` are `Time.frames :: Owned (Event Number)`.
+- `Time.debounced` is `Time.debounceSignal`.
+- `WebSocket.connect` no longer has `message` or the `Message` type; use `messages`.

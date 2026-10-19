@@ -22,19 +22,19 @@ The examples are in `examples/src`. Run `npm run build:examples` to bundle them 
 
 **Signals are pure values.** `Signal a` is a value that changes over time. `map`, `apply`, `bind`, `sampleOn`, `sampleManyWith` and `dropRepeats` build new signals without touching the reactive graph. A derived signal connects to its sources only while something observes it, and it is garbage-collected like any other value when nothing refers to it. A signal propagates a change only when its value actually changes: by `Object.is`, or by `Eq` through `dropRepeats`.
 
-**Stateful signals advance only while observed.** `fold`, `merge`, `filter` and `filterOn` keep state. That state starts from the seed when the first observer arrives, and it pauses when the last observer leaves. On resuming it starts again from the inputs' current values, and changes made while it was paused are not replayed.
+**Stateful signals advance only while observed.** `merge` (`<|>`), `latestWhere`, `gate`, `withPrevious` and `history` keep state, as do `Event.fold` and `stepper`. That state starts from the seed when the first observer arrives, and it pauses when the last observer leaves. On resuming it starts again from the inputs' current values, and changes made while it was paused are not replayed.
 
 **Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.Source`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
 
 **Events sit next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (`Screamer.Event`, imported qualified) carries occurrences instead, such as clicks or messages, and delivers every one, in fire order, even repeats and several in one batch. `eventSource` (in `Effect`, from `Screamer.Source`) gives `{ event, fire }`, and a typed handler takes `fire` directly. `Event.fold`, `stepper`, `changes`, `tag`, `attachWith` and `Event.subscribe` connect events and signals. The semantics, and every combinator next to its RxJS counterpart, are in `docs/combinators.md`.
 
-**Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `subscribe`, `hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
+**Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `Signal.subscribe`, `Signal.hold`, `Event.subscribe`, `Event.hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
 
 **`component` runs setup once per instance.** `component :: Owned Element -> Element` runs its setup when the element is instantiated. Sources, timers and subscriptions created there belong to that instance, and they are released when the instance is removed: by `dyn` switching branches, by `each` dropping a row, or by unmounting.
 
 **`mount` returns unmount.** `mount :: String -> Element -> Effect (Effect Unit)` renders into the first element matching the selector. The action it returns removes the nodes and disposes every effect the tree created.
 
-**Subscriptions and resources are owned too.** `Screamer.Subscriptions.Timer` (`every`, `after`), `AnimationFrame` (`frames`, `every`), `WebSocket` (`connect`) and `Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Router` only tracks the location; the Router example matches it, and builds its links, with [windrose-router](https://github.com/blankhart/purescript-windrose-router), whose routes are a type. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
+**Subscriptions and resources are owned too.** `Screamer.Time` (`clock`, `interval`, `after`, `frames`), `Screamer.Subscriptions.WebSocket` (`connect`) and `Router` (`location`, `navigate`, `link`) start when their scope runs and stop when it is disposed. `Router` only tracks the location; the Router example matches it, and builds its links, with [windrose-router](https://github.com/blankhart/purescript-windrose-router), whose routes are a type. `Screamer.Resource.resource` runs an `Aff` request for each value of an input signal and gives a `Signal (Remote b)`. When the input changes or the scope is disposed, the running request is killed, and its result is never shown.
 
 **Typed DOM.** `Screamer.Html`, `Screamer.Html.Attributes`, `Screamer.Html.Handlers` and `Screamer.Svg` are generated from `codegen/data.ts` (run `npm run codegen:dom`). Attributes take either a plain value or a `Signal` of the right type, enumerated attributes take an ADT, `style_` takes a record checked against the known CSS properties, and event handlers receive the specific event type. Bubbling events are delegated to one listener per type on the document.
 
@@ -89,6 +89,21 @@ Nothing is called `Core` any more, the two source modules are one, and the gener
 | `Screamer.DOM.EventHandler` | `Screamer.Html.Handlers` |
 | `Screamer.DOM.Svg` | `Screamer.Svg` |
 | `Screamer.Internal` | removed (unused) |
+
+### Signal and Event alignment
+
+| Before | Now |
+|---|---|
+| `Signal.fold f seed s` | `Event.fold f seed (Event.changes s)`: accumulation is over events |
+| `Owned.subscribe`, `Owned.hold` | `Signal.subscribe`, `Signal.hold`, next to `Event.subscribe`, `Event.hold` |
+| `Signal.filter` | `Signal.latestWhere` |
+| `Signal.filterOn` | `Signal.gate` |
+| `Subscriptions.Timer.every` | `Time.clock :: Milliseconds -> Owned (Signal Instant)` |
+| `Subscriptions.Timer.after ms action` | `Time.after ms :: Owned (Event Unit)`, then `Event.subscribe` |
+| (new) | `Time.interval :: Milliseconds -> Owned (Event Unit)` |
+| `Subscriptions.AnimationFrame.frames`, `.every` | `Time.frames :: Owned (Event Number)` |
+| `Time.debounced` | `Time.debounceSignal` |
+| `WebSocket` `message`, `Message` | `messages :: Event String` (with `Event.stepper` for the latest) |
 
 ## Background
 

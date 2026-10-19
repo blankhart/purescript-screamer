@@ -31,7 +31,7 @@ Four kinds of signal node, plus the event nodes described in `docs/combinators.m
 |---|---|---|---|---|
 | Cell | `signalSource` in `Effect` | is a source | none | GC when unreachable; holds observers only while they observe |
 | Derived | `map`, `apply`, `bind`, `sampleOn`, `sampleManyWith`, `dropRepeatsBy` | only while observed | none | GC when unreachable; cached while observed, recomputed on demand otherwise |
-| Stateful | `fold`, `merge`, `filter`, `filterOn` | only while observed | none | state lives in the node and advances only while observed |
+| Stateful | `merge`, `latestWhere`, `gate`, `withPrevious`, `history`; `Event.fold` and `stepper` over events | only while observed | none | state lives in the node and advances only while observed |
 | Effect | DOM bindings, `subscribe`, `hold`, `dyn` | always, while alive | a scope (required) | disposed with its scope; creating one outside a scope is an error |
 | Event source | `eventSource` in `Effect` | is a source | none | GC when unreachable; an occurrence fired while unobserved goes nowhere |
 | Derived event | `map`, `filter`, `<|>`, `changes`, `attachWith` (#18) | only while observed | none | produces only occurrences fired while observed |
@@ -40,7 +40,7 @@ Four kinds of signal node, plus the event nodes described in `docs/combinators.m
 ### Stateful signals advance only while observed
 
 - **Start.** State begins at the seed (for `merge`, the left input's current value). Values the input held before observation are not stepped over.
-- **Step.** One step per propagation in which an input changed. Writes inside one batch coalesce, so two writes in one handler step a `fold` once.
+- **Step.** One step per propagation in which an input changed. Writes inside one batch coalesce, so two writes in one handler step a stateful node once.
 - **Pause.** When the last observer goes, the node unlinks and keeps its state. `read` returns that state. When observed again it resynchronizes with its inputs without stepping, then continues.
 - **Simultaneity.** When both inputs of `merge` change in one batch, the left wins (like Reflex's `leftmost`).
 
@@ -74,11 +74,13 @@ sampleMany     :: ...                              -- row-typed, unchanged
 sampleManyWith :: ...                              -- row-typed, unchanged
 dropRepeats    :: forall a. Eq a => Signal a -> Signal a
 dropRepeatsBy  :: forall a. (a -> a -> Boolean) -> Signal a -> Signal a
-fold     :: forall a b. (a -> b -> b) -> b -> Signal a -> Signal b
-merge    :: forall a. Signal a -> Signal a -> Signal a
-filter   :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
-filterOn :: forall a. Signal Boolean -> a -> Signal a -> Signal a
-read     :: forall a. Signal a -> Effect a           -- untracked, formerly get
+merge       :: forall a. Signal a -> Signal a -> Signal a
+latestWhere :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a      -- formerly filter
+gate        :: forall a. Signal Boolean -> a -> Signal a -> Signal a      -- formerly filterOn
+read        :: forall a. Signal a -> Effect a        -- untracked, formerly get
+subscribe   :: forall a. Signal a -> (a -> Effect Unit) -> Owned Unit   -- in Screamer.Owned until #46
+hold        :: forall a. Signal a -> Owned (Signal a)
+-- Signal.fold was removed in #46: Event.fold f seed (Event.changes s)
 
 -- Screamer.Source: sources of signals and events (Screamer.Channel until #17, merged in #45)
 type SignalSource a = { signal :: Signal a, put :: a -> Effect Unit, modify :: (a -> a) -> Effect Unit }
@@ -92,8 +94,6 @@ eventSource :: forall a. Effect (EventSource a)
 -- Screamer.Owned: effects with an owner
 newtype Owned a = Owned (Scope -> Effect a)        -- Functor .. Monad, MonadEffect
 onCleanup :: Effect Unit -> Owned Unit
-subscribe :: forall a. Signal a -> (a -> Effect Unit) -> Owned Unit
-hold      :: forall a. Signal a -> Owned (Signal a)
 child     :: forall a. Owned a -> Owned { value :: a, dispose :: Effect Unit }
 resource  :: forall a b. Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))   -- stage 9
 
@@ -128,7 +128,7 @@ Evaluating an `Element` runs nothing, including the setup inside `component`. In
 - **Exception safety.** A throwing derivation leaves its node dirty and the graph consistent; a throwing effect is reported to the nearest scope's error handler and does not stop the flush.
 - **One runtime.** The core is the foreign module of `Screamer.Runtime`. Other foreign modules import it at run time as `../Screamer.Runtime/foreign.js` (where `purs` puts it in `output/`) and take its types from `./Runtime.js`, so every module shares one graph and the import also works when Screamer is a dependency.
 - **Release at batch end.** A node that loses its last target during a batch stays linked until the batch ends, and unlinks then only if nothing observes it again. A stateful node that moves from one observer to another within a batch therefore neither pauses nor resynchronizes.
-- **`filterOn`.** Follows its source while the condition is true and holds its last value while it is false; when the condition becomes true it takes the source's current value. It starts at the source if the condition holds at the start, otherwise at the seed.
+- **`gate` (formerly `filterOn`).** Follows its source while the condition is true and holds its last value while it is false; when the condition becomes true it takes the source's current value. It starts at the source if the condition holds at the start, otherwise at the seed.
 - **No owner inside computations.** Derivations and effect bodies run with no current scope, so they cannot create effects by accident. Code that builds a child scope from inside an effect (`dyn`, `each`) names the parent scope explicitly.
 - **Libraries checked (stage 1).** `@preact/signals-core` 1.14.4 has `watched`/`unwatched` options on signals but keeps versions internal (`_version`); `alien-signals` 3.2.1 exposes an `unwatched` hook in `createReactiveSystem` but no first-observer hook and only per-link versions. Neither exposes both without patching, so the core is our own (`src/Screamer/Runtime.ts`).
 

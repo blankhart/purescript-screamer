@@ -1,5 +1,6 @@
 // Foreign module of Screamer.Signal. Allocating a lazy node has no effect on
-// the graph, so everything here is pure except `read`.
+// the graph, so everything here is pure except `read`, `subscribeImpl` and
+// `holdImpl`.
 import type * as Runtime from './Runtime.js';
 // @ts-ignore: purs copies this file to output/Screamer.Signal/foreign.js, next to the runtime's.
 import * as runtime from '../Screamer.Runtime/foreign.js';
@@ -25,9 +26,6 @@ export const sampleOn = <A>(a: S<A>) => <B>(b: S<B>): S<B> =>
 
 export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (s: S<A>): S<A> =>
   R.dropRepeatsBy((x: A, y: A) => eq(x)(y), s);
-
-export const fold = <A, B>(f: (a: A) => (b: B) => B) => (seed: B) => (s: S<A>): S<B> =>
-  R.fold((a: A, b: B) => f(a)(b), seed, s);
 
 export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A) => (s: S<A>): S<T> => {
   const pair = R.stateful<{ previous: A; current: A }>(
@@ -60,11 +58,22 @@ export const attemptImpl = <A, T>(left: (e: Error) => T) => (right: (a: A) => T)
 
 export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => R.merge(a, b);
 
-export const filter = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => R.filter(p, seed, s);
+export const latestWhere = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => R.latestWhere(p, seed, s);
 
-export const filterOn = <A>(cond: S<boolean>) => (seed: A) => (s: S<A>): S<A> => R.filterOn(cond, seed, s);
+export const gate = <A>(cond: S<boolean>) => (seed: A) => (s: S<A>): S<A> => R.gateSignal(cond, seed, s);
 
 export const read = <A>(s: S<A>) => (): A => R.sample(s);
+
+export const subscribeImpl = <A>(s: Runtime.Scope) => (sig: S<A>) => (cb: (a: A) => () => void) => () => {
+  R.runInScope(s, () => {
+    R.effect(() => {
+      const v = sig.read();
+      R.untracked(() => cb(v)());
+    });
+  });
+};
+
+export const holdImpl = <A>(s: Runtime.Scope) => (sig: S<A>) => (): S<A> => R.runInScope(s, () => R.hold(sig));
 
 export const sampleManyWithImpl =
   (sampled: Record<string, S<any>>) => (tracked: Record<string, S<any>>) => <C>(f: (r: any) => C): S<C> => {
