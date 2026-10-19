@@ -173,13 +173,24 @@ export namespace codegen {
     constructors: values.map((value) => ({ constructor: prefix + pascal(value), value })),
   }));
 
-  type AttrSpec = { type: string; kind: AttrKind; prop?: string };
+  // How a property is written in HTML, for a renderer that serializes the
+  // properties an element was given (see `Screamer.Html.Reflect`):
+  // - attribute: the attribute, with the value as its text
+  // - boolean: the bare attribute when true, nothing when false
+  // - enumerated: the attribute, with one word for true and one for false
+  export type ReflectKind = 'attribute' | 'boolean' | 'enumerated';
+  type Reflect = { kind: ReflectKind; on?: string; off?: string };
+
+  type AttrSpec = { type: string; kind: AttrKind; prop?: string; reflect?: Reflect };
 
   const str: AttrSpec = { type: 'String', kind: 'attribute' };
   const int: AttrSpec = { type: 'Int', kind: 'attribute' };
   const num: AttrSpec = { type: 'Number', kind: 'attribute' };
   const bool: AttrSpec = { type: 'Boolean', kind: 'boolean' };
-  const prop = (type: string, name: string): AttrSpec => ({ type, kind: 'property', prop: name });
+  const prop = (type: string, name: string, reflect: Reflect = { kind: 'attribute' }): AttrSpec =>
+    ({ type, kind: 'property', prop: name, reflect });
+  const boolProp = (name: string) => prop('Boolean', name, { kind: 'boolean' });
+  const trueFalseProp = (name: string) => prop('Boolean', name, { kind: 'enumerated', on: 'true', off: 'false' });
   const enumerated = (type: string): AttrSpec => ({ type, kind: 'attribute' });
 
   // https://html.spec.whatwg.org/multipage/indices.html#attributes-3
@@ -202,14 +213,14 @@ export namespace codegen {
     autofocus: bool,
     autoplay: bool,
     charset: str,
-    checked: prop('Boolean', 'checked'),
+    checked: boolProp('checked'),
     cite: str,
     class: str,
     color: str,
     cols: int,
     colspan: int,
     content: str,
-    contenteditable: prop('Boolean', 'contentEditable'),
+    contenteditable: trueFalseProp('contentEditable'),
     controls: bool,
     coords: str,
     crossorigin: enumerated('CrossOrigin'),
@@ -222,7 +233,7 @@ export namespace codegen {
     dirname: str,
     disabled: bool,
     download: str,
-    draggable: prop('Boolean', 'draggable'),
+    draggable: trueFalseProp('draggable'),
     enctype: str,
     enterkeyhint: enumerated('EnterKeyHint'),
     for: str,
@@ -263,7 +274,7 @@ export namespace codegen {
     min: num,
     minlength: int,
     multiple: bool,
-    muted: prop('Boolean', 'muted'),
+    muted: boolProp('muted'),
     name: str,
     nomodule: bool,
     nonce: str,
@@ -285,12 +296,12 @@ export namespace codegen {
     rowspan: int,
     sandbox: str,
     scope: str,
-    selected: prop('Boolean', 'selected'),
+    selected: boolProp('selected'),
     shape: str,
     size: int,
     sizes: str,
     slot: str,
-    spellcheck: prop('Boolean', 'spellcheck'),
+    spellcheck: trueFalseProp('spellcheck'),
     src: str,
     srcdoc: str,
     srclang: str,
@@ -300,7 +311,7 @@ export namespace codegen {
     tabindex: int,
     target: str,
     title: str,
-    translate: prop('Boolean', 'translate'),
+    translate: prop('Boolean', 'translate', { kind: 'enumerated', on: 'yes', off: 'no' }),
     type: enumerated('InputType'),
     typemustmatch: bool,
     usemap: str,
@@ -353,6 +364,24 @@ export namespace codegen {
     ...AriaAttributes.map((dom) => ({ name: camel(dom), dom, type: 'String', binding: binding(dom, str) })),
   ];
 
+
+  // The HTML form of every property the generated attributes set, plus the
+  // DOM properties whose name differs from their attribute's. `value` is
+  // special on two elements: a textarea's value is its text, and a select's
+  // value selects the option with that value.
+  export const PropertyReflections: Record<string, { attribute: string; kind: ReflectKind; on?: string; off?: string; elements?: Record<string, 'text' | 'option'> }> =
+    Object.fromEntries([
+      ...Object.entries(Attributes).flatMap(([name, spec]) =>
+        spec.kind === 'property' && spec.prop !== undefined
+          ? [[spec.prop, {
+              attribute: name.replace(/_/g, '-'),
+              ...spec.reflect,
+              ...(spec.prop === 'value' ? { elements: { textarea: 'text', select: 'option' } } : {}),
+            }]]
+          : []),
+      ['className', { attribute: 'class', kind: 'attribute' }],
+      ['htmlFor', { attribute: 'for', kind: 'attribute' }],
+    ].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 
   // https://html.spec.whatwg.org/multipage/indices.html#elements-3
   export const Elements: Record<string, string[]> = {

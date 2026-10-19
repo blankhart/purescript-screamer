@@ -6,10 +6,12 @@ import Effect (Effect)
 import Screamer.Test (runSpec)
 import Test.Context as Context
 import Test.Dom as Dom
+import Test.Renderer as Renderer
 import Test.TypedDom as TypedDom
 
 main :: Effect Unit
 main = runSpec do
   Context.spec
   Dom.spec
+  Renderer.spec
   TypedDom.spec
