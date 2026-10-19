@@ -8,7 +8,7 @@ export const onVisibilityChange = (changed: () => void) => (): (() => void) => {
   return () => document.removeEventListener('visibilitychange', listener);
 };
 
-export const onlineNow = (): boolean => navigator.onLine;
+export const onlineNow = (): boolean => window.navigator.onLine;
 
 export const onOnlineChange = (changed: () => void) => (): (() => void) => {
   const listener = () => changed();
