@@ -13,15 +13,15 @@ import Data.Number.Format (fixed, toStringWith)
 import Data.String as String
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (Element, component, element, text)
-import Screamer.DOM.Attribute (InputType(..))
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, component, element, text)
 import Screamer.Examples.Formlet (Form, Validated(..), Wizard, build, checkbox, indent, mustBe, nonEmpty, number, password, prop, required, section, select, step, textbox, validated, wizard)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes (InputType(..))
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Signal (read)
+import Screamer.Source (signalSource)
 import Type.Proxy (Proxy(..))
 import Web.Event.Event (preventDefault)
 

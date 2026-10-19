@@ -1,15 +1,15 @@
 // Foreign module of Screamer.Flatten: one child scope per inner value.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Flatten/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Flatten/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
-type Scope = Core.Scope;
+type Scope = Runtime.Scope;
 type Eff<A> = () => A;
 /** An `Owned b` at run time. */
 type Owned<B> = (s: Scope) => Eff<B>;
-type Ev<T> = Core.EventLike<T>;
+type Ev<T> = Runtime.EventLike<T>;
 
 /** Run an `Owned` in a new child scope of `parent`, in a batch, untracked. */
 function runChild<B>(parent: Scope, o: Owned<B>): { scope: Scope; value: B } {
@@ -18,9 +18,9 @@ function runChild<B>(parent: Scope, o: Owned<B>): { scope: Scope; value: B } {
   return { scope, value };
 }
 
-export const switchOwnedImpl = <A, B>(s: Scope) => (sig: Core.Readable<A>) => (f: (a: A) => Owned<B>) => () => {
+export const switchOwnedImpl = <A, B>(s: Scope) => (sig: Runtime.Readable<A>) => (f: (a: A) => Owned<B>) => () => {
   let child: Scope | null = null;
-  let out: Core.Cell<B> | null = null;
+  let out: Runtime.Cell<B> | null = null;
   R.effectIn(s, () => {
     const a = sig.read();
     R.untracked(() => {

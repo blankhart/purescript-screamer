@@ -5,8 +5,8 @@ module Screamer.Examples.Harness (run) where
 import Prelude
 
 import Effect (Effect)
-import Screamer.Core (Element, mount)
-import Screamer.Reactive.Core (Stats, readStats)
+import Screamer.Element (Element, mount)
+import Screamer.Runtime (Stats, readStats)
 
 foreign import expose :: { unmount :: Effect Unit, stats :: Effect Stats } -> Effect Unit
 

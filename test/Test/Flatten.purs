@@ -12,14 +12,13 @@ import Effect.Exception (Error, error, message)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.EventSource (eventSource)
 import Screamer.Flatten (concatOwned, exhaustOwned, mergeOwned, switchOwned)
 import Screamer.Owned (onCleanup, runOwned)
-import Screamer.Reactive.Core (readStats)
 import Screamer.Resource (Remote(..), Strategy(..), request, resourceWith)
+import Screamer.Runtime (readStats)
 import Screamer.Signal (read)
 import Screamer.Signal as Signal
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (eventSource, signalSource)
 import Screamer.Subscriptions.Timer as Timer
 import Test.Event (observeE)
 import Test.Fakes as Fake

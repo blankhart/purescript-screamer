@@ -10,23 +10,23 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Class as Owned
 import Effect.Ref as Ref
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, foreign_, fragment_, mount, on_, property, styleProperty, text)
+import Screamer.Element (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, foreign_, fragment_, mount, on_, property, styleProperty, text)
 import Screamer.Owned (onCleanup, subscribe)
-import Screamer.Reactive.Core (readStats)
+import Screamer.Runtime (readStats)
 import Screamer.Signal (Signal, fold, read)
 import Screamer.Signal as Signal
+import Screamer.Source (signalSource)
 import Test.DomHelpers (click, fakeWidget, currentTag, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
 import Test.QuickCheck.Gen (randomSample', shuffle, chooseInt, Gen)
-import Web.Event.Event (stopPropagation)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
+import Web.Event.Event (stopPropagation)
 
 div' :: Array Attribute -> Array Element -> Element
 div' = element_ "div"
 
 spec :: Spec Unit
-spec = describe "Screamer.Core" do
+spec = describe "Screamer.Element" do
   it "renders static markup" do
     liftEffect resetBody
     _ <- liftEffect $ mount "#root" $

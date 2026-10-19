@@ -4,19 +4,19 @@ import Prelude
 
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (element, mount)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
-import Screamer.DOM.Svg as Svg
+import Screamer.Element (element, mount)
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
+import Screamer.Source (signalSource)
+import Screamer.Svg as Svg
 import Test.DomHelpers (click, innerHTML, propertyOf, resetBody)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Web.UIEvent.MouseEvent as MouseEvent
 
 spec :: Spec Unit
-spec = describe "Screamer.DOM" do
+spec = describe "Screamer.Html" do
   it "value_ sets the value property" do
     liftEffect resetBody
     v <- liftEffect $ signalSource "hello"

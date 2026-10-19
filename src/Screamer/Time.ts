@@ -1,10 +1,10 @@
 // Foreign module of Screamer.Time. Each function returns the action that
 // cancels what it scheduled; cancelling twice, or after it ran, is a no-op.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Time/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Time/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
 /** Run `action` once after `ms`, inside a batch. */
 export const timeoutImpl = (ms: number) => (action: () => void) => () => {

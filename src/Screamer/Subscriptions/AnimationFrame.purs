@@ -9,9 +9,9 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal)
+import Screamer.Source (signalSource)
 
 foreign import nowImpl :: Effect Number
 

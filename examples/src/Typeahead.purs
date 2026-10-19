@@ -20,18 +20,17 @@ import Effect.Aff (Aff, delay, error, message, throwError)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Ref as Ref
-import Screamer.Core (Element, component, each, text)
-import Screamer.DOM.Attribute (InputType(..))
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, component, each, text)
 import Screamer.Event as Event
-import Screamer.EventSource (eventSource)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes (InputType(..))
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Owned (hold)
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry)
 import Screamer.Signal (read)
-import Screamer.SignalSource (signalSource)
+import Screamer.Source (eventSource, signalSource)
 import Screamer.Time as Time
 import Web.Event.Event (preventDefault, target)
 import Web.HTML.HTMLInputElement as Input

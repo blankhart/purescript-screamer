@@ -20,14 +20,14 @@ import Effect.Class (liftEffect)
 import Effect.Random as Random
 import Effect.Ref as Ref
 import Partial.Unsafe (unsafePartial)
-import Screamer.SignalSource (SignalSource, batch, signalSource)
-import Screamer.Core (Element, component, each, element)
-import Screamer.DOM.Attribute (InputType(..))
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, component, each, element)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes (InputType(..))
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Signal (Signal, read)
+import Screamer.Source (batch, SignalSource, signalSource)
 
 ---------------------------------------------------
 -- Main

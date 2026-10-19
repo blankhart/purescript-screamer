@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   cell, derived, map, bind, fold, merge, filter, filterOn, hold, scope, effect, batch, stats,
   Readable,
-} from '../../src/Screamer/Reactive/Core.ts';
+} from '../../src/Screamer/Runtime.ts';
 
 describe('prototype checks', () => {
   test('6 fold steps only while observed, keeps its state, coalesces within a batch', () => {

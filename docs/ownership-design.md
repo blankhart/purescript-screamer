@@ -80,12 +80,12 @@ filter   :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
 filterOn :: forall a. Signal Boolean -> a -> Signal a -> Signal a
 read     :: forall a. Signal a -> Effect a           -- untracked, formerly get
 
--- Screamer.SignalSource: sources of signals (Screamer.Channel until #17)
+-- Screamer.Source: sources of signals and events (Screamer.Channel until #17, merged in #45)
 type SignalSource a = { signal :: Signal a, put :: a -> Effect Unit, modify :: (a -> a) -> Effect Unit }
 signalSource :: forall a. a -> Effect (SignalSource a)
 batch        :: forall a. Effect a -> Effect a
 
--- Screamer.Event and Screamer.EventSource: discrete events (#18), specified in docs/combinators.md
+-- Screamer.Event: discrete events (#18), specified in docs/combinators.md; their source is in Screamer.Source
 type EventSource a = { event :: Event a, fire :: a -> Effect Unit }
 eventSource :: forall a. Effect (EventSource a)
 
@@ -97,7 +97,7 @@ hold      :: forall a. Signal a -> Owned (Signal a)
 child     :: forall a. Owned a -> Owned { value :: a, dispose :: Effect Unit }
 resource  :: forall a b. Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))   -- stage 9
 
--- Screamer.Core: elements
+-- Screamer.Element: elements
 newtype Element = Element (Owned Node)             -- opaque; pure to construct
 element_    :: String -> Array Attribute -> Array Element -> Element
 svgElement_ :: String -> Array Attribute -> Array Element -> Element
@@ -126,11 +126,11 @@ Evaluating an `Element` runs nothing, including the setup inside `component`. In
 - **Scopes.** Cleanups run in reverse order; disposal is idempotent.
 - **Dev checks** behind `__DEV__`: write guard, cycle detection among derived nodes, counters for live effects, scopes and links.
 - **Exception safety.** A throwing derivation leaves its node dirty and the graph consistent; a throwing effect is reported to the nearest scope's error handler and does not stop the flush.
-- **One runtime.** The core is the foreign module of `Screamer.Reactive.Core`. Other foreign modules import it at run time as `../Screamer.Reactive.Core/foreign.js` (where `purs` puts it in `output/`) and take its types from `./Reactive/Core.js`, so every module shares one graph and the import also works when Screamer is a dependency.
+- **One runtime.** The core is the foreign module of `Screamer.Runtime`. Other foreign modules import it at run time as `../Screamer.Runtime/foreign.js` (where `purs` puts it in `output/`) and take its types from `./Runtime.js`, so every module shares one graph and the import also works when Screamer is a dependency.
 - **Release at batch end.** A node that loses its last target during a batch stays linked until the batch ends, and unlinks then only if nothing observes it again. A stateful node that moves from one observer to another within a batch therefore neither pauses nor resynchronizes.
 - **`filterOn`.** Follows its source while the condition is true and holds its last value while it is false; when the condition becomes true it takes the source's current value. It starts at the source if the condition holds at the start, otherwise at the seed.
 - **No owner inside computations.** Derivations and effect bodies run with no current scope, so they cannot create effects by accident. Code that builds a child scope from inside an effect (`dyn`, `each`) names the parent scope explicitly.
-- **Libraries checked (stage 1).** `@preact/signals-core` 1.14.4 has `watched`/`unwatched` options on signals but keeps versions internal (`_version`); `alien-signals` 3.2.1 exposes an `unwatched` hook in `createReactiveSystem` but no first-observer hook and only per-link versions. Neither exposes both without patching, so the core is our own (`src/Screamer/Reactive/Core.ts`).
+- **Libraries checked (stage 1).** `@preact/signals-core` 1.14.4 has `watched`/`unwatched` options on signals but keeps versions internal (`_version`); `alien-signals` 3.2.1 exposes an `unwatched` hook in `createReactiveSystem` but no first-observer hook and only per-link versions. Neither exposes both without patching, so the core is our own (`src/Screamer/Runtime.ts`).
 
 A working prototype (153 lines, 23 checks, randomized glitch test) is attached to the stage 1 issue, #4.
 
@@ -181,7 +181,7 @@ Handlers take the standard `Web.*` event types. Screamer's generated event class
 | Discrete events | **Decided (#17):** a separate `Event a` type with no current value and no cutoff; every occurrence propagates, in fire order. See `docs/combinators.md` |
 | Names of sources | **Decided (#17):** `SignalSource` (`signalSource`, formerly `Channel`/`channel`) and `EventSource` (`eventSource`) |
 | Combinators that need timers or async work | **Decided (#17):** they return `Owned`; everything else is pure |
-| Escape hatch for JS widgets | **Decided (#27):** `foreign_ :: (Web.DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element` in `Screamer.Core`, not a `withNode_` attribute. A host element with no Screamer children makes "Screamer never touches its children" true by construction, while an attribute could be put on an element that also has Screamer children, and attributes have no ordering to say when it runs. |
+| Escape hatch for JS widgets | **Decided (#27):** `foreign_ :: (Web.DOM.Element -> Owned Unit) -> String -> Array Attribute -> Element` in `Screamer.Element`, not a `withNode_` attribute. A host element with no Screamer children makes "Screamer never touches its children" true by construction, while an attribute could be put on an element that also has Screamer children, and attributes have no ordering to say when it runs. |
 
 ## Stages
 

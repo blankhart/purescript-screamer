@@ -1,16 +1,16 @@
-// Foreign module of Screamer.Core: the DOM layer.
+// Foreign module of Screamer.Element: the DOM layer.
 //
 // An Element is an `Owned Node`; at run time that is a function from a scope
 // to an effect producing the node. Instantiating it creates the DOM nodes and
 // the effects that keep them up to date, all owned by that scope.
-import type * as Core from './Reactive/Core.js';
-// @ts-ignore: purs copies this file to output/Screamer.Core/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
+import type * as Runtime from './Runtime.js';
+// @ts-ignore: purs copies this file to output/Screamer.Element/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
 
-const R: typeof Core = CoreRuntime;
+const R: typeof Runtime = runtime;
 
-type Scope = Core.Scope;
-type Sig<T> = Core.Readable<T>;
+type Scope = Runtime.Scope;
+type Sig<T> = Runtime.Readable<T>;
 type El = (s: Scope) => () => Node;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -219,7 +219,7 @@ export const dynImpl = (sig: Sig<El>) => (s: Scope) => (): Node => {
 
 interface Row<A> {
   key: any;
-  cell: Core.Cell<A>;
+  cell: Runtime.Cell<A>;
   scope: Scope;
   first: Node;
   last: Node;

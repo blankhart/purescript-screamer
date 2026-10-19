@@ -1,6 +1,6 @@
-// @ts-ignore: purs copies this file to output/Screamer.Time/foreign.js, next to the core's.
-import * as CoreRuntime from '../Screamer.Reactive.Core/foreign.js';
-const R = CoreRuntime;
+// @ts-ignore: purs copies this file to output/Screamer.Time/foreign.js, next to the runtime's.
+import * as runtime from '../Screamer.Runtime/foreign.js';
+const R = runtime;
 /** Run `action` once after `ms`, inside a batch. */
 export const timeoutImpl = (ms) => (action) => () => {
     const id = setTimeout(() => R.batch(action), ms);

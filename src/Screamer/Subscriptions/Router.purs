@@ -11,13 +11,13 @@ import Prelude
 
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (Attribute, Element)
-import Screamer.DOM.Attribute (href_)
-import Screamer.DOM.Element (a_)
-import Screamer.DOM.EventHandler (onClick_)
+import Screamer.Element (Attribute, Element)
+import Screamer.Html (a_)
+import Screamer.Html.Attributes (href_)
+import Screamer.Html.Handlers (onClick_)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal)
+import Screamer.Source (signalSource)
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, altKey, button, ctrlKey, metaKey, shiftKey, toEvent)
 

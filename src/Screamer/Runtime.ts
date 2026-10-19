@@ -1640,7 +1640,7 @@ export function holdEvent<A>(e: EventLike<A>): EventLike<A> {
 }
 
 // ---------------------------------------------------------------------------
-// PureScript entry points of `Screamer.Reactive.Core`
+// PureScript entry points of `Screamer.Runtime`
 
 /** A copy of the introspection counters, as an `Effect`. */
 export const readStats = () => ({ ...stats });

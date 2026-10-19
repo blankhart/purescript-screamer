@@ -9,14 +9,14 @@ import Prelude
 import Data.String as String
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Core (Element, component, element, foreign_, text)
-import Screamer.DOM.Attribute as A
-import Screamer.DOM.Element as E
-import Screamer.DOM.EventHandler as H
+import Screamer.Element (Element, component, element, foreign_, text)
 import Screamer.Examples.Harness as Harness
+import Screamer.Html as E
+import Screamer.Html.Attributes as A
+import Screamer.Html.Handlers as H
 import Screamer.Owned (onCleanup, subscribe)
 import Screamer.Signal (Signal, read)
-import Screamer.SignalSource (batch, signalSource)
+import Screamer.Source (batch, signalSource)
 import Web.DOM.Element as DOM
 
 main :: Effect Unit

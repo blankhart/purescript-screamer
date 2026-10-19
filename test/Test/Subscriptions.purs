@@ -13,13 +13,13 @@ import Effect.Aff (Aff, delay, effectCanceler, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Effect.Ref as Ref
-import Screamer.SignalSource (signalSource)
-import Screamer.Core (text)
-import Screamer.Core as Core
+import Screamer.Element (text)
+import Screamer.Element as E
 import Screamer.Event as Event
 import Screamer.Owned (runOwned, subscribe)
 import Screamer.Resource (Remote(..), resource)
 import Screamer.Signal (read)
+import Screamer.Source (signalSource)
 import Screamer.Subscriptions.AnimationFrame as AnimationFrame
 import Screamer.Subscriptions.Router as Router
 import Screamer.Subscriptions.Timer as Timer
@@ -89,7 +89,7 @@ webSocket = before_ (liftEffect Fake.installMockWebSocket) $ after_ (liftEffect 
     states <- liftEffect $ Ref.new []
     sock <- liftEffect $ Ref.new Nothing
     received <- liftEffect $ Ref.new []
-    unmount <- liftEffect $ Core.mount "#root" $ Core.component do
+    unmount <- liftEffect $ E.mount "#root" $ E.component do
       s <- WebSocket.connect "ws://example.test/chat"
       subscribe s.state \st -> Ref.modify_ (_ <> [ show st ]) states
       liftEffect $ Ref.write (Just s) sock
@@ -120,11 +120,11 @@ router = describe "Router" do
   it "follows navigate, redirect, links and popstate" do
     liftEffect resetBody
     liftEffect $ Router.redirect "/start"
-    unmount <- liftEffect $ Core.mount "#root" $ Core.component do
+    unmount <- liftEffect $ E.mount "#root" $ E.component do
       loc <- Router.location
-      pure $ Core.fragment_
-        [ Router.link "/about?x=1#top" [] [ Core.element "about" ]
-        , Core.element_ "p" [] [ text (loc <#> \l -> l.pathname <> l.search <> l.hash) ]
+      pure $ E.fragment_
+        [ Router.link "/about?x=1#top" [] [ E.element "about" ]
+        , E.element_ "p" [] [ text (loc <#> \l -> l.pathname <> l.search <> l.hash) ]
         ]
     let shown = innerHTML "#root p"
     liftEffect shown >>= shouldEqual "/start"
