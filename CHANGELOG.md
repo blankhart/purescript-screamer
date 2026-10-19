@@ -84,3 +84,8 @@ Server rendering will live in a separate library; the core gains the seams it ne
 
 - New in screamer-web: `Screamer.Web.Storage` (`localStorage`, `sessionStorage`), `Screamer.Web.MediaQuery` (`matches`), `Screamer.Web.Observers` (`resize`, `intersecting`) and `Screamer.Web.Page` (`visible`, `online`).
 - Every screamer-web source, `WebSocket.connect` included, creates nothing when `Screamer.Renderer.interactive` is false. screamer-web now depends on screamer.
+
+### Release branch (#53)
+
+- The `.js` that `tsc` compiles from each FFI `.ts` is no longer committed. `scripts/release.mjs`, run by the Release workflow, commits it onto the `release` branch and tags each release `v<version>`. Depend on a tag with spago `extraPackages` (see the README).
+- `npm run set-version -- <version>` sets one version on every package.

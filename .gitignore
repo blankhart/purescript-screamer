@@ -13,3 +13,6 @@
 **/.vscode
 **/yarn-error.log
 .compile-fail-output/
+# tsc compiles each FFI .ts to the .js beside it. Only the release branch
+# commits that .js (scripts/release.mjs).
+packages/*/src/**/*.js
