@@ -27,7 +27,7 @@ import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Signal (Signal, read)
-import Screamer.Source (batch, SignalSource, signalSource)
+import Screamer.Source (SignalSource, batch, signalSource)
 
 ---------------------------------------------------
 -- Main
