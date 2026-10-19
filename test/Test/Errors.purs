@@ -10,9 +10,9 @@ import Effect.Aff (delay, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error, message, throw)
 import Effect.Ref as Ref
-import Screamer.Owned (child, onError, runOwned, subscribe)
+import Screamer.Owned (child, onError, runOwned)
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry, toMaybe, withDefault)
-import Screamer.Signal (read)
+import Screamer.Signal (read, subscribe)
 import Screamer.Signal as Signal
 import Screamer.Source (signalSource)
 import Test.Fakes as Fake

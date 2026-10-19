@@ -11,7 +11,8 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
 import Effect (Effect)
 import Effect.Class (liftEffect)
-import Screamer.Signal (Signal, dropRepeats, fold, read, sampleManyWith)
+import Screamer.Event as Event
+import Screamer.Signal (Signal, dropRepeats, read, sampleManyWith)
 import Screamer.Source (SignalSource, batch, signalSource)
 import Test.Observe (observe)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
@@ -150,16 +151,6 @@ spec = describe "Screamer.Signal" do
       liftEffect o.trace >>= shouldEqual [ { n: 1 }, { n: 2 } ]
       liftEffect (Array.length <$> raw.trace) >>= shouldEqual 4
 
-  describe "fold" do
-    it "advances only while observed" do
-      ch <- liftEffect $ signalSource 0
-      let count = fold (\_ n -> n + 1) 0 ch.signal
-      o <- liftEffect $ observe count
-      liftEffect $ ch.put 1
-      liftEffect $ ch.put 2
-      liftEffect o.stop
-      liftEffect $ ch.put 3
-      liftEffect (read count) >>= shouldEqual 2
   where
   f p x = x * p.k + p.m
   g p x = x * 2 - p.m
@@ -167,4 +158,4 @@ spec = describe "Screamer.Signal" do
   v s = map (\k x -> x * k) s.b
   kf s x = if even x then map (_ + x) s.b else s.c
   kg s y = if y > 3 then map (_ - y) s.a else s.b
-  kfold s x = fold (\y acc -> acc + y) x s.b
+  kfold s x = Event.fold (\y acc -> acc + y) x (Event.changes s.b)

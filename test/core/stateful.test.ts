@@ -1,9 +1,16 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cell, derived, map, bind, fold, merge, filter, filterOn, hold, scope, effect, batch, stats,
+  cell, derived, map, bind, stateful, merge, latestWhere, gateSignal, hold, scope, effect, batch, stats,
   Readable,
 } from '../../src/Screamer/Runtime.ts';
+
+// A stateful signal that accumulates its input, one step per batch in which
+// the input changed. The removed signal fold was this; PureScript code folds an
+// event (`Event.fold f seed (Event.changes s)`), but these tests use it to
+// exercise the stateful node itself.
+const fold = <A, B>(f: (a: A, b: B) => B, seed: B, s: Readable<A>): Readable<B> =>
+  stateful([s], () => seed, (_, values, b) => f(values[0], b));
 
 describe('prototype checks', () => {
   test('6 fold steps only while observed, keeps its state, coalesces within a batch', () => {
@@ -65,9 +72,9 @@ describe('prototype checks', () => {
     s2();
   });
 
-  test('8 filter', () => {
+  test('8 latestWhere', () => {
     const s = cell(1);
-    const evens = filter((x: number) => x % 2 === 0, 0, s);
+    const evens = latestWhere((x: number) => x % 2 === 0, 0, s);
     const seen: number[] = [];
     const stop = scope(() => { effect(() => { seen.push(evens.read()); }); });
     s.write(2);
@@ -102,11 +109,11 @@ describe('hold', () => {
   });
 });
 
-describe('filterOn', () => {
+describe('gateSignal', () => {
   test('follows the source while the condition holds and keeps its value otherwise', () => {
     const cond = cell(true);
     const src = cell(1);
-    const f = filterOn(cond, 0, src);
+    const f = gateSignal(cond, 0, src);
     const seen: number[] = [];
     const stop = scope(() => { effect(() => { seen.push(f.read()); }); });
     src.write(2);
@@ -124,7 +131,7 @@ describe('filterOn', () => {
   test('starts at the seed when the condition is false', () => {
     const cond = cell(false);
     const src = cell(1);
-    const f = filterOn(cond, 0, src);
+    const f = gateSignal(cond, 0, src);
     assert.equal(f.read(), 0);
   });
 });

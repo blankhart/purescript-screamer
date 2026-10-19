@@ -18,8 +18,8 @@ export const intervalImpl = (ms: number) => (action: () => void) => () => {
   return () => clearInterval(id);
 };
 
-/** Run `action` on the next animation frame, inside a batch. */
-export const frameImpl = (action: () => void) => () => {
-  const id = requestAnimationFrame(() => R.batch(action));
+/** Run `action` with the next animation frame's timestamp, inside a batch. */
+export const frameImpl = (action: (t: number) => () => void) => () => {
+  const id = requestAnimationFrame((t) => R.batch(action(t)));
   return () => cancelAnimationFrame(id);
 };

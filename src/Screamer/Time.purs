@@ -1,7 +1,9 @@
--- | Rate-limiting and scheduling for events. Each combinator needs a timer,
--- | so each returns `Owned`: its timers start when its scope runs and are
--- | cancelled when the scope is disposed, and a pending occurrence is then
--- | dropped.
+-- | Time: timer and frame sources, and rate-limiting and scheduling for
+-- | events. Each needs a timer, so each returns `Owned`: its timers start
+-- | when its scope runs and are cancelled when the scope is disposed, and a
+-- | pending occurrence is then dropped. Sources return a `Signal` for state
+-- | (`clock`) or an `Event` for occurrences (`interval`, `after`, `frames`),
+-- | never take a callback; every timer callback runs inside `batch`.
 -- |
 -- | Each combinator subscribes to its input when it is instantiated, so it
 -- | observes the input for the whole life of its scope, whether or not
@@ -10,8 +12,12 @@
 -- | without a timer (a leading throttle edge, a timeout's `Right`) are fired
 -- | from a subscription, so they arrive in the round after the input's.
 module Screamer.Time
-  ( debounce
-  , debounced
+  ( clock
+  , interval
+  , after
+  , frames
+  , debounce
+  , debounceSignal
   , throttle
   , audit
   , sampleEvery
@@ -24,24 +30,26 @@ module Screamer.Time
 import Prelude
 
 import Data.Array as Array
+import Data.DateTime.Instant (Instant)
 import Data.Either (Either(..))
 import Data.Foldable (for_, sequence_, traverse_)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Now (now)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.Owned (Owned, hold, onCleanup)
-import Screamer.Signal (Signal, read)
+import Screamer.Owned (Owned, onCleanup)
+import Screamer.Signal (Signal, hold, read)
 import Screamer.Source (eventSource, signalSource)
 
 foreign import timeoutImpl :: Number -> Effect Unit -> Effect (Effect Unit)
 
 foreign import intervalImpl :: Number -> Effect Unit -> Effect (Effect Unit)
 
-foreign import frameImpl :: Effect Unit -> Effect (Effect Unit)
+foreign import frameImpl :: (Number -> Effect Unit) -> Effect (Effect Unit)
 
 -- | A single timer slot: starting it cancels the previous one.
 type Slot = { start :: Effect (Effect Unit) -> Effect Unit, cancel :: Effect Unit, busy :: Effect Boolean }
@@ -60,6 +68,44 @@ slot = do
   onCleanup cancel
   pure { start, cancel, busy: isJust <$> Ref.read current }
 
+-- | The current time, starting now and updated every interval.
+clock :: Milliseconds -> Owned (Signal Instant)
+clock (Milliseconds ms) = do
+  time <- liftEffect $ signalSource =<< now
+  cancel <- liftEffect $ intervalImpl ms (time.put =<< now)
+  onCleanup cancel
+  pure time.signal
+
+-- | One occurrence every interval, starting one interval from now.
+interval :: Milliseconds -> Owned (Event Unit)
+interval (Milliseconds ms) = do
+  out <- liftEffect eventSource
+  cancel <- liftEffect $ intervalImpl ms (out.fire unit)
+  onCleanup cancel
+  pure out.event
+
+-- | One occurrence, the interval from now, unless the scope is disposed
+-- | first.
+after :: Milliseconds -> Owned (Event Unit)
+after (Milliseconds ms) = do
+  out <- liftEffect eventSource
+  cancel <- liftEffect $ timeoutImpl ms (out.fire unit)
+  onCleanup cancel
+  pure out.event
+
+-- | One occurrence per animation frame, carrying the frame's timestamp in
+-- | milliseconds on the `performance.now()` clock.
+frames :: Owned (Event Number)
+frames = do
+  out <- liftEffect eventSource
+  timer <- slot
+  let
+    loop _ = timer.start $ frameImpl \t -> do
+      loop unit
+      out.fire t
+  liftEffect $ loop unit
+  pure out.event
+
 -- | The last occurrence of each burst, once the input has been quiet for
 -- | the interval. (RxJS `debounceTime`.)
 debounce :: forall a. Milliseconds -> Event a -> Owned (Event a)
@@ -70,9 +116,10 @@ debounce (Milliseconds ms) input = do
   pure out.event
 
 -- | The signal's value once it has stopped changing for the interval. It
--- | starts at the signal's current value.
-debounced :: forall a. Milliseconds -> Signal a -> Owned (Signal a)
-debounced ms input = do
+-- | starts at the signal's current value. The signal counterpart of
+-- | `debounce`.
+debounceSignal :: forall a. Milliseconds -> Signal a -> Owned (Signal a)
+debounceSignal ms input = do
   out <- liftEffect $ signalSource =<< read input
   settled <- debounce ms (Event.changes input)
   Event.subscribe settled out.put
@@ -120,7 +167,7 @@ audit (Milliseconds ms) input = do
 
 -- | The signal's value at every interval, starting one interval from now.
 -- | The signal is held, so a stateful signal keeps advancing. (RxJS
--- | `sampleTime`, built like `Timer.every`.)
+-- | `sampleTime`, built like `clock`.)
 sampleEvery :: forall a. Milliseconds -> Signal a -> Owned (Event a)
 sampleEvery (Milliseconds ms) input = do
   out <- liftEffect eventSource
@@ -172,7 +219,7 @@ onFrame input = do
   Event.subscribe input \a -> do
     Ref.write (Just a) latest
     waiting <- timer.busy
-    unless waiting $ timer.start $ frameImpl do
+    unless waiting $ timer.start $ frameImpl \_ -> do
       timerDone timer
       Ref.modify' (\l -> { state: Nothing, value: l }) latest >>= traverse_ out.fire
   pure out.event

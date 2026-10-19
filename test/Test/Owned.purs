@@ -8,9 +8,10 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (message, try)
 import Effect.Ref as Ref
-import Screamer.Owned (Owned, child, hold, onCleanup, runOwned, subscribe)
+import Screamer.Owned (child, onCleanup, runOwned)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (fold, read)
+import Screamer.Event as Event
+import Screamer.Signal (hold, read, subscribe)
 import Screamer.Source (signalSource)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
@@ -95,8 +96,8 @@ spec = describe "Screamer.Owned" do
 
   it "stops a held fold advancing when its child scope is disposed" do
     clicks <- liftEffect $ signalSource 0
-    let count = fold (\_ n -> n + 1) 0 clicks.signal
-    r <- liftEffect $ runOwned (child (void $ hold count) :: Owned _)
+    let count = Event.fold (\_ n -> n + 1) 0 (Event.changes clicks.signal)
+    r <- liftEffect $ runOwned $ child (void $ hold count)
     liftEffect $ clicks.put 1
     liftEffect $ clicks.put 2
     liftEffect (read count) >>= shouldEqual 2
@@ -110,7 +111,7 @@ spec = describe "Screamer.Owned" do
     a <- liftEffect $ signalSource 0
     r <- liftEffect $ runOwned do
       subscribe (map (_ + 1) a.signal) \_ -> pure unit
-      void $ hold (fold (+) 0 a.signal)
+      void $ hold (Event.fold (+) 0 (Event.changes a.signal))
       void $ child (subscribe a.signal \_ -> pure unit)
     liftEffect $ a.put 1
     liftEffect r.dispose

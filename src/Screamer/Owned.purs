@@ -8,8 +8,6 @@ module Screamer.Owned
   ( Scope
   , Owned(..)
   , onCleanup
-  , subscribe
-  , hold
   , child
   , runOwned
   , onError
@@ -20,7 +18,6 @@ import Prelude
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Effect.Exception (Error)
-import Screamer.Signal (Signal)
 
 foreign import data Scope :: Type
 
@@ -48,10 +45,6 @@ instance MonadEffect Owned where
 
 foreign import onCleanupImpl :: Scope -> Effect Unit -> Effect Unit
 
-foreign import subscribeImpl :: forall a. Scope -> Signal a -> (a -> Effect Unit) -> Effect Unit
-
-foreign import holdImpl :: forall a. Scope -> Signal a -> Effect (Signal a)
-
 foreign import childImpl :: forall a. Scope -> (Scope -> Effect a) -> Effect { value :: a, dispose :: Effect Unit }
 
 foreign import runOwnedImpl :: forall a. (Scope -> Effect a) -> Effect { value :: a, dispose :: Effect Unit }
@@ -61,19 +54,6 @@ foreign import onErrorImpl :: Scope -> (Error -> Effect Unit) -> Effect Unit
 -- | Run an action when the current scope is disposed.
 onCleanup :: Effect Unit -> Owned Unit
 onCleanup e = Owned \s -> onCleanupImpl s e
-
--- | Call the function with the signal's value now and whenever it changes,
--- | until the current scope is disposed. The callback runs untracked; writes
--- | it makes take effect in the next flush round, and it never runs
--- | re-entrantly.
-subscribe :: forall a. Signal a -> (a -> Effect Unit) -> Owned Unit
-subscribe sig cb = Owned \s -> subscribeImpl s sig cb
-
--- | Observe a signal for the lifetime of the current scope, so a stateful
--- | signal advances whether or not anything else reads it. Returns the same
--- | signal.
-hold :: forall a. Signal a -> Owned (Signal a)
-hold sig = Owned \s -> holdImpl s sig
 
 -- | Run in a child scope that can be disposed early. It is disposed with the
 -- | current scope at the latest.

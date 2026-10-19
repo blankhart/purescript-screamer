@@ -19,9 +19,10 @@ import Screamer.Examples.Harness as Harness
 import Screamer.Html as E
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
-import Screamer.Signal (Signal, filterOn, sampleManyWith, sampleOn)
+import Screamer.Event as Event
+import Screamer.Signal (Signal, gate, sampleManyWith, sampleOn)
 import Screamer.Source (SignalSource, signalSource)
-import Screamer.Subscriptions.AnimationFrame as AnimationFrame
+import Screamer.Time as Time
 import Web.DOM.Element as Element
 import Web.Event.Event (currentTarget, preventDefault)
 import Web.PointerEvent.PointerEvent (toMouseEvent)
@@ -91,7 +92,7 @@ mkDot dotAttrs i =
   }
   where
   isActive = dotAttrs <#> \{ max } -> Int.toNumber i < max
-  activeAttrs = filterOn isActive { hb: 0, pos: origin, max: 0.0 } dotAttrs
+  activeAttrs = gate isActive { hb: 0, pos: origin, max: 0.0 } dotAttrs
 
 -- | The pointer's position relative to the centre of the element handling
 -- | the event, which is where the spiral starts.
@@ -111,7 +112,8 @@ spiral = component do
   heartbeat <- liftEffect $ signalSource 0
   position <- liftEffect $ signalSource origin
   isBig <- liftEffect $ signalSource false
-  AnimationFrame.every (heartbeat.modify (_ + 1))
+  ticks <- Time.frames
+  Event.subscribe ticks \_ -> heartbeat.modify (_ + 1)
   let
     dotAttrs = sampleManyWith { pos: position.signal, n: numerosity.signal } { hb: heartbeat.signal } toDotAttrs
     cursor = sampleOn heartbeat.signal position.signal

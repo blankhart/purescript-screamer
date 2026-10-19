@@ -28,8 +28,8 @@ import Effect.Exception (Error, message)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.Owned (Owned, onCleanup, subscribe)
-import Screamer.Signal (Signal)
+import Screamer.Owned (Owned, onCleanup)
+import Screamer.Signal (Signal, subscribe)
 import Screamer.Source (eventSource, signalSource)
 
 data Remote b = Loading | Failed Error | Loaded b
