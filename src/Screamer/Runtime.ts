@@ -624,6 +624,12 @@ export class Scope {
   children: Set<Scope> = new Set();
   disposed = false;
   onError: ErrorHandler | null = null;
+  /**
+   * Context values provided at this scope, or null when it provides none.
+   * A scope that provides creates its object with its parent's nearest
+   * context as prototype, so a lookup needs only the nearest non-null one.
+   */
+  ctx: Context | null = null;
   constructor(public parent: Scope | null) {
     if (parent !== null) {
       if (parent.disposed) throw new Error('scope created under a disposed scope');
@@ -664,6 +670,21 @@ export class Scope {
     }
     if (failed) throw error;
   }
+}
+
+/** Context values by key. */
+export type Context = Record<PropertyKey, unknown>;
+
+/** The context of the nearest scope at or above `s` that has one, or null. */
+export function contextOf(s: Scope | null): Context | null {
+  for (let x = s; x !== null; x = x.parent) if (x.ctx !== null) return x.ctx;
+  return null;
+}
+
+/** The value provided for `key` at or above `s`, or `dflt` when none is. */
+export function lookupContext<T>(s: Scope | null, key: PropertyKey, dflt: T): T {
+  const ctx = contextOf(s);
+  return ctx !== null && key in ctx ? (ctx[key] as T) : dflt;
 }
 
 export function createScope(parent: Scope | null = owner): Scope {

@@ -226,7 +226,7 @@ resource = resourceWith Switch
 
 ## Time (#22)
 
-`Screamer.Time`. Its sources return state as a `Signal` and occurrences as an `Event`, and take no callbacks:
+`Screamer.Time`. Each combinator reads the `Screamer.Host` of its scope when it is instantiated, so a fake host drives it in tests. Its sources return state as a `Signal` and occurrences as an `Event`, and take no callbacks:
 
 ```purescript
 clock    :: Milliseconds -> Owned (Signal Instant)   -- the current time, updated every interval
