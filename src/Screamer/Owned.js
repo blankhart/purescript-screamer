@@ -8,15 +8,6 @@ export const onCleanupImpl = (s) => (e) => () => {
         throw new Error('onCleanup in a disposed scope');
     s.cleanups.push(e);
 };
-export const subscribeImpl = (s) => (sig) => (cb) => () => {
-    R.runInScope(s, () => {
-        R.effect(() => {
-            const v = sig.read();
-            R.untracked(() => cb(v)());
-        });
-    });
-};
-export const holdImpl = (s) => (sig) => () => R.runInScope(s, () => R.hold(sig));
 const result = (value, s) => ({ value, dispose: () => R.batch(() => s.dispose()) });
 export const childImpl = (s) => (body) => () => {
     const c = R.createScope(s);

@@ -11,9 +11,10 @@ import Effect.Class (liftEffect)
 import Effect.Class as Owned
 import Effect.Ref as Ref
 import Screamer.Element (Attribute, Element, attribute, booleanAttribute, component, dyn, each, element, element_, foreign_, fragment_, mount, on_, property, styleProperty, text)
-import Screamer.Owned (onCleanup, subscribe)
+import Screamer.Owned (onCleanup)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (Signal, fold, read)
+import Screamer.Event as Event
+import Screamer.Signal (Signal, read, subscribe)
 import Screamer.Signal as Signal
 import Screamer.Source (signalSource)
 import Test.DomHelpers (click, fakeWidget, currentTag, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
@@ -121,7 +122,7 @@ spec = describe "Screamer.Element" do
     src <- liftEffect $ signalSource 0
     let
       branch t = component do
-        let clicks = fold (\_ n -> n + 1) 0 src.signal
+        let clicks = Event.fold (\_ n -> n + 1) 0 (Event.changes src.signal)
         subscribe clicks \_ -> pure unit
         pure $ element_ "p" [] [ element t, text (show <$> clicks) ]
     _ <- liftEffect $ mount "#root" $ div' [] [ dyn (branch <$> tab.signal) ]

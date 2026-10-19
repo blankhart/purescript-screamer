@@ -11,11 +11,10 @@
 -- | when first observed, step once per occurrence while observed, and keep
 -- | their state when the last observer leaves. Unlike stateful signals they
 -- | do not resynchronize on return: occurrences fired while paused are
--- | missed. Use `Screamer.Owned.hold` on a signal, or `hold` here on an
+-- | missed. Use `Screamer.Signal.hold` on a signal, or `hold` here on an
 -- | event, to keep one advancing.
 -- |
--- | This module reuses names from `Screamer.Signal` and `Screamer.Owned`,
--- | so import it qualified: `import Screamer.Event as Event`. See
+-- | This module reuses names from `Screamer.Signal`, so import it qualified: `import Screamer.Event as Event`. See
 -- | `docs/combinators.md` for the full semantics.
 module Screamer.Event
   ( Event
@@ -158,7 +157,7 @@ foreign import holdImpl :: forall a. Scope -> Event a -> Effect (Event a)
 -- | Observe an event for the lifetime of the current scope, so a stateful
 -- | event (`take`, `mapAccum`, `dropRepeats`, ...) keeps stepping while
 -- | nothing else observes it. Returns the same event. The event counterpart
--- | of `Screamer.Owned.hold`; see "Sharing" in `docs/combinators.md`.
+-- | of `Screamer.Signal.hold`; see "Sharing" in `docs/combinators.md`.
 hold :: forall a. Event a -> Owned (Event a)
 hold e = Owned \s -> holdImpl s e
 
@@ -216,7 +215,7 @@ count :: forall a. Event a -> Signal Int
 count = fold (\_ n -> n + 1) 0
 
 -- | The occurrences of rounds that end with the signal true. The event
--- | version of `Screamer.Signal.filterOn`.
+-- | version of `Screamer.Signal.gate`.
 foreign import gate :: forall a. Signal Boolean -> Event a -> Event a
 
 -- Combining several streams (#20).

@@ -10,7 +10,6 @@ export const sampleOn = (a) => (b) => R.derived(() => {
     return R.sample(b);
 });
 export const dropRepeatsByImpl = (eq) => (s) => R.dropRepeatsBy((x, y) => eq(x)(y), s);
-export const fold = (f) => (seed) => (s) => R.fold((a, b) => f(a)(b), seed, s);
 export const withPreviousImpl = (tuple) => (seed) => (s) => {
     const pair = R.stateful([s], () => ({ previous: seed, current: s.read() }), (_, values, p) => ({ previous: p.current, current: values[0] }));
     return R.map((p) => tuple(p.previous)(p.current), pair);
@@ -30,9 +29,18 @@ export const attemptImpl = (left) => (right) => (s) => R.derived(() => {
     }
 });
 export const merge = (a) => (b) => R.merge(a, b);
-export const filter = (p) => (seed) => (s) => R.filter(p, seed, s);
-export const filterOn = (cond) => (seed) => (s) => R.filterOn(cond, seed, s);
+export const latestWhere = (p) => (seed) => (s) => R.latestWhere(p, seed, s);
+export const gate = (cond) => (seed) => (s) => R.gateSignal(cond, seed, s);
 export const read = (s) => () => R.sample(s);
+export const subscribeImpl = (s) => (sig) => (cb) => () => {
+    R.runInScope(s, () => {
+        R.effect(() => {
+            const v = sig.read();
+            R.untracked(() => cb(v)());
+        });
+    });
+};
+export const holdImpl = (s) => (sig) => () => R.runInScope(s, () => R.hold(sig));
 export const sampleManyWithImpl = (sampled) => (tracked) => (f) => {
     const sampledKeys = Object.keys(sampled);
     const trackedKeys = Object.keys(tracked);

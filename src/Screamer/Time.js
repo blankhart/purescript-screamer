@@ -11,8 +11,8 @@ export const intervalImpl = (ms) => (action) => () => {
     const id = setInterval(() => R.batch(action), ms);
     return () => clearInterval(id);
 };
-/** Run `action` on the next animation frame, inside a batch. */
+/** Run `action` with the next animation frame's timestamp, inside a batch. */
 export const frameImpl = (action) => () => {
-    const id = requestAnimationFrame(() => R.batch(action));
+    const id = requestAnimationFrame((t) => R.batch(action(t)));
     return () => cancelAnimationFrame(id);
 };

@@ -17,18 +17,6 @@ export const onCleanupImpl = (s: Scope) => (e: Eff<void>) => () => {
   s.cleanups.push(e);
 };
 
-export const subscribeImpl = <A>(s: Scope) => (sig: Runtime.Readable<A>) => (cb: (a: A) => Eff<void>) => () => {
-  R.runInScope(s, () => {
-    R.effect(() => {
-      const v = sig.read();
-      R.untracked(() => cb(v)());
-    });
-  });
-};
-
-export const holdImpl = <A>(s: Scope) => (sig: Runtime.Readable<A>) => (): Runtime.Readable<A> =>
-  R.runInScope(s, () => R.hold(sig));
-
 const result = <A>(value: A, s: Scope) => ({ value, dispose: () => R.batch(() => s.dispose()) });
 
 export const childImpl = <A>(s: Scope) => (body: (s: Scope) => Eff<A>) => () => {

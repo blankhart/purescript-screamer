@@ -6,6 +6,7 @@ import Data.Array as Array
 import Data.Either (Either(..), either)
 import Data.Foldable (for_, traverse_)
 import Data.Time.Duration (Milliseconds(..))
+import Effect (Effect)
 import Effect.Aff (Aff, delay, effectCanceler, makeAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, error, message)
@@ -13,13 +14,13 @@ import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
 import Screamer.Flatten (concatOwned, exhaustOwned, mergeOwned, switchOwned)
-import Screamer.Owned (onCleanup, runOwned)
+import Screamer.Owned (Owned, onCleanup, runOwned)
 import Screamer.Resource (Remote(..), Strategy(..), request, resourceWith)
 import Screamer.Runtime (readStats)
 import Screamer.Signal (read)
 import Screamer.Signal as Signal
 import Screamer.Source (eventSource, signalSource)
-import Screamer.Subscriptions.Timer as Timer
+import Screamer.Time as Time
 import Test.Event (observeE)
 import Test.Fakes as Fake
 import Test.Observe (observe)
@@ -58,6 +59,17 @@ pure_ = describe "pure" do
     liftEffect o.trace >>= shouldEqual [ "a1", "b1" ]
     liftEffect o.stop
 
+-- | Run an action once after the delay, unless the scope is disposed first.
+afterDo :: Milliseconds -> Effect Unit -> Owned Unit
+afterDo d action = Time.after d >>= \e -> Event.subscribe e \_ -> action
+
+-- | A child that fires the value once after the delay, and is then done.
+emitAfter :: forall a. Milliseconds -> a -> Effect Unit -> Owned (Event a)
+emitAfter d x done = do
+  e <- Time.after d
+  Event.subscribe e \_ -> done
+  pure (x <$ e)
+
 owned :: Spec Unit
 owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.uninstallFakeTimers) $ describe "owned inner work" do
   it "switchOwned disposes the previous child, releasing its timer" do
@@ -65,7 +77,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
     input <- liftEffect $ signalSource "a"
     before <- liftEffect readStats
     r <- liftEffect $ runOwned $ switchOwned input.signal \x -> do
-      Timer.after (Milliseconds 100.0) (Ref.modify_ (_ <> [ "fired " <> x ]) log)
+      afterDo (Milliseconds 100.0) (Ref.modify_ (_ <> [ "fired " <> x ]) log)
       onCleanup (Ref.modify_ (_ <> [ "disposed " <> x ]) log)
       pure (x <> "!")
     liftEffect (read r.value) >>= shouldEqual "a!"
@@ -83,9 +95,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
   it "mergeOwned runs every child until it is done" do
     src <- liftEffect eventSource
     r <- liftEffect $ runOwned $ mergeOwned src.event \n done -> do
-      tick <- liftEffect eventSource
-      Timer.after (Milliseconds (toNumber n)) (tick.fire n *> done)
-      pure tick.event
+      emitAfter (Milliseconds (toNumber n)) n done
     o <- liftEffect $ observeE r.value
     liftEffect $ traverse_ src.fire [ 300, 100, 200 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 3
@@ -97,9 +107,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
   it "concatOwned runs one child at a time, in order" do
     src <- liftEffect eventSource
     r <- liftEffect $ runOwned $ concatOwned src.event \n done -> do
-      tick <- liftEffect eventSource
-      Timer.after (Milliseconds (toNumber n)) (tick.fire n *> done)
-      pure tick.event
+      emitAfter (Milliseconds (toNumber n)) n done
     o <- liftEffect $ observeE r.value
     liftEffect $ traverse_ src.fire [ 300, 100, 200 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 1
@@ -112,9 +120,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
   it "exhaustOwned ignores inputs while a child runs" do
     src <- liftEffect eventSource
     r <- liftEffect $ runOwned $ exhaustOwned src.event \n done -> do
-      tick <- liftEffect eventSource
-      Timer.after (Milliseconds 100.0) (tick.fire n *> done)
-      pure tick.event
+      emitAfter (Milliseconds 100.0) n done
     o <- liftEffect $ observeE r.value
     liftEffect $ traverse_ src.fire [ 1, 2 ]
     liftEffect $ Fake.advance 150.0
@@ -126,7 +132,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
   it "disposing the parent disposes every running child" do
     src <- liftEffect eventSource
     r <- liftEffect $ runOwned $ mergeOwned src.event \_ _ -> do
-      Timer.after (Milliseconds 100.0) (pure unit)
+      void $ Time.after (Milliseconds 100.0)
       pure (Event.changes (pure 0))
     liftEffect $ traverse_ src.fire [ 1, 2, 3 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 3

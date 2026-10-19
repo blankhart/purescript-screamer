@@ -14,8 +14,8 @@ import Screamer.Examples.Harness as Harness
 import Screamer.Html as E
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
-import Screamer.Owned (onCleanup, subscribe)
-import Screamer.Signal (Signal, read)
+import Screamer.Owned (onCleanup)
+import Screamer.Signal (read, Signal, subscribe)
 import Screamer.Source (batch, signalSource)
 import Web.DOM.Element as DOM
 
