@@ -8,7 +8,7 @@ import Effect.Class as Owned
 import Effect.Ref as Ref
 import Screamer.Attribute (attribute, booleanAttribute, on_, property, styleProperty)
 import Screamer.Context (ask, key, provide)
-import Screamer.Element (Element, component, dyn, each, element, element_, foreignWithFallback_, foreign_, fragment_, svgElement_, text)
+import Screamer.Element (component, dyn, each, element, element_, foreignWithFallback_, foreign_, fragment_, svgElement_, text)
 import Screamer.Element.Unsafe (instantiateWith)
 import Screamer.Renderer (interactive)
 import Screamer.Runtime (readStats)
