@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "bench": "tsc && spago bundle -p screamer-examples --module Screamer.Examples.JsFrameworksBenchmark --outfile output/JsFrameworksBenchmark.bench.js --bundler-args --define:__DEV__=false",
+    "bench": "tsc && node examples/build.mjs --bench",
     "build": "tsc && spago build",
     "build:examples": "tsc && node examples/build.mjs",
     "codegen:dom": "tsx codegen/dom.ts",
@@ -35,6 +35,7 @@
     "jsdom": "^26.1.0",
     "playwright": "^1.64.1",
     "purescript": "^0.15.16",
+    "purs-backend-es": "^1.4.3",
     "purs-tidy": "^0.11.1",
     "spago": "^1.0.4",
     "tsx": "^4.23.15",

@@ -3,6 +3,7 @@
 **/dist
 **/generated-docs/
 **/output/
+**/output-es/
 **/node_modules/
 **/.psa*
 **/.psc-package/

@@ -1,22 +1,28 @@
-// Bundles every example module that defines `main` into examples/output/<Name>.js,
-// then writes examples/output/index.html, which links to each bundle, and
-// copies examples/static (the stylesheet) beside it.
+// Compiles the examples with spago, optimizes the compiled CoreFn into output-es
+// with purs-backend-es, and bundles every example module that defines `main`
+// with esbuild into examples/output/<Name>.js. It then writes
+// examples/output/index.html, which links to each bundle, and copies
+// examples/static (the stylesheet) beside it.
 //   node examples/build.mjs [Name ...]
+// With --bench it instead bundles only the benchmark, with __DEV__ false, into
+// examples/output/JsFrameworksBenchmark.bench.js (`npm run bench`).
 // Open the index at `?example=<Name>` to run one example (`npm run serve`).
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import * as esbuild from 'esbuild';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
 const srcDir = path.join(here, 'src');
 const outDir = path.join(here, 'output');
 const staticDir = path.join(here, 'static');
-const wanted = process.argv.slice(2);
+const bench = process.argv.includes('--bench');
+const wanted = process.argv.slice(2).filter((arg) => arg !== '--bench');
 // Names that splitting at capitals would get wrong.
 const titles = { CodeMirror: 'CodeMirror', JsFrameworksBenchmark: 'JS Frameworks Benchmark', WebSocket: 'WebSocket' };
-const spago = path.join(root, 'node_modules', '.bin', 'spago');
+const bin = (name) => path.join(root, 'node_modules', '.bin', name);
 
 const examples = fs.readdirSync(srcDir).sort().filter((file) => file.endsWith('.purs')).flatMap((file) => {
   const name = path.basename(file, '.purs');
@@ -25,15 +31,38 @@ const examples = fs.readdirSync(srcDir).sort().filter((file) => file.endsWith('.
   return [];
 });
 
+execFileSync(bin('spago'), ['build', '-p', 'screamer-examples'], { cwd: root, stdio: 'inherit' });
+execFileSync(bin('purs-backend-es'), ['build'], { cwd: root, stdio: 'inherit' });
+
+if (bench) {
+  await bundle('JsFrameworksBenchmark', 'JsFrameworksBenchmark.bench.js', { __DEV__: 'false' });
+  process.exit(0);
+}
+
 for (const name of examples) {
   if (wanted.length && !wanted.includes(name)) continue;
-  console.log(`bundling ${name}`);
-  execFileSync(spago, ['bundle', '-p', 'screamer-examples', '--module', `Screamer.Examples.${name}`, '--outfile', `output/${name}.js`],
-    { cwd: root, stdio: 'inherit' });
+  await bundle(name, `${name}.js`);
 }
 
 fs.cpSync(staticDir, outDir, { recursive: true });
 writeIndex(examples.filter((name) => fs.existsSync(path.join(outDir, `${name}.js`))));
+
+async function bundle(name, outfile, define = {}) {
+  console.log(`bundling ${name}`);
+  await esbuild.build({
+    stdin: {
+      contents: `import { main } from './output-es/Screamer.Examples.${name}/index.js';\nmain();\n`,
+      resolveDir: root,
+      sourcefile: `${name}.entry.js`,
+    },
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    define,
+    outfile: path.join(outDir, outfile),
+    logLevel: 'warning',
+  });
+}
 
 function title(name) {
   return titles[name] ?? name.replace(/([a-z])([A-Z])/g, '$1 $2');
