@@ -261,7 +261,7 @@ interface Row<A> {
 }
 
 /** Indices of a longest strictly increasing subsequence of `xs`, ignoring negative entries. */
-export function longestIncreasingSubsequence(xs: ArrayLike<number>): Uint8Array {
+function longestIncreasingSubsequence(xs: ArrayLike<number>): Uint8Array {
   const n = xs.length;
   const prev = new Int32Array(n);
   const tails: number[] = []; // indices into xs

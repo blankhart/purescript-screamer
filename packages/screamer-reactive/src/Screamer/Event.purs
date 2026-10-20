@@ -98,9 +98,9 @@ instance Filterable Event where
   filter = filterImpl
 
 partitionMapE :: forall a l r. (a -> Either l r) -> Event a -> { left :: Event l, right :: Event r }
-partitionMapE f e =
-  { left: filterMapE (either Just (const Nothing) <<< f) e
-  , right: filterMapE (either (const Nothing) Just <<< f) e
+partitionMapE f = map f >>> \e ->
+  { left: filterMapE (either Just (const Nothing)) e
+  , right: filterMapE (either (const Nothing) Just) e
   }
 
 -- | One occurrence, with the new value, in each round in which the signal
