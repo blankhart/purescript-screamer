@@ -65,7 +65,7 @@ workspace:
 
 `npm run release -- 0.2.0` does the same locally, and pushes only with `--push`.
 
-The examples are in `examples/src`. Run `npm run build:examples` to bundle them into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
+The examples are in `examples/src`. Run `npm run build:examples` to compile them, optimize the compiled code with [purs-backend-optimizer](https://github.com/aristanetworks/purescript-backend-optimizer) (into `output-es`), and bundle each one with esbuild into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
 
 ## How ownership works
 
