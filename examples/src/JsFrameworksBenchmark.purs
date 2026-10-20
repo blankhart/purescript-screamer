@@ -1,12 +1,7 @@
 -- | The js-framework-benchmark app: create, update, swap, select and
 -- | remove up to ten thousand table rows.
-module Screamer.Examples.JsFrameworksBenchmark where
-
 -- https://github.com/krausest/js-framework-benchmark
-
--- https://gist.githubusercontent.com/utkarshkukreti/ad83e5a0eb7e6f456e20be0778aae843/raw/2d5ca8641f267aef08d7d658e0fa4ab24b997c21/Screen%2520Shot%25202018-08-24%2520at%25202.04.20%2520PM.png
-
--- http://localhost:8080/webdriver-ts-results/table.html
+module Screamer.Examples.JsFrameworksBenchmark where
 
 import Prelude
 
@@ -174,11 +169,10 @@ row' :: (SignalSource String -> Effect Unit) -> (Int -> Effect Unit) -> Signal T
 row' select remove rowSignal = component do
   { id, label, highlight } <- liftEffect $ read rowSignal
   pure $ E.tr_
-    [ A.class_ highlight.signal
-    , H.onClick_ \_ -> select highlight
-    ]
+    [ A.class_ highlight.signal ]
     [ E.td_ [ A.class_ "col-md-1" ] [ element id ]
-    , E.td_ [ A.class_ "col-md-4" ] [ E.a_ [] [ element label.signal ] ]
+    , E.td_ [ A.class_ "col-md-4" ]
+        [ E.a_ [ H.onClick_ \_ -> select highlight ] [ element label.signal ] ]
     , E.td_
         [ A.class_ "col-md-1" ]
         [ E.a_
