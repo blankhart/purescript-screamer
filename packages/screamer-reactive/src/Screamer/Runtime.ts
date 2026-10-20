@@ -17,8 +17,6 @@
 // An effect runs at most once per flush round and always sees a consistent
 // graph. A node bumps its version only when its value changes under its
 // equality, so unchanged results stop propagation.
-//
-// See docs/ownership-design.md.
 
 declare const __DEV__: boolean | undefined;
 

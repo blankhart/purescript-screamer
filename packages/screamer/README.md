@@ -23,4 +23,4 @@ Depends on: screamer-reactive, and the `web-*` packages.
 
 ## Renderer backends
 
-Every node an element creates, moves or removes goes through the `Screamer.Renderer` backend that its scope's context provides; the default is the browser DOM. A server or hydrating renderer, written as a separate library, supplies its own with `Screamer.Element.Unsafe.instantiateWith`. When the backend is not interactive, `on_` attaches nothing and `foreign_` runs no setup (`foreignWithFallback_` shows its fallback instead). See [`docs/ssr.md`](../../docs/ssr.md).
+Every node an element creates, moves or removes goes through the `Screamer.Renderer` backend that its scope's context provides; the default is the browser DOM. A server or hydrating renderer, written as a separate library, supplies its own with `Screamer.Element.Unsafe.instantiateWith`. When the backend is not interactive, `on_` attaches nothing and `foreign_` runs no setup (`foreignWithFallback_` shows its fallback instead).

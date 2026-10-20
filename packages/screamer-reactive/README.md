@@ -16,4 +16,4 @@ The reactive core: signals, events, sources and scopes, with no DOM. It builds w
 
 Depends on: prelude, effect, control, either, maybe, tuples, exceptions, filterable, record, typelevel-prelude, unsafe-coerce.
 
-The semantics are in [`docs/combinators.md`](../../docs/combinators.md) and [`docs/ownership-design.md`](../../docs/ownership-design.md). `test/core/` has the TypeScript tests of the runtime (`npm run test:core`).
+`test/core/` has the TypeScript tests of the runtime (`npm run test:core`).

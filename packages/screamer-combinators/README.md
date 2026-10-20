@@ -9,7 +9,7 @@ More operators over the core's signals and events, as an add-on: everything here
 | `Screamer.Time` | timer and frame sources, and rate-limiting and scheduling for events, through the scope's `Screamer.Host` |
 | `Screamer.Flatten` | `switchOwned`, `mergeOwned`, `concatOwned`, `exhaustOwned`: flattening with a child scope per inner value |
 
-Depends on: screamer-reactive, and datetime for `Time.clock`. The semantics (pausing, simultaneity, rounds) are the core's, in [`docs/combinators.md`](../../docs/combinators.md). The tables below write `Event.take` and `Signal.combine` for brevity; import the `Extra` modules qualified under names of their own, such as `import Screamer.Event.Extra as EventX`.
+Depends on: screamer-reactive, and datetime for `Time.clock`.  The tables below write `Event.take` and `Signal.combine` for brevity; import the `Extra` modules qualified under names of their own, such as `import Screamer.Event.Extra as EventX`.
 
 ## Transform and filter
 

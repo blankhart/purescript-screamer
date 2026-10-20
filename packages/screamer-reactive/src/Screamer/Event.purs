@@ -14,8 +14,8 @@
 -- | missed. Use `Screamer.Signal.hold` on a signal, or `hold` here on an
 -- | event, to keep one advancing.
 -- |
--- | This module reuses names from `Screamer.Signal`, so import it qualified: `import Screamer.Event as Event`. See
--- | `docs/combinators.md` for the full semantics. More operators (`take`,
+-- | This module reuses names from `Screamer.Signal`, so import it qualified:
+-- | `import Screamer.Event as Event`. More operators (`take`,
 -- | `zip`, `race`, buffering, ...) are in `Screamer.Event.Extra`, in the
 -- | `screamer-combinators` package.
 module Screamer.Event
@@ -144,7 +144,7 @@ foreign import holdImpl :: forall a. Scope -> Event a -> Effect (Event a)
 -- | Observe an event for the lifetime of the current scope, so a stateful
 -- | event (`take`, `mapAccum`, `dropRepeats`, ...) keeps stepping while
 -- | nothing else observes it. Returns the same event. The event counterpart
--- | of `Screamer.Signal.hold`; see "Sharing" in `docs/combinators.md`.
+-- | of `Screamer.Signal.hold`.
 hold :: forall a. Event a -> Owned (Event a)
 hold e = Owned \s -> holdImpl s e
 
