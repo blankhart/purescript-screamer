@@ -167,4 +167,4 @@ Efficient JS frameworks trace state changes to the view changes they cause, and 
 
 * The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral).
 
-* `bench/` drives the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations.
+* `bench/` runs the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations, measured as upstream measures them, against Screamer and upstream's VanillaJS, Solid and Halogen apps (`npm run bench:measure`; results in `bench/results/summary.md`). Absolute times depend on the machine, so compare frameworks within one run rather than against upstream's published tables. `bench/legacy/` holds earlier Screamer-only results from a cold-start harness that is not comparable.
