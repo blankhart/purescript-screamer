@@ -74,9 +74,9 @@ spec = describe "Screamer.Owned" do
         Ref.modify_ (_ - 1) depth
       subscribe b.signal \y -> record log ("b " <> show y)
     liftEffect $ a.put 1
-    -- A write from a subscriber takes effect when the next round starts,
-    -- so `b` sees each value the round after `a`'s subscriber wrote it,
-    -- whatever the order the two subscribed in.
+    -- A write from a subscriber is deferred to the start of the next
+    -- timestep, so `b` sees each value one timestep after `a`'s subscriber
+    -- wrote it, whatever the order the two subscribed in.
     liftEffect (Ref.read log) >>= shouldEqual
       [ "a 0", "a done 0", "b 0"
       , "a 1", "a done 1"
@@ -96,7 +96,7 @@ spec = describe "Screamer.Owned" do
       Left e -> unless (contains (Pattern "effect loop") (message e)) $ fail (message e)
       Right _ -> fail "expected an effect loop"
 
-  it "composes two subscribers' modifies in one round" do
+  it "composes two subscribers' modifies in one timestep" do
     a <- liftEffect $ signalSource 0
     n <- liftEffect $ signalSource 1
     seen <- liftEffect $ Ref.new []
@@ -104,7 +104,7 @@ spec = describe "Screamer.Owned" do
       subscribe a.signal \x -> when (x > 0) (n.modify (_ + 1))
       subscribe a.signal \x -> when (x > 0) do
         n.modify (_ * 10)
-        -- Not yet: the writes take effect when the next round starts.
+        -- Not yet: the writes are deferred to the next timestep.
         read n.signal >>= \v -> Ref.modify_ (_ <> [ v ]) seen
     liftEffect $ a.put 1
     liftEffect (read n.signal) >>= shouldEqual 20

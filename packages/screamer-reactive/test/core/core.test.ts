@@ -119,7 +119,7 @@ describe('prototype checks', () => {
 
   test('12b a self-loop is caught', () => {
     const c = cell(0);
-    // The first run's write is held into the next round, where the effect
+    // The first run's write is deferred to the next round, where the effect
     // is linked, so the loop shows up as soon as the scope is set up.
     const s = createScope(null);
     assert.throws(() => batch(() => runInScope(s, () => { effect(() => { c.write(c.read() + 1); }); })), /effect loop/);
@@ -497,7 +497,7 @@ describe('writes from effects (#70)', () => {
     stop();
   });
 
-  test('a held write equal to the current value changes nothing', () => {
+  test('a deferred write equal to the current value changes nothing', () => {
     const a = cell(0);
     const c = cell(7);
     let runs = 0;
