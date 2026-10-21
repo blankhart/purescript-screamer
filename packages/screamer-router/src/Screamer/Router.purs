@@ -9,6 +9,7 @@ module Screamer.Router
   , RouterEnv
   , browserRouter
   , staticRouter
+  , RouterKey
   , routerKey
   , withRouter
   , router
@@ -23,7 +24,7 @@ import Prelude
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Screamer.Attribute (Attribute)
-import Screamer.Context (Key, ask, key, provide)
+import Screamer.Context (class ContextKey, ask, provide)
 import Screamer.Element (Element, component)
 import Screamer.Html (a_)
 import Screamer.Html.Attributes (href_)
@@ -33,6 +34,7 @@ import Screamer.Signal (Signal)
 import Screamer.Source (signalSource)
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, altKey, button, ctrlKey, metaKey, shiftKey, toEvent)
+import Type.Proxy (Proxy(..))
 
 type Location = { pathname :: String, search :: String, hash :: String }
 
@@ -82,8 +84,14 @@ staticRouter url sink =
   }
 
 -- | The router env of the current scope; default `browserRouter`.
-routerKey :: Key RouterEnv
-routerKey = key "router" browserRouter
+data RouterKey
+
+instance ContextKey RouterKey RouterEnv where
+  keyName _ = "Screamer.Router.RouterKey"
+  keyDefault _ = browserRouter
+
+routerKey :: Proxy RouterKey
+routerKey = Proxy
 
 -- | Run the body with a different router env. Elements see it when they
 -- | are instantiated inside the body: `Element (withRouter env (instantiate el))`.

@@ -31,11 +31,12 @@ import Prelude
 import Effect (Effect)
 import Effect.Exception (Error)
 import Screamer.Attribute (Attribute)
-import Screamer.Context (Key, ask, key, provide)
+import Screamer.Context (class ContextKey, Key, ask, key, provide)
 import Screamer.Owned (Owned(..), Scope, runOwned)
 import Screamer.Pending (settled)
 import Screamer.Renderer (Backend, Boundary, boundaryKey, browserBackend, interactive, rendererKey)
 import Screamer.Signal (Signal)
+import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element as DOM
 import Web.DOM.Node (Node)
@@ -83,7 +84,7 @@ text s = Element (Owned (textImpl s))
 -- | Each new value disposes the previous element's scope and nodes, then
 -- | instantiates the new element in a fresh child scope.
 dyn :: Signal Element -> Element
-dyn s = Element (Owned (dynImpl leaveKey s))
+dyn s = Element (Owned (dynImpl (key leaveKey) s))
 
 -- | Run setup effects once per instance, in the element's scope.
 component :: Owned Element -> Element
@@ -123,7 +124,7 @@ foreignWithFallback_ setup tag attrs fallback = Element $ Owned \s -> do
 -- | update their signal in place, removed keys are disposed, and reorders
 -- | move as few rows as possible.
 each :: forall k a. Ord k => (a -> k) -> Signal (Array a) -> (Signal a -> Element) -> Element
-each key items row = Element (Owned (eachImpl leaveKey cmp key items row))
+each rowKey items row = Element (Owned (eachImpl (key leaveKey) cmp rowKey items row))
   where
   cmp a b = case compare a b of
     LT -> -1
@@ -165,7 +166,7 @@ foreign import suspenseImpl
 -- | bring the fallback back. Content that has nothing pending is shown at
 -- | once, with no fallback built.
 suspense :: Element -> Element -> Element
-suspense fallback content = Element (Owned (suspenseImpl settledIn boundaryKey fallback content))
+suspense fallback content = Element (Owned (suspenseImpl settledIn (key boundaryKey) fallback content))
   where
   settledIn s = let Owned run = settled in run s
 
@@ -175,8 +176,14 @@ type LeaveHook = Node -> Effect Unit -> Effect Unit
 
 foreign import immediateLeave :: LeaveHook
 
-leaveKey :: Key LeaveHook
-leaveKey = key "leave" immediateLeave
+data LeaveKey
+
+instance ContextKey LeaveKey LeaveHook where
+  keyName _ = "Screamer.Element.LeaveKey"
+  keyDefault _ = immediateLeave
+
+leaveKey :: Proxy LeaveKey
+leaveKey = Proxy
 
 -- | Delay the removal of branches of `dyn` and rows of `each` inside the
 -- | element, for exit animations. When a branch or row is removed its scope

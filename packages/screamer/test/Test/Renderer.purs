@@ -7,7 +7,7 @@ import Effect.Class (liftEffect)
 import Effect.Class as Owned
 import Effect.Ref as Ref
 import Screamer.Attribute (attribute, booleanAttribute, on_, property, styleProperty)
-import Screamer.Context (ask, key, provide)
+import Screamer.Context (class ContextKey, ask, provide)
 import Screamer.Element (component, dyn, each, element, element_, foreignWithFallback_, foreign_, fragment_, svgElement_, text)
 import Screamer.Element.Unsafe (instantiateWith)
 import Screamer.Renderer (interactive)
@@ -17,6 +17,13 @@ import Screamer.Test.Dom (fakeWidget)
 import Test.Backend (guardDocument, recordingBackend)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
+import Type.Proxy (Proxy(..))
+
+data Greeting
+
+instance ContextKey Greeting String where
+  keyName _ = "Test.Renderer.Greeting"
+  keyDefault _ = "hello"
 
 spec :: Spec Unit
 spec = describe "Screamer.Renderer" do
@@ -105,7 +112,7 @@ spec = describe "Screamer.Renderer" do
   it "instantiateWith runs the element inside the setup wrapper" do
     rec <- liftEffect $ recordingBackend true
     let
-      k = key "greeting" "hello"
+      k = Proxy :: Proxy Greeting
       greet = component do
         g <- ask k
         pure (element_ "p" [] [ element g ])
