@@ -20,6 +20,7 @@ import Screamer.Html as E
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Event as Event
+import Screamer.Owned (Owned)
 import Screamer.Signal (Signal, gate, sampleManyWith, sampleOn)
 import Screamer.Source (SignalSource, signalSource)
 import Screamer.Time as Time
@@ -82,17 +83,18 @@ toDotAttrs { pos, n, hb } = { hb, max, pos }
   max = n' + sin (2.0 * pi * hb' / 90.0) * n' * 0.5
 
 -- | The style of dot `i`. An inactive dot keeps its last position and is
--- | hidden, so only active dots follow the animation.
-mkDot :: Signal DotAttrs -> Int -> DotStyle
-mkDot dotAttrs i =
-  { left: activeAttrs <#> \{ pos, max } -> px (dotCoord i pos.x sin max)
-  , top: activeAttrs <#> \{ pos, max } -> px (dotCoord i pos.y cos max)
-  , "border-color": activeAttrs <#> \{ hb, max } -> dotColor i hb max
-  , display: isActive <#> if _ then "inline" else "none"
-  }
-  where
-  isActive = dotAttrs <#> \{ max } -> Int.toNumber i < max
-  activeAttrs = gate isActive { hb: 0, pos: origin, max: 0.0 } dotAttrs
+-- | hidden, so only active dots follow the animation. Keeping the last
+-- | position is state, so each dot makes its own `gate`.
+mkDot :: Signal DotAttrs -> Int -> Owned DotStyle
+mkDot dotAttrs i = do
+  let isActive = dotAttrs <#> \{ max } -> Int.toNumber i < max
+  activeAttrs <- gate isActive { hb: 0, pos: origin, max: 0.0 } dotAttrs
+  pure
+    { left: activeAttrs <#> \{ pos, max } -> px (dotCoord i pos.x sin max)
+    , top: activeAttrs <#> \{ pos, max } -> px (dotCoord i pos.y cos max)
+    , "border-color": activeAttrs <#> \{ hb, max } -> dotColor i hb max
+    , display: isActive <#> if _ then "inline" else "none"
+    }
 
 -- | The pointer's position relative to the centre of the element handling
 -- | the event, which is where the spiral starts.
@@ -136,7 +138,9 @@ spiral = component do
                 }
                 []
             , dyn $ numerosity.signal <#> \n ->
-                fragment_ $ Array.range 0 (n * 3 / 2) <#> \i -> dot isBig.signal (mkDot dotAttrs i) []
+                fragment_ $ Array.range 0 (n * 3 / 2) <#> \i -> component do
+                  style <- mkDot dotAttrs i
+                  pure (dot isBig.signal style [])
             ]
         ]
     ]

@@ -32,6 +32,7 @@ import Screamer.Host (Host, host)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Pending (pendingIn)
 import Screamer.Signal (Signal, subscribe)
+import Screamer.Signal as Signal
 import Screamer.Source (eventSource, signalSource)
 
 data Remote b = Loading | Failed Error | Loaded b
@@ -84,15 +85,16 @@ isLoading = case _ of
 -- | Keep showing the last `Loaded` value while a new request loads, so a
 -- | list does not flash empty on every keystroke. `Failed` and new `Loaded`
 -- | values pass through; `Loading` shows only before anything has loaded.
--- | Stateful: it starts from the input's current value when observed.
-keepLast :: forall a. Signal (Remote a) -> Signal (Remote a)
-keepLast = keepLastImpl isLoading isLoaded
+-- | Stateful: it starts from the argument's current value when the `Owned`
+-- | action runs.
+keepLast :: forall a. Signal (Remote a) -> Owned (Signal (Remote a))
+keepLast s = liftEffect (keepLastImpl isLoading isLoaded s) >>= Signal.hold
   where
   isLoaded = case _ of
     Loaded _ -> true
     _ -> false
 
-foreign import keepLastImpl :: forall a. (Remote a -> Boolean) -> (Remote a -> Boolean) -> Signal (Remote a) -> Signal (Remote a)
+foreign import keepLastImpl :: forall a. (Remote a -> Boolean) -> (Remote a -> Boolean) -> Signal (Remote a) -> Effect (Signal (Remote a))
 
 -- | How long to wait before each retry.
 -- |

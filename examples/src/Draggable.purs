@@ -66,8 +66,8 @@ point e = { x: Int.toNumber (clientX m), y: Int.toNumber (clientY m) }
 draggable :: Element
 draggable = component do
   pointer <- liftEffect eventSource
+  drag <- Event.fold step start pointer.event
   let
-    drag = Event.fold step start pointer.event
     colours = [ "tomato", "seagreen", "steelblue" ]
     circle i colour =
       Svg.circle_

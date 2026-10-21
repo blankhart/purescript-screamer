@@ -1,5 +1,6 @@
-// Foreign module of Screamer.Event. Allocating an event node has no effect
-// on the graph, so everything here is pure except `subscribeImpl`.
+// Foreign module of Screamer.Event. Allocating a stateless node has no effect
+// on the graph, so those are pure. A stateful node is made by an effect, which
+// `Screamer.Event` holds in a scope.
 import type * as Runtime from './Runtime.js';
 // @ts-ignore: purs copies this file to output/Screamer.Event/foreign.js, next to the runtime's.
 import * as runtime from '../Screamer.Runtime/foreign.js';
@@ -23,9 +24,9 @@ export const filterMapImpl = <A, B>(f: (a: A) => { ok: boolean; v: B }) => (e: E
 
 export const changes = <A>(s: S<A>): E<A> => R.changes(s);
 
-export const stepper = <A>(seed: A) => (e: E<A>): S<A> => R.stepper(seed, e);
+export const stepperImpl = <A>(seed: A) => (e: E<A>) => (): S<A> => R.stepper(seed, e);
 
-export const fold = <A, B>(f: (a: A) => (b: B) => B) => (seed: B) => (e: E<A>): S<B> =>
+export const foldImpl = <A, B>(f: (a: A) => (b: B) => B) => (seed: B) => (e: E<A>) => (): S<B> =>
   R.foldEvent((a: A, b: B) => f(a)(b), seed, e);
 
 export const attachWith = <A, B, C>(f: (b: B) => (a: A) => C) => (s: S<B>) => (e: E<A>): E<C> =>
@@ -38,15 +39,15 @@ export const subscribeImpl = <A>(s: Runtime.Scope) => (e: E<A>) => (cb: (a: A) =
 };
 
 // Transform, filter and accumulate (#19). Each stateful combinator is an
-// `accumEvent` state machine; `seed` makes a fresh state when first observed.
+// `accumEvent` state machine, made by an effect; `seed` makes its state.
 
 type Accum<S, B> = Runtime.Accum<S, B>;
-const accum = <A, S, B>(f: (a: A, s: S) => Accum<S, B>, seed: () => S) => (e: E<A>): E<B> =>
+const accum = <A, S, B>(f: (a: A, s: S) => Accum<S, B>, seed: () => S) => (e: E<A>) => (): E<B> =>
   R.accumEvent(f, seed, e);
 
 export const gate = <A>(cond: S<boolean>) => (e: E<A>): E<A> => gateNode(cond, e);
 
-export const mapAccum = <A, S, B>(f: (a: A) => (s: S) => { state: S; value: B }) => (seed: S) =>
+export const mapAccumImpl = <A, S, B>(f: (a: A) => (s: S) => { state: S; value: B }) => (seed: S) =>
   accum<A, S, B>((a, s) => {
     const r = f(a)(s);
     return { state: r.state, emit: true, value: r.value };
@@ -59,7 +60,7 @@ interface Prev<A> {
 
 const noPrev = (): Prev<any> => ({ has: false, v: undefined });
 
-export const withPrevious = <A>(e: E<A>): E<{ previous: A; current: A }> =>
+export const withPreviousImpl = <A>(e: E<A>): (() => E<{ previous: A; current: A }>) =>
   accum<A, Prev<A>, { previous: A; current: A }>(
     (a, p) => (p.has
       ? { state: { has: true, v: a }, emit: true, value: { previous: p.v, current: a } }
@@ -67,7 +68,7 @@ export const withPrevious = <A>(e: E<A>): E<{ previous: A; current: A }> =>
     noPrev,
   )(e);
 
-export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (e: E<A>): E<A> =>
+export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (e: E<A>): (() => E<A>) =>
   accum<A, Prev<A>, A>(
     (a, p) => ({ state: { has: true, v: a }, emit: !p.has || !eq(p.v)(a), value: a }),
     noPrev,

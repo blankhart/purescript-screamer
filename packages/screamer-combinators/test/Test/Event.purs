@@ -18,13 +18,13 @@ import Effect.Class (liftEffect)
 import Screamer.Event (Event)
 import Screamer.Event (attach, attachWith, changes, dropRepeats, dropRepeatsOn, fold, gate, mapAccum, oneOf, stepper, tag, withPrevious) as Event
 import Screamer.Event.Extra (bufferCount, bufferOn, bufferWhile, count, first, leftmost, mergeWith, race, skip, skipWhile, take, takeWhile, zip) as Event
-import Screamer.Owned (runOwned)
+import Screamer.Owned (Owned, runOwned)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (hold, read)
+import Screamer.Signal (read)
 import Screamer.Signal (dropRepeatsOn, withPrevious) as Signal
 import Screamer.Signal.Extra (combine, history, withLatest) as Signal
 import Screamer.Source (batch, eventSource, signalSource)
-import Screamer.Test (observe, observeE)
+import Screamer.Test (observe, observeE, observeOwned, observeOwnedE)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
@@ -67,14 +67,14 @@ genFires = arrayOf do
   n <- chooseInt 1 4
   vectorOf n (chooseInt 0 4)
 
--- | An operator observed from the start agrees with a model over the
--- | sequence of every occurrence fired.
-model :: forall b. Eq b => Show b => (Event Int -> Event b) -> (Array Int -> Array b) -> Effect Unit
+-- | A stateful operator, made and observed before the first fire, agrees
+-- | with a model over the sequence of every occurrence fired.
+model :: forall b. Eq b => Show b => (Event Int -> Owned (Event b)) -> (Array Int -> Array b) -> Effect Unit
 model op ref = do
   scripts <- randomSample' 200 genFires
   for_ scripts \script -> do
     src <- eventSource
-    o <- observeE (op src.event)
+    o <- observeOwnedE (op src.event)
     for_ script \fires -> batch (for_ fires src.fire)
     got <- o.trace
     o.stop
@@ -149,7 +149,7 @@ spec = describe "Screamer.Event" do
       (Event.mapAccum (\a s -> { state: s + a, value: s * 10 + a }) 0)
       (\xs -> Array.zipWith (\s a -> s * 10 + a) (Array.scanl (+) 0 xs # Array.cons 0) xs)
     it "withPrevious" $ liftEffect $ model
-      (map (\p -> Tuple p.previous p.current) <<< Event.withPrevious)
+      (map (map (\p -> Tuple p.previous p.current)) <<< Event.withPrevious)
       (\xs -> Array.zip xs (Array.drop 1 xs))
     it "dropRepeats" $ liftEffect $ model Event.dropRepeats (map NonEmpty.head <<< Array.group)
     it "dropRepeatsOn" $ liftEffect $ model (Event.dropRepeatsOn (_ `div` 2))
@@ -161,25 +161,25 @@ spec = describe "Screamer.Event" do
     it "first" $ liftEffect $ model Event.first (Array.take 1)
 
   describe "transform, filter and accumulate" do
-    it "take and skip count only while observed, and do not restart" do
+    it "take and skip count from when they are made, observed or not" do
       src <- liftEffect eventSource
-      keep <- liftEffect $ observeE src.event
-      let
-        t = Event.take 2 src.event
-        s = Event.skip 2 src.event
-      o1 <- liftEffect $ observeE (map Left t <|> map Right s)
+      r <- liftEffect $ runOwned do
+        t <- Event.take 2 src.event
+        s <- Event.skip 2 src.event
+        pure (map Left t <|> map Right s)
+      o1 <- liftEffect $ observeE r.value
       liftEffect $ src.fire 1
       liftEffect o1.stop
       liftEffect $ traverse_ src.fire [ 2, 3 ]
-      o2 <- liftEffect $ observeE (map Left t <|> map Right s)
-      liftEffect $ traverse_ src.fire [ 4, 5, 6 ]
+      o2 <- liftEffect $ observeE r.value
+      liftEffect $ traverse_ src.fire [ 4, 5 ]
       liftEffect o1.trace >>= shouldEqual [ Left 1 ]
-      liftEffect o2.trace >>= shouldEqual [ Left 4, Right 5, Right 6 ]
-      liftEffect (o2.stop *> keep.stop)
+      liftEffect o2.trace >>= shouldEqual [ Right 4, Right 5 ]
+      liftEffect (o2.stop *> r.dispose)
 
     it "count counts occurrences" do
       src <- liftEffect eventSource
-      o <- liftEffect $ observe (Event.count src.event)
+      o <- liftEffect $ observeOwned (Event.count src.event)
       liftEffect $ batch (src.fire unit *> src.fire unit)
       liftEffect o.trace >>= shouldEqual [ 0, 2 ]
       liftEffect o.stop
@@ -196,7 +196,7 @@ spec = describe "Screamer.Event" do
 
     it "Signal.withPrevious pairs each value with the one before" do
       s <- liftEffect $ signalSource 1
-      o <- liftEffect $ observe (Signal.withPrevious 0 s.signal)
+      o <- liftEffect $ observeOwned (Signal.withPrevious 0 s.signal)
       liftEffect $ s.put 2
       liftEffect $ s.put 3
       liftEffect o.trace >>= shouldEqual [ Tuple 0 1, Tuple 1 2, Tuple 2 3 ]
@@ -204,7 +204,7 @@ spec = describe "Screamer.Event" do
 
     it "Signal.dropRepeatsOn compares keys" do
       s <- liftEffect $ signalSource 1
-      o <- liftEffect $ observe (Signal.dropRepeatsOn (_ `div` 10) s.signal)
+      o <- liftEffect $ observeOwned (Signal.dropRepeatsOn (_ `div` 10) s.signal)
       liftEffect $ traverse_ s.put [ 2, 12, 15, 3 ]
       liftEffect o.trace >>= shouldEqual [ 1, 12, 3 ]
       liftEffect o.stop
@@ -230,28 +230,27 @@ spec = describe "Screamer.Event" do
     it "zip pairs simultaneous and queued occurrences" do
       a <- liftEffect eventSource
       b <- liftEffect eventSource
-      o <- liftEffect $ observeE (Event.zip a.event b.event)
+      o <- liftEffect $ observeOwnedE (Event.zip a.event b.event)
       liftEffect $ batch (a.fire 1 *> a.fire 2 *> b.fire "x")
       liftEffect $ b.fire "y"
       liftEffect o.trace >>= shouldEqual [ Tuple 1 "x", Tuple 2 "y" ]
       liftEffect o.stop
-    it "zip releases its queue when unobserved" do
+    it "zip keeps its queue while unobserved" do
       a <- liftEffect eventSource
       b <- liftEffect eventSource
-      keep <- liftEffect $ observeE (a.event <|> map (const 0) b.event)
-      let z = Event.zip a.event b.event
-      o1 <- liftEffect $ observeE z
+      z <- liftEffect $ runOwned (Event.zip a.event b.event)
+      o1 <- liftEffect $ observeE z.value
       liftEffect $ traverse_ a.fire [ 1, 2 ]
       liftEffect o1.stop
-      o2 <- liftEffect $ observeE z
+      o2 <- liftEffect $ observeE z.value
       liftEffect $ b.fire "x"
       liftEffect $ a.fire 3
-      liftEffect o2.trace >>= shouldEqual [ Tuple 3 "x" ]
-      liftEffect (o2.stop *> keep.stop)
+      liftEffect o2.trace >>= shouldEqual [ Tuple 1 "x" ]
+      liftEffect (o2.stop *> z.dispose)
     it "race follows the first to fire, the leftmost on a tie" do
       a <- liftEffect eventSource
       b <- liftEffect eventSource
-      o <- liftEffect $ observeE (Event.race [ a.event, b.event ])
+      o <- liftEffect $ observeOwnedE (Event.race [ a.event, b.event ])
       liftEffect $ batch (b.fire 1 *> a.fire 2)
       liftEffect $ b.fire 3
       liftEffect $ a.fire 4
@@ -268,7 +267,7 @@ spec = describe "Screamer.Event" do
     it "Signal.withLatest changes only with the driver" do
       x <- liftEffect $ signalSource 1
       y <- liftEffect $ signalSource "a"
-      o <- liftEffect $ observe (Signal.withLatest y.signal x.signal)
+      o <- liftEffect $ observeOwned (Signal.withLatest y.signal x.signal)
       liftEffect $ y.put "b"
       liftEffect $ x.put 2
       liftEffect $ batch (x.put 3 *> y.put "c")
@@ -284,7 +283,7 @@ spec = describe "Screamer.Event" do
       for_ scripts \script -> do
         d <- eventSource
         n <- eventSource
-        o <- observeE (Event.bufferOn n.event d.event)
+        o <- observeOwnedE (Event.bufferOn n.event d.event)
         for_ script \fires -> batch $ for_ fires \f -> if f.notify then n.fire unit else d.fire f.value
         got <- o.trace
         o.stop
@@ -295,7 +294,7 @@ spec = describe "Screamer.Event" do
       for_ scripts \script -> do
         d <- eventSource
         cond <- signalSource false
-        o <- observeE (Event.bufferWhile cond.signal d.event)
+        o <- observeOwnedE (Event.bufferWhile cond.signal d.event)
         -- In each batch a notify toggles the condition.
         for_ script \fires -> batch $ for_ fires \f ->
           if f.notify then cond.modify not else d.fire f.value
@@ -305,22 +304,21 @@ spec = describe "Screamer.Event" do
         when (got /= want) $ fail $ "bufferWhile " <> show script <> ": got " <> show got <> ", want " <> show want
 
   describe "buffering" do
-    it "a paused buffer keeps what it holds" do
+    it "a buffer collects while unobserved" do
       src <- liftEffect eventSource
-      keep <- liftEffect $ observeE src.event
-      let b = Event.bufferCount 3 3 src.event
-      o1 <- liftEffect $ observeE b
+      b <- liftEffect $ runOwned (Event.bufferCount 3 3 src.event)
+      o1 <- liftEffect $ observeE b.value
       liftEffect $ traverse_ src.fire [ 1, 2 ]
       liftEffect o1.stop
       liftEffect $ src.fire 99
-      o2 <- liftEffect $ observeE b
+      o2 <- liftEffect $ observeE b.value
       liftEffect $ traverse_ src.fire [ 3, 4, 5, 6 ]
-      liftEffect o2.trace >>= shouldEqual [ [ 1, 2, 3 ], [ 4, 5, 6 ] ]
-      liftEffect (o2.stop *> keep.stop)
+      liftEffect o2.trace >>= shouldEqual [ [ 3, 4, 5 ] ]
+      liftEffect (o2.stop *> b.dispose)
 
     it "history keeps the last n values" do
       s <- liftEffect $ signalSource 1
-      o <- liftEffect $ observe (Signal.history 3 s.signal)
+      o <- liftEffect $ observeOwned (Signal.history 3 s.signal)
       liftEffect $ traverse_ s.put [ 2, 3, 4 ]
       liftEffect o.trace >>= shouldEqual [ [ 1 ], [ 1, 2 ], [ 1, 2, 3 ], [ 2, 3, 4 ] ]
       liftEffect o.stop
@@ -328,8 +326,7 @@ spec = describe "Screamer.Event" do
   describe "event sources" do
     it "delivers two fires of the same value in one batch to a fold" do
       src <- liftEffect eventSource
-      let count = Event.fold (\_ n -> n + 1) 0 src.event
-      o <- liftEffect $ observe count
+      o <- liftEffect $ observeOwned (Event.fold (\_ n -> n + 1) 0 src.event)
       liftEffect $ batch (src.fire unit *> src.fire unit)
       liftEffect $ src.fire unit
       liftEffect o.trace >>= shouldEqual [ 0, 2, 3 ]
@@ -368,46 +365,42 @@ spec = describe "Screamer.Event" do
       liftEffect o.trace >>= shouldEqual [ 2, 3 ]
       liftEffect o.stop
 
-    it "stepper and fold pause, keep their state and miss occurrences while paused" do
+    it "stepper and fold keep stepping while nothing observes them" do
       src <- liftEffect eventSource
-      let
-        latest = Event.stepper 0 src.event
-        total = Event.fold (+) 0 src.event
+      r <- liftEffect $ runOwned ({ latest: _, total: _ } <$> Event.stepper 0 src.event <*> Event.fold (+) 0 src.event)
+      let { latest, total } = r.value
       o1 <- liftEffect $ observe (Tuple <$> latest <*> total)
       liftEffect $ src.fire 1
       liftEffect $ src.fire 2
       liftEffect o1.stop
       liftEffect $ src.fire 10
-      liftEffect (read latest) >>= shouldEqual 2
-      liftEffect (read total) >>= shouldEqual 3
+      liftEffect (read latest) >>= shouldEqual 10
+      liftEffect (read total) >>= shouldEqual 13
       o2 <- liftEffect $ observe (Tuple <$> latest <*> total)
       liftEffect $ src.fire 4
-      liftEffect o2.trace >>= shouldEqual [ Tuple 2 3, Tuple 4 7 ]
-      liftEffect o2.stop
+      liftEffect o2.trace >>= shouldEqual [ Tuple 10 13, Tuple 4 17 ]
+      liftEffect (o2.stop *> r.dispose)
 
-    it "hold keeps a fold over events advancing for the scope" do
+    it "a fold over events stops when its scope is disposed" do
       src <- liftEffect eventSource
-      let total = Event.fold (+) 0 src.event
-      r <- liftEffect $ runOwned $ hold total
+      r <- liftEffect $ runOwned $ Event.fold (+) 0 src.event
       liftEffect $ src.fire 1
       liftEffect $ src.fire 2
-      liftEffect (read total) >>= shouldEqual 3
+      liftEffect (read r.value) >>= shouldEqual 3
       liftEffect r.dispose
       liftEffect $ src.fire 4
-      liftEffect (read total) >>= shouldEqual 3
+      liftEffect (read r.value) >>= shouldEqual 3
 
   describe "ownership" do
     it "holds no links while unobserved and releases them on dispose" do
       before <- liftEffect readStats
       src <- liftEffect eventSource
       s <- liftEffect $ signalSource 1
-      let
-        e = Event.attachWith (+) s.signal src.event <|> Event.changes s.signal
-        count = Event.fold (\_ n -> n + 1) 0 (filter (_ > 0) e)
+      let e = Event.attachWith (+) s.signal src.event <|> Event.changes s.signal
       unobserved <- liftEffect readStats
       (unobserved.links - before.links) `shouldEqual` 0
       o <- liftEffect $ observeE e
-      c <- liftEffect $ observe count
+      c <- liftEffect $ observeOwned (Event.fold (\_ n -> n + 1) 0 (filter (_ > 0) e))
       liftEffect $ src.fire 1
       liftEffect $ s.put 2
       liftEffect o.trace >>= shouldEqual [ 2, 2 ]

@@ -13,12 +13,12 @@ Depends on: screamer-reactive, and datetime for `Time.clock`.  The tables below 
 
 ## Transform and filter
 
-All pure, and stateful: they start from their seed when first observed and count only occurrences seen while observed. A `take 3` that loses its observers and is observed again does not restart: it carries on from the count it had.
+All stateful, so each returns `Owned`: it starts from its seed when the action runs and counts every occurrence from then on, for the life of its scope, whether or not anything observes it.
 
 | RxJS | Screamer | Notes |
 |---|---|---|
-| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event` | pause |
-| `count`, `reduce` | `Event.count :: Event a -> Signal Int`, `Event.fold` | pause |
+| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event`, such as `Event.take :: Int -> Event a -> Owned (Event a)` | |
+| `count`, `reduce` | `Event.count :: Event a -> Owned (Signal Int)`, `Event.fold` | |
 
 ## Combining several streams
 
@@ -27,11 +27,11 @@ On signals, one step per batch; on events, every occurrence is kept in fire orde
 | RxJS | Screamer | Simultaneity |
 |---|---|---|
 | `combineLatest` | `Signal.combine :: Array (Signal a) -> Signal (Array a)` | one value per batch; one node instead of a chain of `apply`s |
-| `withLatestFrom` | `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Signal (Tuple a b)` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; the first is observed with it, so a stateful signal there keeps advancing |
+| `withLatestFrom` | `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Owned (Signal (Tuple a b))` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; stateful |
 | (Reflex `leftmost`) | `Event.leftmost :: Array (Event a) -> Event a` | only the leftmost input that fired in the round |
 | `mergeWith` keeping both | `Event.mergeWith :: (a -> b -> c) -> (a -> c) -> (b -> c) -> Event a -> Event b -> Event c` | occurrences with the same fire stamp (both derived from one fire) are combined; nothing is lost |
-| `zip` | `Event.zip`, `Event.zipWith` | pairs the nth occurrence of each, counting from observation; unpaired occurrences queue without bound; a paused zip drops its queues, because what they would pair with is missed; pauses |
-| `race` | `Event.race :: Array (Event a) -> Event a` | follows the first input to fire after first observation (the leftmost, on a tie); keeps that choice while paused; pauses |
+| `zip` | `Event.zip`, `Event.zipWith` (in `Owned`) | pairs the nth occurrence of each, counting from when the action runs; unpaired occurrences queue without bound; stateful |
+| `race` | `Event.race :: Array (Event a) -> Owned (Event a)` | follows the first argument to fire after the action runs (the leftmost, on a tie); stateful |
 
 ## Flattening
 
@@ -66,7 +66,7 @@ Each combinator needs a timer, so each returns `Owned` and cancels its timers wh
 | `debounceTime` | `debounce :: Milliseconds -> Event a -> Owned (Event a)`; `debounceSignal :: Milliseconds -> Signal a -> Owned (Signal a)` holds the last settled value, starting at the current one |
 | `throttleTime` | `throttle :: { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)`; a trailing occurrence opens a new interval, as in RxJS |
 | `auditTime` | `audit :: Milliseconds -> Event a -> Owned (Event a)` |
-| `sampleTime` | `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)`; holds the signal so a stateful one keeps advancing |
+| `sampleTime` | `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)`; holds the signal so it is kept computed between samples |
 | `delay` | `delay :: Milliseconds -> Event a -> Owned (Event a)`; keeps order |
 | `timeout` | `timeout :: Milliseconds -> Event a -> Owned (Event (Either Unit a))`; a `Left unit` for each silence of the interval, from instantiation and after each occurrence, instead of an error |
 | `interval`, `timer` | `interval`, `after`; `clock` for the time itself |
@@ -76,16 +76,16 @@ Each timer callback runs in one `batch`, so what it fires arrives in one round. 
 
 ## Buffering
 
-| RxJS | Screamer | Pure? |
-|---|---|---|
-| `bufferCount(n, step)` | `Event.bufferCount :: Int -> Int -> Event a -> Event (Array a)` | pure; pauses |
-| `buffer(notifier)` | `Event.bufferOn :: Event b -> Event a -> Event (Array a)` | pure; pauses |
-| `bufferToggle`, `bufferWhen` | `Event.bufferWhile :: Signal Boolean -> Event a -> Event (Array a)` | pure; pauses |
-| `bufferTime` | `Time.bufferFor :: Milliseconds -> Event a -> Owned (Event (Array a))` | `Owned` |
-| `window*` | left out | a window is an event of events, which has no owner for the inner events (see #21); buffer, or use `switchEvent` |
-| (no RxJS name) | `Signal.history :: Int -> Signal a -> Signal (Array a)`: the last n values, oldest first, for sparklines and undo | pure; pauses |
+Every buffer is stateful, so each returns `Owned` and collects from when the action runs, for the life of its scope.
 
-The pure buffers are stateful nodes: they collect only occurrences seen while observed, and **a paused buffer keeps what it held**, as every paused stateful node keeps its state; its next buffer continues from there. (`zip` is the exception, because a queue waiting for partners it will never see would pair the wrong occurrences.)
+| RxJS | Screamer |
+|---|---|
+| `bufferCount(n, step)` | `Event.bufferCount :: Int -> Int -> Event a -> Owned (Event (Array a))` |
+| `buffer(notifier)` | `Event.bufferOn :: Event b -> Event a -> Owned (Event (Array a))` |
+| `bufferToggle`, `bufferWhen` | `Event.bufferWhile :: Signal Boolean -> Event a -> Owned (Event (Array a))` |
+| `bufferTime` | `Time.bufferFor :: Milliseconds -> Event a -> Owned (Event (Array a))` |
+| `window*` | left out: a window is an event of events, which has no owner for the inner events (see #21); buffer, or use `switchEvent` |
+| (no RxJS name) | `Signal.history :: Int -> Signal a -> Owned (Signal (Array a))`: the last n values, oldest first, for sparklines and undo |
 
 - `bufferOn` fires on every notifier occurrence, even with nothing collected, as RxJS does. An occurrence fired in the same round as the notifier and before it goes into that buffer.
 - `bufferWhile` reads its signal at the end of each round, like `gate`: it collects the occurrences of rounds that end with the signal true, and fires the collection (possibly empty) in the round that ends with it false.

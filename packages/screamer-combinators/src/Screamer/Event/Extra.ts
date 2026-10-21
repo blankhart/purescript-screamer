@@ -11,24 +11,25 @@ type S<T> = Runtime.Readable<T>;
 
 const NONE: Runtime.Occ<any>[] = [];
 
-// Each stateful combinator is an `accumEvent` state machine; `seed` makes a
-// fresh state when first observed.
+// Each stateful combinator is made by an effect, which the PureScript side
+// holds in the current scope. Most are `accumEvent` state machines; `seed`
+// makes the state.
 type Accum<St, B> = Runtime.Accum<St, B>;
-const accum = <A, St, B>(f: (a: A, s: St) => Accum<St, B>, seed: () => St) => (e: E<A>): E<B> =>
+const accum = <A, St, B>(f: (a: A, s: St) => Accum<St, B>, seed: () => St) => (e: E<A>) => (): E<B> =>
   R.accumEvent(f, seed, e);
 
 // Transform and filter (#19).
 
-export const take = (n: number) => <A>(e: E<A>): E<A> =>
+export const takeImpl = (n: number) => <A>(e: E<A>): (() => E<A>) =>
   accum<A, number, A>((a, k) => (k < n ? { state: k + 1, emit: true, value: a } : { state: k, emit: false }), () => 0)(e);
 
-export const skip = (n: number) => <A>(e: E<A>): E<A> =>
+export const skipImpl = (n: number) => <A>(e: E<A>): (() => E<A>) =>
   accum<A, number, A>((a, k) => (k < n ? { state: k + 1, emit: false } : { state: k, emit: true, value: a }), () => 0)(e);
 
-export const takeWhile = <A>(p: (a: A) => boolean) => (e: E<A>): E<A> =>
+export const takeWhileImpl = <A>(p: (a: A) => boolean) => (e: E<A>): (() => E<A>) =>
   accum<A, boolean, A>((a, done) => (!done && p(a) ? { state: false, emit: true, value: a } : { state: true, emit: false }), () => false)(e);
 
-export const skipWhile = <A>(p: (a: A) => boolean) => (e: E<A>): E<A> =>
+export const skipWhileImpl = <A>(p: (a: A) => boolean) => (e: E<A>): (() => E<A>) =>
   accum<A, boolean, A>((a, open) => (open || !p(a) ? { state: true, emit: true, value: a } : { state: false, emit: false }), () => false)(e);
 
 // Combining several streams (#20). Node constructors with more than one
@@ -89,8 +90,7 @@ interface ZipState<A, B> {
 
 /**
  * Pairs the nth occurrence of `ea` with the nth of `eb`, counting from when
- * it is observed. Unpaired occurrences queue without bound. A paused zip
- * drops its queues, because what they would be paired with is missed.
+ * it is made. Unpaired occurrences queue without bound.
  */
 function zip<A, B, C>(f: (a: A, b: B) => C, ea: Runtime.EventLike<A>, eb: Runtime.EventLike<B>): Runtime.EventLike<C> {
   return R.eventStateful<ZipState<A, B>, C>(
@@ -124,10 +124,13 @@ function zip<A, B, C>(f: (a: A, b: B) => C, ea: Runtime.EventLike<A>, eb: Runtim
 }
 
 /**
- * Follows the first input to fire after it is first observed (the leftmost,
- * if several fire in that round), and ignores the others from then on.
+ * Follows the first input to fire after it is made (the leftmost, if several
+ * fire in that round), and ignores the others from then on.
  */
-export function race<A>(es: Runtime.EventLike<A>[]): Runtime.EventLike<A> {
+export const raceImpl = <A>(es: Runtime.EventLike<A>[]) => (): Runtime.EventLike<A> =>
+  raceNode(es);
+
+function raceNode<A>(es: Runtime.EventLike<A>[]): Runtime.EventLike<A> {
   return R.eventStateful<number, A>(es, () => -1, (changed, values, winner) => {
     if (winner < 0) winner = changed.indexOf(true);
     return { state: winner, out: winner >= 0 && changed[winner] ? values[winner] : NONE };
@@ -137,12 +140,12 @@ export function race<A>(es: Runtime.EventLike<A>[]): Runtime.EventLike<A> {
 export const mergeWith = <A, B, C>(both: (a: A) => (b: B) => C) => (left: (a: A) => C) => (right: (b: B) => C) =>
   (ea: E<A>) => (eb: E<B>): E<C> => mergeWithNode((a: A, b: B) => both(a)(b), left, right, ea, eb);
 
-export const zipWith = <A, B, C>(f: (a: A) => (b: B) => C) => (ea: E<A>) => (eb: E<B>): E<C> =>
+export const zipWithImpl = <A, B, C>(f: (a: A) => (b: B) => C) => (ea: E<A>) => (eb: E<B>) => (): E<C> =>
   zip((a: A, b: B) => f(a)(b), ea, eb);
 
-// Buffering (#23). A paused buffer keeps what it holds, like any stateful node.
+// Buffering (#23).
 
-export const bufferCount = (n: number) => (step: number) => <A>(e: E<A>): E<A[]> => {
+export const bufferCountImpl = (n: number) => (step: number) => <A>(e: E<A>): (() => E<A[]>) => {
   const size = Math.max(1, n);
   const every = Math.max(1, step);
   return accum<A, { seen: number; open: A[][] }, A[]>((a, st) => {
@@ -157,7 +160,7 @@ export const bufferCount = (n: number) => (step: number) => <A>(e: E<A>): E<A[]>
   }, () => ({ seen: 0, open: [] }))(e);
 };
 
-export const bufferOn = <B>(notifier: E<B>) => <A>(e: E<A>): E<A[]> =>
+export const bufferOnImpl = <B>(notifier: E<B>) => <A>(e: E<A>) => (): E<A[]> =>
   R.eventStateful<A[], A[]>([e, notifier], () => [], (changed, values, held) => {
     const as: Runtime.Occ<A>[] = changed[0] ? values[0] : [];
     const ns: Runtime.Occ<B>[] = changed[1] ? values[1] : [];
@@ -175,7 +178,7 @@ export const bufferOn = <B>(notifier: E<B>) => <A>(e: E<A>): E<A[]> =>
     return { state: buf, out };
   });
 
-export const bufferWhile = (cond: S<boolean>) => <A>(e: E<A>): E<A[]> =>
+export const bufferWhileImpl = (cond: S<boolean>) => <A>(e: E<A>) => (): E<A[]> =>
   R.eventStateful<{ open: boolean; buf: A[] }, A[]>(
     [cond, e],
     () => ({ open: cond.read(), buf: [] }),

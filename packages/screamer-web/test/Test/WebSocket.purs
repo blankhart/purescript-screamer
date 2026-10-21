@@ -27,7 +27,8 @@ spec = before_ (liftEffect Mock.installMockWebSocket) $ after_ (liftEffect Mock.
       subscribe s.state \st -> Ref.modify_ (_ <> [ show st ]) states
       liftEffect $ Ref.write (Just s) sock
       Event.subscribe s.messages \m -> Ref.modify_ (_ <> [ m ]) received
-      pure $ text (Event.stepper "" s.messages)
+      latest <- Event.stepper "" s.messages
+      pure $ text latest
     liftEffect (Ref.read sock) >>= case _ of
       Nothing -> pure unit
       Just s -> do

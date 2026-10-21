@@ -1,6 +1,6 @@
 // Foreign module of Screamer.Signal. Allocating a lazy node has no effect on
-// the graph, so everything here is pure except `read`, `subscribeImpl` and
-// `holdImpl`.
+// the graph, so the derived signals here are pure. A stateful node is made by
+// an effect, which `Screamer.Signal.owned` holds in a scope.
 import type * as Runtime from './Runtime.js';
 // @ts-ignore: purs copies this file to output/Screamer.Signal/foreign.js, next to the runtime's.
 import * as runtime from '../Screamer.Runtime/foreign.js';
@@ -27,7 +27,10 @@ export const sampleOn = <A>(a: S<A>) => <B>(b: S<B>): S<B> =>
 export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (s: S<A>): S<A> =>
   R.dropRepeatsBy((x: A, y: A) => eq(x)(y), s);
 
-export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A) => (s: S<A>): S<T> => {
+export const newDropRepeatsBy = <A>(eq: (x: A) => (y: A) => boolean) => (s: S<A>) => (): S<A> =>
+  R.dropRepeatsBy((x: A, y: A) => eq(x)(y), s);
+
+export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A) => (s: S<A>) => (): S<T> => {
   const pair = R.stateful<{ previous: A; current: A }>(
     [s],
     () => ({ previous: seed, current: s.read() }),
@@ -48,12 +51,12 @@ export const attemptImpl = <A, T>(left: (e: Error) => T) => (right: (a: A) => T)
   });
 
 // Stateful signals. The node constructors take their arguments uncurried and
-// are wrapped below for PureScript.
+// are wrapped below for PureScript, as effects.
 
 /**
  * The latest of `a` and `b`, starting at `a`'s current value; `a` wins when
  * both change in one batch. A merge reports every step, even one that repeats
- * its value, so nested merges agree on which input changed and `<|>` stays
+ * its value, so nested merges agree on which input changed and merging stays
  * associative.
  */
 function mergeNode<A>(a: Runtime.Readable<A>, b: Runtime.Readable<A>): Runtime.Readable<A> {
@@ -79,11 +82,11 @@ function gateSignal<A>(cond: Runtime.Readable<boolean>, seed: A, s: Runtime.Read
   return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev), undefined, 'Signal.gate');
 }
 
-export const merge = <A>(a: S<A>) => (b: S<A>): S<A> => mergeNode(a, b);
+export const mergeImpl = <A>(a: S<A>) => (b: S<A>) => (): S<A> => mergeNode(a, b);
 
-export const latestWhere = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>): S<A> => latestWhereNode(p, seed, s);
+export const latestWhereImpl = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A>) => (): S<A> => latestWhereNode(p, seed, s);
 
-export const gate = <A>(cond: S<boolean>) => (seed: A) => (s: S<A>): S<A> => gateSignal(cond, seed, s);
+export const gateImpl = <A>(cond: S<boolean>) => (seed: A) => (s: S<A>) => (): S<A> => gateSignal(cond, seed, s);
 
 export const read = <A>(s: S<A>) => (): A => R.sample(s);
 
