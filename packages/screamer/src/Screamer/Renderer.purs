@@ -13,19 +13,22 @@ module Screamer.Renderer
   ( Backend
   , browserBackend
   , createBrowserBackend
+  , RendererKey
   , rendererKey
   , interactive
   , delegated
   , Boundary
+  , BoundaryKey
   , boundaryKey
   ) where
 
 import Prelude
 
 import Effect (Effect)
-import Screamer.Context (Key, ask, key)
+import Screamer.Context (class ContextKey, ask)
 import Screamer.Owned (Owned)
 import Screamer.Signal (Signal)
+import Type.Proxy (Proxy(..))
 import Web.DOM.Node (Node)
 
 -- | The node operations of one renderer.
@@ -41,8 +44,14 @@ foreign import browserBackend :: Backend
 foreign import createBrowserBackend :: Effect Backend
 
 -- | The backend of the current scope; default `browserBackend`.
-rendererKey :: Key Backend
-rendererKey = key "renderer" browserBackend
+data RendererKey
+
+instance ContextKey RendererKey Backend where
+  keyName _ = "Screamer.Renderer.RendererKey"
+  keyDefault _ = browserBackend
+
+rendererKey :: Proxy RendererKey
+rendererKey = Proxy
 
 foreign import interactiveImpl :: Backend -> Boolean
 
@@ -64,5 +73,11 @@ type Boundary = { start :: Node, end :: Node, settled :: Signal Boolean }
 -- | content is built; the default does nothing. A streaming renderer
 -- | provides one to learn which ranges to send late: those whose `settled`
 -- | is still false when it flushes the page.
-boundaryKey :: Key (Boundary -> Effect Unit)
-boundaryKey = key "boundary" \_ -> pure unit
+data BoundaryKey
+
+instance ContextKey BoundaryKey (Boundary -> Effect Unit) where
+  keyName _ = "Screamer.Renderer.BoundaryKey"
+  keyDefault _ _ = pure unit
+
+boundaryKey :: Proxy BoundaryKey
+boundaryKey = Proxy

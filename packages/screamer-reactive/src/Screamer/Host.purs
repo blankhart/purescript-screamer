@@ -7,6 +7,7 @@
 module Screamer.Host
   ( Host
   , browserHost
+  , HostKey
   , hostKey
   , host
   , withHost
@@ -15,8 +16,9 @@ module Screamer.Host
 import Prelude
 
 import Effect (Effect)
-import Screamer.Context (Key, ask, key, provide)
+import Screamer.Context (class ContextKey, ask, provide)
 import Screamer.Owned (Owned)
+import Type.Proxy (Proxy(..))
 
 -- | Each scheduling function returns the action that cancels what it
 -- | scheduled; cancelling twice, or after it ran, is a no-op. Callbacks
@@ -33,8 +35,15 @@ type Host =
 -- | are missing.
 foreign import browserHost :: Host
 
-hostKey :: Key Host
-hostKey = key "host" browserHost
+-- | The context key of the host; default `browserHost`.
+data HostKey
+
+instance ContextKey HostKey Host where
+  keyName _ = "Screamer.Host.HostKey"
+  keyDefault _ = browserHost
+
+hostKey :: Proxy HostKey
+hostKey = Proxy
 
 -- | The host of the current scope.
 host :: Owned Host
