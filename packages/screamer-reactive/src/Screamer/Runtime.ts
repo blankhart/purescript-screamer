@@ -18,8 +18,8 @@
 // graph. A node bumps its version only when its value changes under its
 // equality, so unchanged results stop propagation.
 //
-// A write made by an effect, or anywhere during a flush, is held until the
-// next round starts, as a fire is. So every effect in a round sees the same
+// A write made by an effect, or anywhere during a flush, is deferred to the
+// start of the next round, as a fire is. So every effect in a round sees the same
 // value of every cell, whatever order the effects were created in, and a
 // read right after such a write still returns the round's value.
 
@@ -212,9 +212,9 @@ export class Cell<T> implements Source<T> {
   targets: Set<Target> = new Set();
   _track = 0;
   _diff = 0;
-  /** A write held until the next round starts, if `held`. */
+  /** The value of a deferred write, meaningful only if `deferred`. */
   next: T = UNSET;
-  held = false;
+  deferred = false;
   constructor(public value: T, public eq: Eq<T> = Object.is) {}
 
   refresh(): void {}
@@ -226,15 +226,15 @@ export class Cell<T> implements Source<T> {
 
   /**
    * Set the value. A write made by an effect, or anywhere during a flush,
-   * is held until the next round starts, like a fire: every effect in a
-   * round sees the value the round started with. Of several held writes to
-   * one cell, the last wins.
+   * is deferred to the start of the next round, like a fire: every effect
+   * in a round sees the value the round started with. Of several writes to
+   * one cell deferred from one round, the last made is the one applied.
    */
   write(x: T): void {
     if (DEV && inDerived > 0) throw new Error('write inside a derivation');
     if (inEffect > 0 || flushing > 0) {
-      if (!this.held) {
-        this.held = true;
+      if (!this.deferred) {
+        this.deferred = true;
         written.push(this);
       }
       this.next = x;
@@ -264,12 +264,12 @@ export class Cell<T> implements Source<T> {
     }
   }
 
-  /** The value including a held write: what the next round will start with. */
+  /** The value including a deferred write: what the next round will start with. */
   latest(): T {
-    return this.held ? this.next : this.value;
+    return this.deferred ? this.next : this.value;
   }
 
-  /** Write `f` of the latest value, so held updates compose. */
+  /** Write `f` of the latest value, so deferred updates compose. */
   modify(f: (x: T) => T): void {
     this.write(f(this.latest()));
   }
@@ -937,7 +937,7 @@ function flush(): void {
         for (const src of fired) src.pending = [];
         fired = [];
         for (const c of written) {
-          c.held = false;
+          c.deferred = false;
           c.next = UNSET;
         }
         written = [];
@@ -1043,7 +1043,7 @@ function settle(): void {
 }
 
 /**
- * Start a round: apply the writes held since the last one and deliver the
+ * Start a round: apply the writes deferred since the last one and deliver the
  * occurrences fired since then, then notify their observers.
  */
 function startRound(): void {
@@ -1058,7 +1058,7 @@ function startRound(): void {
   for (let i = 0; i < ws.length; i++) {
     const c = ws[i];
     const x = c.next;
-    c.held = false;
+    c.deferred = false;
     c.next = UNSET;
     if (c.eq(x, c.value)) continue;
     c.value = x;

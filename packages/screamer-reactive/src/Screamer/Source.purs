@@ -25,10 +25,11 @@ import Screamer.Signal (Signal)
 import Type.Proxy (Proxy)
 
 -- | A writable cell and the signal that reads it. A `put` or `modify` from an
--- | event handler or other code outside a flush takes effect at once. One
--- | from a subscriber is held until the next flush round starts, so `read`
--- | returns the old value until then; `modify` applies its function to the
--- | held value, so two `modify`s in one round compose.
+-- | event handler, or other code outside a subscriber, takes effect at once.
+-- | One from a subscriber is deferred to the start of the next timestep, so
+-- | `read` returns the old value until then. `modify` applies its function
+-- | to the value including writes already deferred, so two `modify`s made
+-- | in one timestep compose.
 type SignalSource a =
   { signal :: Signal a
   , put :: a -> Effect Unit

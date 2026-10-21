@@ -141,8 +141,8 @@ foreign import subscribeImpl :: forall a. Scope -> Event a -> (a -> Effect Unit)
 
 -- | Call the function once per occurrence, in fire order, until the current
 -- | scope is disposed. Occurrences from before the call are not delivered.
--- | The callback runs untracked; writes and fires it makes take effect when
--- | the next flush round starts (see `Signal.subscribe`).
+-- | The callback runs untracked; writes and fires it makes are deferred to
+-- | the start of the next timestep (see `Signal.subscribe`).
 subscribe :: forall a. Event a -> (a -> Effect Unit) -> Owned Unit
 subscribe e cb = Owned \s -> subscribeImpl s e cb
 
