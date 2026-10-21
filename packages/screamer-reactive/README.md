@@ -8,7 +8,7 @@ The reactive core: signals, events, sources and scopes, with no DOM. It builds w
 | `Screamer.Event` | `Event`, its instances, `changes`, `stepper`, `fold`, `tag`, `attach*`, `mapAccum`, `withPrevious`, `startWith`, `dropRepeats*`, `gate`, `oneOf`, `switchEvent`, `subscribe`, `hold` |
 | `Screamer.Source` | `signalSource`, `eventSource`, `batch`, and `focus` and `prop` for a source over part of another's value |
 | `Screamer.Owned` | `Owned`, `onCleanup`, `child`, `runOwned`, `onError` |
-| `Screamer.Context` | `key`, `provide`, `ask`, `uniqueId` |
+| `Screamer.Context` | `ContextKey`, `provide`, `ask`, `uniqueId`, and `key` for foreign code |
 | `Screamer.Host` | the clock, timers and frames as a context value |
 | `Screamer.Pending` | `pending`, `settled`: work in flight per scope |
 | `Screamer.Runtime` | `readStats`, for leak checks |

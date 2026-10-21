@@ -12,7 +12,7 @@ import Effect.Class (liftEffect)
 import Effect.Class as Owned
 import Effect.Exception (message, throw)
 import Effect.Ref as Ref
-import Screamer.Context (ask, key, provide)
+import Screamer.Context (class ContextKey, ask, provide)
 import Screamer.Element (Element(..), catchError, component, dyn, each, element, element_, instantiate, mount, portal, suspense, text, withLeave)
 import Screamer.Host (Host, withHost)
 import Screamer.Resource (Remote(..), resource)
@@ -23,7 +23,14 @@ import Screamer.Test.Dom (innerHTML, resetBody)
 import Test.Backend (addTarget, crash)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
+import Type.Proxy (Proxy(..))
 import Web.DOM.Node (Node)
+
+data Who
+
+instance ContextKey Who String where
+  keyName _ = "Test.Primitives.Who"
+  keyDefault _ = "nobody"
 
 type Leak = { effects :: Int, scopes :: Int, links :: Int }
 
@@ -59,7 +66,7 @@ spec = describe "framework primitives" do
       liftEffect $ resetBody *> addTarget "modal"
       shown <- liftEffect $ signalSource true
       let
-        k = key "who" "nobody"
+        k = Proxy :: Proxy Who
         dialog = component do
           who <- ask k
           pure $ portal "#modal" (element_ "p" [] [ element ("hello " <> who) ])

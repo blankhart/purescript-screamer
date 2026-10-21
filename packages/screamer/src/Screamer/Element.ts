@@ -164,8 +164,7 @@ function removeBetween(b: Backend, start: N, end: N, r: Remover | null = null): 
 /** A context key, as `Screamer.Context.key` makes it. */
 interface Key<A> {
   name: string;
-  id: symbol;
-  dflt: A;
+  default: A;
 }
 
 type LeaveHook = (node: N) => (done: () => void) => () => void;
@@ -183,7 +182,7 @@ class Remover {
   constructor(private b: Backend, private hook: LeaveHook | null) {}
 
   static of(b: Backend, s: Scope, k: Key<LeaveHook>): Remover {
-    const hook = R.lookupContext(s, k.id, k.dflt);
+    const hook = R.lookupContext(s, k.name, k.default);
     const r = new Remover(b, hook === immediateLeave ? null : hook);
     if (r.hook !== null) s.cleanups.push(() => r.flush());
     return r;
@@ -550,7 +549,7 @@ export const suspenseImpl =
     const { start, end, f } = anchors(b);
     const scope = R.createScope(s);
     const settled = settledIn(scope)();
-    R.lookupContext(s, boundary.id, boundary.dflt)({ start, end, settled })();
+    R.lookupContext(s, boundary.name, boundary.default)({ start, end, settled })();
     // The content builds detached, so its pending work starts at once.
     const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => content(scope)())));
     if (R.sample(settled)) {

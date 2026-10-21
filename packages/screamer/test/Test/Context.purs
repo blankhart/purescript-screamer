@@ -3,7 +3,7 @@ module Test.Context (spec) where
 import Prelude
 
 import Effect.Class (liftEffect)
-import Screamer.Context (ask, key, provide, uniqueId)
+import Screamer.Context (class ContextKey, ask, provide, uniqueId)
 import Screamer.Element (Element(..), component, dyn, each, element_, instantiate, mount, text)
 import Screamer.Owned (child, runOwned)
 import Screamer.Runtime (readStats)
@@ -11,17 +11,44 @@ import Screamer.Source (signalSource)
 import Screamer.Test.Dom (innerHTML, resetBody)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
+import Type.Proxy (Proxy(..))
+
+data Theme
+
+instance ContextKey Theme String where
+  keyName _ = "Test.Context.Theme"
+  keyDefault _ = "light"
+
+theme :: Proxy Theme
+theme = Proxy
+
+data X1
+
+instance ContextKey X1 Int where
+  keyName _ = "Test.Context.X1"
+  keyDefault _ = 1
+
+data X2
+
+instance ContextKey X2 Int where
+  keyName _ = "Test.Context.X2"
+  keyDefault _ = 2
+
+data Unit'
+
+instance ContextKey Unit' Unit where
+  keyName _ = "Test.Context.Unit'"
+  keyDefault _ = unit
 
 spec :: Spec Unit
 spec = describe "Screamer.Context" do
   it "ask returns the default when nothing is provided" do
-    let k = key "theme" "light"
-    r <- liftEffect $ runOwned (ask k)
+    r <- liftEffect $ runOwned (ask theme)
     r.value `shouldEqual` "light"
     liftEffect r.dispose
 
   it "provide shadows the default in nested scopes, and only inside its body" do
-    let k = key "theme" "light"
+    let k = theme
     before <- liftEffect readStats
     r <- liftEffect $ runOwned do
       outer <- ask k
@@ -38,10 +65,10 @@ spec = describe "Screamer.Context" do
     after <- liftEffect readStats
     (after.liveScopes - before.liveScopes) `shouldEqual` 0
 
-  it "keys with the same name are different keys" do
+  it "keys of different types are different keys, even with the same value type" do
     let
-      k1 = key "x" 1
-      k2 = key "x" 2
+      k1 = Proxy :: Proxy X1
+      k2 = Proxy :: Proxy X2
     r <- liftEffect $ runOwned $ provide k1 10 do
       a <- ask k1
       b <- ask k2
@@ -49,10 +76,16 @@ spec = describe "Screamer.Context" do
     r.value `shouldEqual` [ 10, 2 ]
     liftEffect r.dispose
 
+  it "a key written inline is the same key as a shared one" do
+    r <- liftEffect $ runOwned $ provide (Proxy :: Proxy Theme) "dark" do
+      ask (Proxy :: Proxy Theme)
+    r.value `shouldEqual` "dark"
+    liftEffect r.dispose
+
   it "reaches dyn branches and each rows, including ones created later" do
     liftEffect resetBody
     let
-      k = key "theme" "light"
+      k = theme
       themed label = component do
         v <- ask k
         pure (element_ "i" [] [ text (pure (label <> ":" <> v)) ])
@@ -79,7 +112,7 @@ spec = describe "Screamer.Context" do
   describe "uniqueId" do
     it "counts in instantiation order within a root, across child and provided scopes" do
       let
-        k = key "k" unit
+        k = Proxy :: Proxy Unit'
         ids = do
           a <- uniqueId
           b <- child uniqueId
