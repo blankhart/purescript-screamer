@@ -74,25 +74,42 @@ spec = describe "Screamer.Owned" do
         Ref.modify_ (_ - 1) depth
       subscribe b.signal \y -> record log ("b " <> show y)
     liftEffect $ a.put 1
-    -- Each round runs queued subscribers in creation order, so `b` first
-    -- sees 4: its write of 2 and the write of 4 coalesce into one round.
+    -- A write from a subscriber takes effect when the next round starts,
+    -- so `b` sees each value the round after `a`'s subscriber wrote it,
+    -- whatever the order the two subscribed in.
     liftEffect (Ref.read log) >>= shouldEqual
       [ "a 0", "a done 0", "b 0"
       , "a 1", "a done 1"
-      , "a 2", "a done 2", "b 4"
-      , "a 3", "a done 3", "b 6"
+      , "a 2", "a done 2", "b 2"
+      , "a 3", "a done 3", "b 4"
+      , "b 6"
       ]
     liftEffect (Ref.read maxDepth) >>= shouldEqual 1
     liftEffect r.dispose
 
   it "surfaces an effect loop as an exception" do
     a <- liftEffect $ signalSource 0
-    r <- liftEffect $ runOwned $ subscribe a.signal \x -> a.put (x + 1)
+    r <- liftEffect $ runOwned $ subscribe a.signal \x -> when (x > 0) (a.put (x + 1))
     result <- liftEffect $ try (a.put 100)
     liftEffect r.dispose
     case result of
       Left e -> unless (contains (Pattern "effect loop") (message e)) $ fail (message e)
       Right _ -> fail "expected an effect loop"
+
+  it "composes two subscribers' modifies in one round" do
+    a <- liftEffect $ signalSource 0
+    n <- liftEffect $ signalSource 1
+    seen <- liftEffect $ Ref.new []
+    r <- liftEffect $ runOwned do
+      subscribe a.signal \x -> when (x > 0) (n.modify (_ + 1))
+      subscribe a.signal \x -> when (x > 0) do
+        n.modify (_ * 10)
+        -- Not yet: the writes take effect when the next round starts.
+        read n.signal >>= \v -> Ref.modify_ (_ <> [ v ]) seen
+    liftEffect $ a.put 1
+    liftEffect (read n.signal) >>= shouldEqual 20
+    liftEffect (Ref.read seen) >>= shouldEqual [ 1 ]
+    liftEffect r.dispose
 
   it "stops a fold advancing when the child scope that made it is disposed" do
     clicks <- liftEffect $ signalSource 0

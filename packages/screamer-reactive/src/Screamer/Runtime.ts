@@ -17,6 +17,11 @@
 // An effect runs at most once per flush round and always sees a consistent
 // graph. A node bumps its version only when its value changes under its
 // equality, so unchanged results stop propagation.
+//
+// A write made by an effect, or anywhere during a flush, is held until the
+// next round starts, as a fire is. So every effect in a round sees the same
+// value of every cell, whatever order the effects were created in, and a
+// read right after such a write still returns the round's value.
 
 declare const __DEV__: boolean | undefined;
 
@@ -62,6 +67,10 @@ let roundStamp = 0;
 let flushing = 0;
 /** Event sources fired since the last round started. */
 let fired: EventSourceNode<any>[] = [];
+/** Greater than zero while an effect's function runs. */
+let inEffect = 0;
+/** Cells written by effects or during a flush since the last round started. */
+let written: Cell<any>[] = [];
 /**
  * Stateful nodes over events that were notified and may not have stepped
  * yet. They step at the end of the round, before the next one replaces
@@ -203,7 +212,10 @@ export class Cell<T> implements Source<T> {
   targets: Set<Target> = new Set();
   _track = 0;
   _diff = 0;
-  constructor(public value: T, private eq: Eq<T> = Object.is) {}
+  /** A write held until the next round starts, if `held`. */
+  next: T = UNSET;
+  held = false;
+  constructor(public value: T, public eq: Eq<T> = Object.is) {}
 
   refresh(): void {}
 
@@ -212,7 +224,32 @@ export class Cell<T> implements Source<T> {
     return this.value;
   }
 
+  /**
+   * Set the value. A write made by an effect, or anywhere during a flush,
+   * is held until the next round starts, like a fire: every effect in a
+   * round sees the value the round started with. Of several held writes to
+   * one cell, the last wins.
+   */
   write(x: T): void {
+    if (DEV && inDerived > 0) throw new Error('write inside a derivation');
+    if (inEffect > 0 || flushing > 0) {
+      if (!this.held) {
+        this.held = true;
+        written.push(this);
+      }
+      this.next = x;
+      return;
+    }
+    this.writeNow(x);
+  }
+
+  /**
+   * Set the value at once, even inside an effect or a flush. For runtime
+   * bookkeeping that the writer reads back synchronously, such as the
+   * pending-work counts behind `suspense`; it brings back the order
+   * dependence that `write` avoids. A cell uses one or the other.
+   */
+  writeNow(x: T): void {
     if (DEV && inDerived > 0) throw new Error('write inside a derivation');
     if (this.eq(x, this.value)) return;
     this.value = x;
@@ -225,6 +262,16 @@ export class Cell<T> implements Source<T> {
     } finally {
       if (--batchDepth === 0) flush();
     }
+  }
+
+  /** The value including a held write: what the next round will start with. */
+  latest(): T {
+    return this.held ? this.next : this.value;
+  }
+
+  /** Write `f` of the latest value, so held updates compose. */
+  modify(f: (x: T) => T): void {
+    this.write(f(this.latest()));
   }
 }
 
@@ -796,6 +843,7 @@ export class EffectNode implements Target, Computation {
     const prevOwner = owner;
     const prev = startCapture(this);
     owner = null;
+    inEffect++;
     try {
       this.fn();
     } catch (e) {
@@ -803,6 +851,7 @@ export class EffectNode implements Target, Computation {
     } finally {
       current = prev;
       owner = prevOwner;
+      inEffect--;
     }
     if (this.disposed) {
       this.newDeps = [];
@@ -828,8 +877,8 @@ export class EffectNode implements Target, Computation {
 }
 
 /**
- * Create an effect owned by the current scope and run it once. Writes made
- * while it runs are queued into the next flush round.
+ * Create an effect owned by the current scope and run it once. Writes and
+ * fires made while it runs take effect when the next flush round starts.
  */
 export function effect(fn: () => void): EffectNode {
   const s = owner;
@@ -881,12 +930,17 @@ function flush(): void {
   batchDepth++;
   flushing++;
   try {
-    while (queue.length > 0 || fired.length > 0) {
+    while (queue.length > 0 || fired.length > 0 || written.length > 0) {
       if (++rounds > LOOP_LIMIT) {
         for (const e of queue) e.queued = false;
         queue = [];
         for (const src of fired) src.pending = [];
         fired = [];
+        for (const c of written) {
+          c.held = false;
+          c.next = UNSET;
+        }
+        written = [];
         loopError = new Error('effect loop');
         break;
       }
@@ -988,18 +1042,37 @@ function settle(): void {
   }
 }
 
-/** Start a round: deliver the occurrences fired since the last one. */
+/**
+ * Start a round: apply the writes held since the last one and deliver the
+ * occurrences fired since then, then notify their observers.
+ */
 function startRound(): void {
   roundStamp = ++stamp;
-  if (fired.length === 0) return;
+  if (fired.length === 0 && written.length === 0) return;
+  const ws = written;
+  written = [];
   const fs = fired;
   fired = [];
   epoch++;
+  const changed: Cell<any>[] = [];
+  for (let i = 0; i < ws.length; i++) {
+    const c = ws[i];
+    const x = c.next;
+    c.held = false;
+    c.next = UNSET;
+    if (c.eq(x, c.value)) continue;
+    c.value = x;
+    c.version++;
+    changed.push(c);
+  }
   for (let i = 0; i < fs.length; i++) {
     const src = fs[i];
     src.value = src.pending;
     src.pending = [];
     src.version++;
+  }
+  for (let i = 0; i < changed.length; i++) {
+    for (const t of changed[i].targets) t.notify();
   }
   for (let i = 0; i < fs.length; i++) {
     for (const t of fs[i].targets) t.notify();
