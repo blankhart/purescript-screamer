@@ -27,21 +27,24 @@ const {
   subscribeEvent, holdEvent, accumEvent, touch,
 } = runtime;
 
+// The stateful constructors are effects that make a node; these tests call
+// them directly, outside any scope, to exercise the nodes themselves.
 const curry2 = <A, B, C>(f: (a: A, b: B) => C) => (a: A) => (b: B) => f(a, b);
 
 const { oneOf, mergeAll } = event;
-const { leftmost, race } = eventExtra;
+const { leftmost } = eventExtra;
+const race = <A>(es: EventLike<A>[]): EventLike<A> => eventExtra.raceImpl(es)();
 const mergeWith = <A, B, C>(both: (a: A, b: B) => C, left: (a: A) => C, right: (b: B) => C, ea: EventLike<A>, eb: EventLike<B>): EventLike<C> =>
   eventExtra.mergeWith(curry2(both))(left)(right)(ea)(eb);
-const zip = <A, B, C>(f: (a: A, b: B) => C, ea: EventLike<A>, eb: EventLike<B>): EventLike<C> => eventExtra.zipWith(curry2(f))(ea)(eb);
+const zip = <A, B, C>(f: (a: A, b: B) => C, ea: EventLike<A>, eb: EventLike<B>): EventLike<C> => eventExtra.zipWithImpl(curry2(f))(ea)(eb)();
 const gate = <A>(cond: Readable<boolean>, e: EventLike<A>): EventLike<A> => event.gate(cond)(e);
 
 const { combine } = signalExtra;
-const merge = <A>(a: Readable<A>, b: Readable<A>): Readable<A> => signal.merge(a)(b);
-const latestWhere = <A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readable<A> => signal.latestWhere(p)(seed)(s);
-const gateSignal = <A>(cond: Readable<boolean>, seed: A, s: Readable<A>): Readable<A> => signal.gate(cond)(seed)(s);
+const merge = <A>(a: Readable<A>, b: Readable<A>): Readable<A> => signal.mergeImpl(a)(b)();
+const latestWhere = <A>(p: (a: A) => boolean, seed: A, s: Readable<A>): Readable<A> => signal.latestWhereImpl(p)(seed)(s)();
+const gateSignal = <A>(cond: Readable<boolean>, seed: A, s: Readable<A>): Readable<A> => signal.gateImpl(cond)(seed)(s)();
 const withLatest = <A, B, T>(pair: (a: A, b: B) => T, b: Readable<B>, a: Readable<A>): Readable<T> =>
-  signalExtra.withLatestImpl(curry2(pair))(b)(a);
+  signalExtra.withLatestImpl(curry2(pair))(b)(a)();
 
 /** Record each occurrence of `e` until stopped. */
 function record<A>(e: EventLike<A>) {

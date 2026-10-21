@@ -16,7 +16,7 @@ import Screamer.Signal (read, subscribe)
 import Screamer.Signal as Signal
 import Screamer.Source (signalSource)
 import Screamer.Test.Clock as Fake
-import Screamer.Test (observe)
+import Screamer.Test (observe, observeOwned)
 import Test.Spec (Spec, after_, before_, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -65,7 +65,7 @@ spec = describe "Error handling" do
 
   it "keepLast shows the previous result while the next one loads" do
     s <- liftEffect $ signalSource (Loading :: Remote Int)
-    o <- liftEffect $ observe (keepLast s.signal)
+    o <- liftEffect $ observeOwned (keepLast s.signal)
     liftEffect do
       s.put (Loaded 1)
       s.put Loading
