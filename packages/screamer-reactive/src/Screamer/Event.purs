@@ -1,18 +1,18 @@
--- | Events: occurrences at moments. Everything here is pure except
--- | `subscribe`: an `Event` is a description of a node in the reactive
--- | graph, and allocating one has no effect on the graph until something
--- | observes it.
+-- | Events: occurrences at moments. An `Event` is a description of a node
+-- | in the reactive graph. The stateless events are pure: allocating one has
+-- | no effect on the graph until something observes it.
 -- |
 -- | An event has no current value and no cutoff. Every occurrence
 -- | propagates, including one equal to the last and several in one batch.
 -- | Occurrences fired while nothing observes an event go nowhere.
 -- |
--- | Stateful nodes over events (`stepper`, `fold`) start from their seed
--- | when first observed, step once per occurrence while observed, and keep
--- | their state when the last observer leaves. Unlike stateful signals they
--- | do not resynchronize on return: occurrences fired while paused are
--- | missed. Use `Screamer.Signal.hold` on a signal, or `hold` here on an
--- | event, to keep one advancing.
+-- | Nodes that remember something about past occurrences are made in
+-- | `Owned`: `stepper`, `fold`, `mapAccum`, `withPrevious`, `startWith` and
+-- | `dropRepeats*` here, and the stateful operators of
+-- | `Screamer.Event.Extra`. Each call makes a new node, whose state starts
+-- | at its seed when the `Owned` action runs. It belongs to the current
+-- | scope and steps once per occurrence for the scope's whole life, whether
+-- | or not anything observes it, until the scope is disposed.
 -- |
 -- | This module reuses names from `Screamer.Signal`, so import it qualified:
 -- | `import Screamer.Event as Event`. More operators (`take`,
@@ -52,8 +52,10 @@ import Data.Filterable (class Filterable)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Screamer.Owned (Owned(..), Scope)
 import Screamer.Signal (Signal)
+import Screamer.Signal as Signal
 import Unsafe.Coerce (unsafeCoerce)
 
 foreign import data Event :: Type -> Type
@@ -109,13 +111,18 @@ partitionMapE f = map f >>> \e ->
 -- | every fire of the same round.
 foreign import changes :: forall a. Signal a -> Event a
 
--- | The latest occurrence, starting at the seed. Stateful: it steps only
--- | while observed.
-foreign import stepper :: forall a. a -> Event a -> Signal a
+-- | The latest occurrence, starting at the seed. Stateful.
+stepper :: forall a. a -> Event a -> Owned (Signal a)
+stepper seed e = ownedSignal (stepperImpl seed e)
+
+foreign import stepperImpl :: forall a. a -> Event a -> Effect (Signal a)
 
 -- | Accumulate from a seed, one step per occurrence, in fire order.
--- | Stateful: it steps only while observed.
-foreign import fold :: forall a b. (a -> b -> b) -> b -> Event a -> Signal b
+-- | Stateful.
+fold :: forall a b. (a -> b -> b) -> b -> Event a -> Owned (Signal b)
+fold f seed e = ownedSignal (foldImpl f seed e)
+
+foreign import foldImpl :: forall a b. (a -> b -> b) -> b -> Event a -> Effect (Signal b)
 
 -- | The signal's value at each occurrence.
 tag :: forall a b. Signal b -> Event a -> Event b
@@ -141,45 +148,58 @@ subscribe e cb = Owned \s -> subscribeImpl s e cb
 
 foreign import holdImpl :: forall a. Scope -> Event a -> Effect (Event a)
 
--- | Observe an event for the lifetime of the current scope, so a stateful
--- | event (`take`, `mapAccum`, `dropRepeats`, ...) keeps stepping while
--- | nothing else observes it. Returns the same event. The event counterpart
--- | of `Screamer.Signal.hold`.
+-- | Observe an event for the lifetime of the current scope, so it keeps
+-- | being computed while nothing else observes it. Returns the same event.
+-- | The event counterpart of `Screamer.Signal.hold`.
 hold :: forall a. Event a -> Owned (Event a)
 hold e = Owned \s -> holdImpl s e
 
--- Transform, filter and accumulate (#19). The stateful ones start from
--- their seed when first observed and count only occurrences seen while
--- observed: a `take 3` observed again later does not restart.
+-- Make a stateful node and hold it for the lifetime of the current scope, so
+-- its state starts now. An add-on does the same with `hold`.
+ownedSignal :: forall a. Effect (Signal a) -> Owned (Signal a)
+ownedSignal make = liftEffect make >>= Signal.hold
+
+owned :: forall a. Effect (Event a) -> Owned (Event a)
+owned make = liftEffect make >>= hold
+
+-- Transform, filter and accumulate (#19). The stateful ones count from
+-- their seed when the `Owned` action runs.
 
 -- | Thread a state through the occurrences, emitting one value for each,
--- | like `fold` but with an output per occurrence. (RxJS `scan` with a
--- | separate output.)
-foreign import mapAccum :: forall a s b. (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Event b
+-- | like `fold` but with an output per occurrence. Stateful. (RxJS `scan`
+-- | with a separate output.)
+mapAccum :: forall a s b. (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Owned (Event b)
+mapAccum f seed e = owned (mapAccumImpl f seed e)
 
--- | Each occurrence with the one before it, from the second occurrence seen
--- | while observed. (RxJS `pairwise`.)
-foreign import withPrevious :: forall a. Event a -> Event { previous :: a, current :: a }
+foreign import mapAccumImpl :: forall a s b. (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Effect (Event b)
+
+-- | Each occurrence with the one before it, from the second occurrence
+-- | after the `Owned` action runs. Stateful. (RxJS `pairwise`.)
+withPrevious :: forall a. Event a -> Owned (Event { previous :: a, current :: a })
+withPrevious e = owned (withPreviousImpl e)
+
+foreign import withPreviousImpl :: forall a. Event a -> Effect (Event { previous :: a, current :: a })
 
 -- | The latest occurrence, starting at the seed. An alias of `stepper`.
 -- | (RxJS `startWith`.)
-startWith :: forall a. a -> Event a -> Signal a
+startWith :: forall a. a -> Event a -> Owned (Signal a)
 startWith = stepper
 
--- | Drop an occurrence equal to the one before it. (RxJS
+-- | Drop an occurrence equal to the one before it. Stateful. (RxJS
 -- | `distinctUntilChanged`.)
-dropRepeats :: forall a. Eq a => Event a -> Event a
-dropRepeats = dropRepeatsByImpl eq
+dropRepeats :: forall a. Eq a => Event a -> Owned (Event a)
+dropRepeats = dropRepeatsBy eq
 
-dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Event a -> Event a
-dropRepeatsBy = dropRepeatsByImpl
+-- | Drop an occurrence equivalent to the one before it. Stateful.
+dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Event a -> Owned (Event a)
+dropRepeatsBy eq e = owned (dropRepeatsByImpl eq e)
 
 -- | Drop an occurrence whose key equals the previous occurrence's key.
--- | (RxJS `distinctUntilKeyChanged`.)
-dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Event a -> Event a
-dropRepeatsOn key = dropRepeatsByImpl \x y -> key x == key y
+-- | Stateful. (RxJS `distinctUntilKeyChanged`.)
+dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Event a -> Owned (Event a)
+dropRepeatsOn key = dropRepeatsBy \x y -> key x == key y
 
-foreign import dropRepeatsByImpl :: forall a. (a -> a -> Boolean) -> Event a -> Event a
+foreign import dropRepeatsByImpl :: forall a. (a -> a -> Boolean) -> Event a -> Effect (Event a)
 
 -- | The occurrences of rounds that end with the signal true. The event
 -- | version of `Screamer.Signal.gate`.
@@ -187,8 +207,8 @@ foreign import gate :: forall a. Signal Boolean -> Event a -> Event a
 
 -- Combining several streams (#20).
 
--- | Every input's occurrences, in fire order, as one node. It agrees with
--- | folding the array with `<|>`. (RxJS `merge`.)
+-- | Every argument's occurrences, in fire order, as one node. It agrees
+-- | with folding the array with `<|>`. (RxJS `merge`.)
 foreign import oneOf :: forall a. Array (Event a) -> Event a
 
 -- Flattening (#21). Flattening that owns inner work (timers, requests) is

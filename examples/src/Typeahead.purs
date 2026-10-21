@@ -28,7 +28,7 @@ import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry)
-import Screamer.Signal (hold, read)
+import Screamer.Signal (read)
 import Screamer.Source (eventSource, signalSource)
 import Screamer.Time as Time
 import Web.Event.Event (preventDefault, target)
@@ -84,20 +84,20 @@ typeahead = component do
   draft <- liftEffect $ signalSource ""
   chosen <- liftEffect $ signalSource ""
   settled <- Time.debounce (Milliseconds 150.0) typed.event
+  distinct <- Event.dropRepeats settled
   let
-    queries = filter (\q -> String.length q >= 3) (Event.dropRepeats settled)
+    queries = filter (\q -> String.length q >= 3) distinct
     policy = { retries: 3, backoff: Exponential { initial: Milliseconds 100.0, max: Milliseconds 1000.0 } }
   searchWithRetry <- retry policy search
-  raw <- resourceWith Switch (Event.stepper "" queries) \q ->
+  query <- Event.stepper "" queries
+  raw <- resourceWith Switch query \q ->
     if q == "" then pure [] else searchWithRetry q
+  results <- keepLast raw
   let
-    results = keepLast raw
     shown = results <#> case _ of
       Loaded rs -> rs
       _ -> []
-  -- Held: while the list is empty nothing else observes the selection, and
-  -- an unheld fold would pause and miss the next results' reset.
-  selection <- hold $ Event.fold select { index: 0, count: 0 }
+  selection <- Event.fold select { index: 0, count: 0 }
     (map Move keys.event <|> map (Results <<< Array.length) (Event.changes shown))
   let
     status = ado

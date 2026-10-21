@@ -2,7 +2,6 @@ module Test.Signal (spec) where
 
 import Prelude
 
-import Control.Alt ((<|>))
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmpty
 import Data.Foldable (for_, traverse_)
@@ -12,7 +11,8 @@ import Data.Traversable (for)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Screamer.Event as Event
-import Screamer.Signal (Signal, dropRepeats, read, sampleManyWith)
+import Screamer.Owned (Owned, runOwned)
+import Screamer.Signal (Signal, dropRepeats, merge, read, sampleManyWith)
 import Screamer.Source (SignalSource, batch, signalSource)
 import Screamer.Test (observe)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
@@ -42,11 +42,12 @@ genScript = do
   m <- chooseInt (-3) 3
   pure { initial, batches, k, m }
 
--- | Observe both sides on the same signal sources while running the script, and
--- | compare the traces of values shown. Consecutive repeats are dropped: a
--- | merge reports every step, so an observer of a merge can be shown the same
--- | value twice where the other side's observer is not.
-law :: forall a. Eq a => Show a => (Script -> Chans -> Signal a) -> (Script -> Chans -> Signal a) -> Script -> Effect Unit
+-- | Make both sides on the same signal sources, each in a scope of its own,
+-- | observe them while running the script, and compare the traces of values
+-- | shown. Consecutive repeats are dropped: a merge reports every step, so an
+-- | observer of a merge can be shown the same value twice where the other
+-- | side's observer is not.
+law :: forall a. Eq a => Show a => (Script -> Chans -> Owned (Signal a)) -> (Script -> Chans -> Owned (Signal a)) -> Script -> Effect Unit
 law lhs rhs script = do
   chans <- for (Array.range 0 2) \i -> signalSource (Array.index script.initial i # fromMaybe0)
   let
@@ -54,14 +55,18 @@ law lhs rhs script = do
       Just ch -> ch.signal
       Nothing -> pure 0
     cs = { a: sig 0, b: sig 1, c: sig 2 }
-  l <- observe (lhs script cs)
-  r <- observe (rhs script cs)
+  ls <- runOwned (lhs script cs)
+  rs <- runOwned (rhs script cs)
+  l <- observe ls.value
+  r <- observe rs.value
   for_ script.batches \writes -> batch do
     for_ writes \{ chan, value } -> for_ (Array.index chans chan) \ch -> ch.put value
   lt <- dedup <$> l.trace
   rt <- dedup <$> r.trace
   l.stop
   r.stop
+  ls.dispose
+  rs.dispose
   when (lt /= rt) do
     fail $ "traces differ for " <> show script <> ": " <> show lt <> " /= " <> show rt
   where
@@ -71,7 +76,10 @@ law lhs rhs script = do
     Nothing -> 0
 
 checkLaw :: forall a. Eq a => Show a => (Script -> Chans -> Signal a) -> (Script -> Chans -> Signal a) -> Effect Unit
-checkLaw lhs rhs = do
+checkLaw lhs rhs = checkOwnedLaw (\p s -> pure (lhs p s)) (\p s -> pure (rhs p s))
+
+checkOwnedLaw :: forall a. Eq a => Show a => (Script -> Chans -> Owned (Signal a)) -> (Script -> Chans -> Owned (Signal a)) -> Effect Unit
+checkOwnedLaw lhs rhs = do
   scripts <- randomSample' 200 genScript
   traverse_ (law lhs rhs) scripts
 
@@ -105,20 +113,25 @@ spec = describe "Screamer.Signal" do
     it "associativity" $ liftEffect $ checkLaw
       (\_ s -> (s.a >>= kf s) >>= kg s)
       (\_ s -> s.a >>= \x -> kf s x >>= kg s)
-    it "associativity with a stateful inner signal" $ liftEffect $ checkLaw
-      (\_ s -> (s.a >>= kfold s) >>= kg s)
-      (\_ s -> s.a >>= \x -> kfold s x >>= kg s)
+    -- A fold can only be made in `Owned`, so the inner function can refer to
+    -- a fold that exists but cannot start a new one.
+    it "associativity with a stateful inner signal" $ liftEffect $ checkOwnedLaw
+      (\_ s -> kfold s <#> \t -> (s.a >>= ksum t) >>= kg s)
+      (\_ s -> kfold s <#> \t -> s.a >>= \x -> ksum t x >>= kg s)
+    it "associativity with a non-injective function and a stateful inner signal" $ liftEffect $ checkOwnedLaw
+      (\_ s -> kfold s <#> \t -> (s.a >>= kmod) >>= ktens t)
+      (\_ s -> kfold s <#> \t -> s.a >>= \x -> kmod x >>= ktens t)
 
-  describe "Alt" do
-    it "is associative on traces" $ liftEffect $ checkLaw
-      (\_ s -> (s.a <|> s.b) <|> s.c)
-      (\_ s -> s.a <|> (s.b <|> s.c))
+  describe "merge" do
+    it "is associative on traces" $ liftEffect $ checkOwnedLaw
+      (\_ s -> merge s.a s.b >>= \ab -> merge ab s.c)
+      (\_ s -> merge s.b s.c >>= \bc -> merge s.a bc)
     -- An injective function keeps the law under equality cutoff: a
     -- non-injective one can hide a left change that the merge on the left
     -- side still prefers.
-    it "map distributes over <|> for injective functions" $ liftEffect $ checkLaw
-      (\p s -> f p <$> (s.a <|> s.b))
-      (\p s -> (f p <$> s.a) <|> (f p <$> s.b))
+    it "map distributes over merge for injective functions" $ liftEffect $ checkOwnedLaw
+      (\p s -> map (f p) <$> merge s.a s.b)
+      (\p s -> merge (f p <$> s.a) (f p <$> s.b))
 
   describe "lifted Semigroup and Monoid" do
     it "appends current values" do
@@ -158,4 +171,7 @@ spec = describe "Screamer.Signal" do
   v s = map (\k x -> x * k) s.b
   kf s x = if even x then map (_ + x) s.b else s.c
   kg s y = if y > 3 then map (_ - y) s.a else s.b
-  kfold s x = Event.fold (\y acc -> acc + y) x (Event.changes s.b)
+  kfold s = Event.fold (\y acc -> acc + y) 0 (Event.changes s.b)
+  ksum t x = map (_ + x) t
+  kmod x = pure (x `mod` 2)
+  ktens t y = (\acc -> acc * 10 + y) <$> t

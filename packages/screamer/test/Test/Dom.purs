@@ -123,7 +123,7 @@ spec = describe "Screamer.Element" do
     src <- liftEffect $ signalSource 0
     let
       branch t = component do
-        let clicks = Event.fold (\_ n -> n + 1) 0 (Event.changes src.signal)
+        clicks <- Event.fold (\_ n -> n + 1) 0 (Event.changes src.signal)
         subscribe clicks \_ -> pure unit
         pure $ element_ "p" [] [ element t, text (show <$> clicks) ]
     _ <- liftEffect $ mount "#root" $ div' [] [ dyn (branch <$> tab.signal) ]

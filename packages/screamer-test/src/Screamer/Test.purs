@@ -2,8 +2,10 @@
 module Screamer.Test
   ( Observer
   , observe
+  , observeOwned
   , EventObserver
   , observeE
+  , observeOwnedE
   , runSpec
   ) where
 
@@ -17,7 +19,7 @@ import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Event as Event
-import Screamer.Owned (runOwned)
+import Screamer.Owned (Owned, runOwned)
 import Screamer.Signal (Signal)
 import Test.Spec (Spec)
 import Test.Spec.Reporter (consoleReporter)
@@ -30,6 +32,14 @@ type Observer a = { trace :: Effect (Array a), stop :: Effect Unit }
 -- | It observes with an effect from the core directly.
 foreign import observe :: forall a. Signal a -> Effect (Observer a)
 
+-- | Run the action in a fresh root scope and observe the signal it
+-- | returns, such as a stateful one. `stop` also disposes the scope.
+observeOwned :: forall a. Owned (Signal a) -> Effect (Observer a)
+observeOwned make = do
+  r <- runOwned make
+  o <- observe r.value
+  pure { trace: o.trace, stop: o.stop *> r.dispose }
+
 type EventObserver a = { trace :: Effect (Array a), stop :: Effect Unit }
 
 -- | Subscribe to an event in a fresh root scope, recording each occurrence.
@@ -38,6 +48,14 @@ observeE e = do
   seen <- Ref.new []
   r <- runOwned $ Event.subscribe e \a -> Ref.modify_ (_ <> [ a ]) seen
   pure { trace: Ref.read seen, stop: r.dispose }
+
+-- | Run the action in a fresh root scope and subscribe to the event it
+-- | returns, such as a stateful one. `stop` also disposes the scope.
+observeOwnedE :: forall a. Owned (Event a) -> Effect (EventObserver a)
+observeOwnedE make = do
+  r <- runOwned make
+  o <- observeE r.value
+  pure { trace: o.trace, stop: o.stop *> r.dispose }
 
 foreign import exit :: Int -> Effect Unit
 

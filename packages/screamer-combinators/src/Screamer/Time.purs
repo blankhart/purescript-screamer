@@ -189,7 +189,7 @@ audit (Milliseconds ms) input = do
   pure out.event
 
 -- | The signal's value at every interval, starting one interval from now.
--- | The signal is held, so a stateful signal keeps advancing. (RxJS
+-- | The signal is held, so it is kept computed between samples. (RxJS
 -- | `sampleTime`, built like `clock`.)
 sampleEvery :: forall a. Milliseconds -> Signal a -> Owned (Event a)
 sampleEvery (Milliseconds ms) input = do

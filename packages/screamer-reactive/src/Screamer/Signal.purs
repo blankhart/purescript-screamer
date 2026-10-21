@@ -1,33 +1,33 @@
--- | Signals: time-varying values. Everything here is pure except `read`,
--- | `subscribe` and `hold`: a `Signal` is a description of a node in the
--- | reactive graph, and allocating one has no effect on the graph until
--- | something observes it.
+-- | Signals: time-varying values. A `Signal` is a description of a node
+-- | in the reactive graph. The derived signals are pure: allocating one has
+-- | no effect on the graph until something observes it.
 -- |
 -- | A signal says what is true now; an `Event` says what happened. To
 -- | accumulate, fold over an event: `Event.fold f seed (Event.changes s)`.
 -- |
 -- | Derived signals (`map`, `apply`, `bind`, `sampleOn`, `sampleManyWith`,
--- | `dropRepeatsBy`) are cached while observed and recomputed on demand
+-- | `dropRepeats`) are cached while observed and recomputed on demand
 -- | otherwise. A node propagates a change only when its value changes under
 -- | its equality (`Object.is` by default, `Eq` through `dropRepeats`).
 -- |
--- | Stateful signals (`merge`, `latestWhere`, `gate`, `withPrevious`,
--- | and `Screamer.Signal.Extra.history`) advance only while observed; they
--- | pause:
+-- | Stateful signals remember something about the past, so they are made in
+-- | `Owned`: `merge`, `latestWhere`, `gate`, `withPrevious`, `dropRepeatsBy`,
+-- | `dropRepeatsOn`, and `Event.stepper`, `Event.fold` and
+-- | `Screamer.Signal.Extra.history`. Each call makes a new node:
 -- |
--- | - Start. State begins at the seed (for `merge`, the left input's current
--- |   value). Values the input held before observation are not stepped over.
--- | - Step. One step per propagation in which an input changed. Writes inside
+-- | - Start. State begins when the `Owned` action runs, at the seed (for
+-- |   `merge`, the left argument's current value).
+-- | - Step. One step per round in which an argument changed. Writes inside
 -- |   one batch coalesce, so two writes in one handler step a node once.
--- | - Pause. When the last observer goes, the node unlinks and keeps its
--- |   state. `read` returns that state. When observed again it
--- |   resynchronizes with its inputs without stepping, then continues.
--- | - Simultaneity. When both inputs of `merge` change in one batch, the left
--- |   wins (like Reflex's `leftmost`).
+-- | - Lifetime. The node belongs to the current scope and steps for the
+-- |   scope's whole life, whether or not anything reads it, until the scope
+-- |   is disposed.
+-- | - Simultaneity. When both arguments of `merge` change in one batch, the
+-- |   left wins (like Reflex's `leftmost`).
 -- |
--- | Two evaluations of the same stateful expression produce the same values
--- | whenever they are observed over the same interval. Use `hold` where a
--- | program needs one state regardless of who observes it.
+-- | Since state starts when it is created, and not when someone subscribes,
+-- | a stateful signal shows the same values to every subscriber, and a pure
+-- | function `a -> Signal b` can only refer to state that already exists.
 module Screamer.Signal
   ( Signal
   , sampleOn
@@ -52,10 +52,10 @@ module Screamer.Signal
 
 import Prelude
 
-import Control.Alt (class Alt)
 import Data.Either (Either(..), either)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Prim.Row (class Nub, class Union)
 import Screamer.Owned (Owned(..), Scope)
@@ -88,10 +88,6 @@ instance Bind Signal where
 
 instance Monad Signal
 
--- | `(<|>)` is `merge`: the latest of the two, the left winning ties.
-instance Alt Signal where
-  alt = merge
-
 -- | Lifted: `a <> b` is `append <$> a <*> b`.
 instance Semigroup a => Semigroup (Signal a) where
   append a b = append <$> a <*> b
@@ -106,23 +102,29 @@ foreign import sampleOn :: forall a b. Signal a -> Signal b -> Signal b
 dropRepeats :: forall a. Eq a => Signal a -> Signal a
 dropRepeats = dropRepeatsByImpl eq
 
-dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Signal a -> Signal a
-dropRepeatsBy = dropRepeatsByImpl
-
 foreign import dropRepeatsByImpl :: forall a. (a -> a -> Boolean) -> Signal a -> Signal a
 
+-- | Propagate a change only when the new value is not equivalent to the one
+-- | shown. Stateful: with an equivalence coarser than equality, it keeps
+-- | showing the first value of each run of equivalent ones.
+dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Signal a -> Owned (Signal a)
+dropRepeatsBy eq s = owned (newDropRepeatsBy eq s)
+
+foreign import newDropRepeatsBy :: forall a. (a -> a -> Boolean) -> Signal a -> Effect (Signal a)
+
 -- | Propagate a change only when the key of the new value differs from the
--- | key of the old one. (RxJS `distinctUntilKeyChanged`.)
-dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Signal a -> Signal a
-dropRepeatsOn key = dropRepeatsByImpl \x y -> key x == key y
+-- | key of the one shown. Stateful, like `dropRepeatsBy`. (RxJS
+-- | `distinctUntilKeyChanged`.)
+dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Signal a -> Owned (Signal a)
+dropRepeatsOn key = dropRepeatsBy \x y -> key x == key y
 
 -- | The previous value and the current one. It starts as the seed and the
 -- | current value, and on each change pairs the value before it with the new
--- | one. Stateful: it steps only while observed. (RxJS `pairwise`.)
-withPrevious :: forall a. a -> Signal a -> Signal (Tuple a a)
-withPrevious = withPreviousImpl Tuple
+-- | one. Stateful. (RxJS `pairwise`.)
+withPrevious :: forall a. a -> Signal a -> Owned (Signal (Tuple a a))
+withPrevious seed s = owned (withPreviousImpl Tuple seed s)
 
-foreign import withPreviousImpl :: forall a. (a -> a -> Tuple a a) -> a -> Signal a -> Signal (Tuple a a)
+foreign import withPreviousImpl :: forall a. (a -> a -> Tuple a a) -> a -> Signal a -> Effect (Signal (Tuple a a))
 
 -- | Recover from a derivation that throws: the handler's value while the
 -- | signal's computation fails, and the signal's value again once it
@@ -139,19 +141,31 @@ attempt = attemptImpl Left Right
 foreign import attemptImpl :: forall a. (Error -> Either Error a) -> (a -> Either Error a) -> Signal a -> Signal (Either Error a)
 
 -- | The latest of two signals, starting at the left one; the left wins ties.
-foreign import merge :: forall a. Signal a -> Signal a -> Signal a
+-- | Stateful: it remembers which argument changed last. A merge reports
+-- | every step, even one that repeats its value, so nested merges agree on
+-- | which argument changed and merging is associative.
+merge :: forall a. Signal a -> Signal a -> Owned (Signal a)
+merge a b = owned (mergeImpl a b)
+
+foreign import mergeImpl :: forall a. Signal a -> Signal a -> Effect (Signal a)
 
 -- | The latest value that satisfies the predicate, starting at the seed
--- | unless the input satisfies it at the start. Stateful: it pauses.
--- | (`Event.filter` keeps occurrences; a signal always has a value, so this
--- | one keeps the last that passed.)
-foreign import latestWhere :: forall a. (a -> Boolean) -> a -> Signal a -> Signal a
+-- | unless the argument satisfies it at the start. Stateful. (`Event.filter`
+-- | keeps occurrences; a signal always has a value, so this one keeps the
+-- | last that passed.)
+latestWhere :: forall a. (a -> Boolean) -> a -> Signal a -> Owned (Signal a)
+latestWhere p seed s = owned (latestWhereImpl p seed s)
 
--- | Follows the input while the condition is true and holds its last value
--- | while it is false; when the condition becomes true it takes the input's
--- | current value. Starts at the seed unless the condition holds at the start.
--- | Stateful: it pauses. The signal counterpart of `Event.gate`.
-foreign import gate :: forall a. Signal Boolean -> a -> Signal a -> Signal a
+foreign import latestWhereImpl :: forall a. (a -> Boolean) -> a -> Signal a -> Effect (Signal a)
+
+-- | Follows the signal while the condition is true and keeps its last value
+-- | while it is false; when the condition becomes true it takes the signal's
+-- | current value. Starts at the seed unless the condition holds at the
+-- | start. Stateful. The signal counterpart of `Event.gate`.
+gate :: forall a. Signal Boolean -> a -> Signal a -> Owned (Signal a)
+gate cond seed s = owned (gateImpl cond seed s)
+
+foreign import gateImpl :: forall a. Signal Boolean -> a -> Signal a -> Effect (Signal a)
 
 -- | The current value, without recording a dependency.
 foreign import read :: forall a. Signal a -> Effect a
@@ -167,11 +181,16 @@ subscribe sig cb = Owned \s -> subscribeImpl s sig cb
 
 foreign import holdImpl :: forall a. Scope -> Signal a -> Effect (Signal a)
 
--- | Observe a signal for the lifetime of the current scope, so a stateful
--- | signal advances whether or not anything else reads it. Returns the same
--- | signal. The signal counterpart of `Event.hold`.
+-- | Observe a signal for the lifetime of the current scope, so it is kept
+-- | computed whether or not anything else reads it. Returns the same signal.
+-- | The signal counterpart of `Event.hold`.
 hold :: forall a. Signal a -> Owned (Signal a)
 hold sig = Owned \s -> holdImpl s sig
+
+-- Make a stateful signal and hold it for the lifetime of the current scope,
+-- so its state starts now. An add-on does the same with `hold`.
+owned :: forall a. Effect (Signal a) -> Owned (Signal a)
+owned make = liftEffect make >>= hold
 
 -- | Forward evidence that a record `sa` has the same fields and types as the
 -- | record `a`, except that each field in `sa` is wrapped in a `Signal`.
