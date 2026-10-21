@@ -1,7 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cell, derived, map, bind, scope, effect, batch, sample, stats, createScope, runInScope,
+  cell, derived, map, bind, scope, effect, batch, sample, untracked, stats, createScope, runInScope,
+  eventSource, subscribeEvent,
   Readable,
 } from '../../src/Screamer/Runtime.ts';
 
@@ -118,9 +119,11 @@ describe('prototype checks', () => {
 
   test('12b a self-loop is caught', () => {
     const c = cell(0);
-    const stop = scope(() => { effect(() => { c.write(c.read() + 1); }); });
-    assert.throws(() => c.write(100), /effect loop/);
-    stop();
+    // The first run's write is held into the next round, where the effect
+    // is linked, so the loop shows up as soon as the scope is set up.
+    const s = createScope(null);
+    assert.throws(() => batch(() => runInScope(s, () => { effect(() => { c.write(c.read() + 1); }); })), /effect loop/);
+    s.dispose();
   });
 });
 
@@ -405,5 +408,116 @@ describe('randomized glitch freedom', () => {
     const seed = Math.floor(Math.random() * 2 ** 31);
     const { bad } = fuzz(seed);
     assert.equal(bad, 0, `fuzz failed with seed ${seed}`);
+  });
+});
+
+describe('writes from effects (#70)', () => {
+  // W writes c := a * 10 whenever a changes; R reads a and c.
+  const trace = (order: 'WR' | 'RW'): string[] => {
+    const a = cell(0);
+    const c = cell(0);
+    const log: string[] = [];
+    const W = () => effect(() => { const v = a.read(); untracked(() => c.write(v * 10)); });
+    const R = () => effect(() => { log.push(`a=${a.read()} c=${c.read()}`); });
+    const stop = scope(() => {
+      if (order === 'WR') { W(); R(); } else { R(); W(); }
+    });
+    log.length = 0;
+    a.write(1);
+    stop();
+    return log;
+  };
+
+  test('a write takes effect in the next round whatever the subscription order', () => {
+    assert.deepEqual(trace('WR'), ['a=1 c=0', 'a=1 c=10']);
+    assert.deepEqual(trace('RW'), ['a=1 c=0', 'a=1 c=10']);
+  });
+
+  test('a read after a write in the same effect returns the old value', () => {
+    const a = cell(0);
+    const c = cell(0);
+    const seen: number[] = [];
+    const stop = scope(() => {
+      effect(() => {
+        const v = a.read();
+        untracked(() => { c.write(v + 1); seen.push(c.read()); });
+      });
+    });
+    assert.deepEqual(seen, [0]);
+    assert.equal(c.read(), 1);
+    a.write(5);
+    assert.deepEqual(seen, [0, 1]);
+    assert.equal(c.read(), 6);
+    stop();
+  });
+
+  test('writes and fires from one round are seen together in the next', () => {
+    const a = cell(0);
+    const c = cell(0);
+    const e = eventSource<number>();
+    const seen: string[] = [];
+    const stop = scope((s) => {
+      subscribeEvent(s, e, (n) => { seen.push(`e=${n} c=${sample(c)}`); });
+      effect(() => {
+        const v = a.read();
+        if (v === 0) return;
+        untracked(() => { c.write(v); e.fire(v); });
+      });
+    });
+    a.write(3);
+    assert.deepEqual(seen, ['e=3 c=3']);
+    stop();
+  });
+
+  test('two effects writing one cell in a round: the later effect wins, whatever the creation order of readers', () => {
+    const a = cell(0);
+    const c = cell('');
+    const seen: string[] = [];
+    const stop = scope(() => {
+      effect(() => { seen.push(c.read()); });
+      effect(() => { const v = a.read(); untracked(() => c.write(`x${v}`)); });
+      effect(() => { const v = a.read(); untracked(() => c.write(`y${v}`)); });
+    });
+    seen.length = 0;
+    a.write(1);
+    // Effects run in creation order within a round, so y's write is last.
+    assert.deepEqual(seen, ['y1']);
+    stop();
+  });
+
+  test('modify from two effects in one round composes both updates', () => {
+    const a = cell(0);
+    const n = cell(0);
+    const stop = scope(() => {
+      effect(() => { if (a.read() > 0) untracked(() => n.modify((x) => x + 1)); });
+      effect(() => { if (a.read() > 0) untracked(() => n.modify((x) => x * 10)); });
+    });
+    a.write(1);
+    assert.equal(n.read(), 10);
+    stop();
+  });
+
+  test('a held write equal to the current value changes nothing', () => {
+    const a = cell(0);
+    const c = cell(7);
+    let runs = 0;
+    const stop = scope(() => {
+      effect(() => { c.read(); runs++; });
+      effect(() => { a.read(); untracked(() => { c.write(8); c.write(7); }); });
+    });
+    const before = runs;
+    const v = c.version;
+    a.write(1);
+    assert.equal(c.version, v);
+    assert.equal(runs, before);
+    stop();
+  });
+
+  test('a write outside any effect or flush still takes effect at once', () => {
+    const c = cell(0);
+    batch(() => {
+      c.write(1);
+      assert.equal(c.read(), 1);
+    });
   });
 });

@@ -10,7 +10,7 @@ export const signalSource = <A>(a: A) => () => {
   return {
     signal: c,
     put: (x: A) => () => c.write(x),
-    modify: (f: (x: A) => A) => () => c.write(f(c.value)),
+    modify: (f: (x: A) => A) => () => c.modify(f),
   };
 };
 

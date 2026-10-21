@@ -1,6 +1,8 @@
 // Foreign module of Screamer.Pending. Each scope that has had work counted
 // gets a count cell; registering work increments the cells of the scope and
-// every ancestor, and `done` decrements the same cells.
+// every ancestor, and `done` decrements the same cells. The counts are
+// written at once, not held to the next round, because `suspense` samples
+// them right after building its content, whose work starts in subscribers.
 import type * as Runtime from './Runtime/Unsafe.js';
 // @ts-ignore: purs copies this file to output/Screamer.Pending/foreign.js, next to the runtime's.
 import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
@@ -25,7 +27,7 @@ function countOf(s: Scope): Runtime.Cell<number> {
 
 const add = (cells: Runtime.Cell<number>[], d: number) =>
   R.batch(() => {
-    for (const c of cells) c.write(c.value + d);
+    for (const c of cells) c.writeNow(c.value + d);
   });
 
 const noop = () => {};

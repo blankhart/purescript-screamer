@@ -174,8 +174,11 @@ foreign import subscribeImpl :: forall a. Scope -> Signal a -> (a -> Effect Unit
 
 -- | Call the function with the signal's value now and whenever it changes,
 -- | until the current scope is disposed. The callback runs untracked; writes
--- | it makes take effect in the next flush round, and it never runs
--- | re-entrantly.
+-- | it makes take effect when the next flush round starts, so every
+-- | subscriber in a round sees the same values, and a `read` right after a
+-- | write still returns the round's value. Of several writes to one source
+-- | in a round, the last made wins; `modify` composes with earlier writes of
+-- | the round. The callback never runs re-entrantly.
 subscribe :: forall a. Signal a -> (a -> Effect Unit) -> Owned Unit
 subscribe sig cb = Owned \s -> subscribeImpl s sig cb
 

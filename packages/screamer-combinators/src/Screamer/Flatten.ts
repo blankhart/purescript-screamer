@@ -68,7 +68,7 @@ const flattenImpl =
         running--;
         R.batch(() => {
           if (scope !== null) scope.dispose();
-          live.write(live.value.filter((c) => c !== entry));
+          live.modify((cs) => cs.filter((c) => c !== entry));
           if (queue.length > 0 && !s.disposed) start(queue.shift()!);
         });
       };
@@ -80,7 +80,7 @@ const flattenImpl =
         return;
       }
       entry.event = made.value;
-      live.write(live.value.concat([entry]));
+      live.modify((cs) => cs.concat([entry]));
     };
     R.subscribeEvent(s, e, (a) => {
       if (running > 0 && strategy === CONCAT) queue.push(a);
