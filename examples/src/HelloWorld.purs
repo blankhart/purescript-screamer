@@ -19,7 +19,7 @@ counter :: Element
 counter = component do
   count <- liftEffect $ signalSource 0
   pure $ E.div_ [ A.class_ "counter" ]
-    [ E.button_ [ A.id_ "decrement", H.onClick_ \_ -> count.modify (_ - 1) ] [ element "-" ]
+    [ E.button_ [ A.id_ "decrement", H.onClick_ \_ -> count.modifyT1 (_ - 1) ] [ element "-" ]
     , E.span_ [ A.id_ "count" ] [ text (show <$> count.signal) ]
-    , E.button_ [ A.id_ "increment", H.onClick_ \_ -> count.modify (_ + 1) ] [ element "+" ]
+    , E.button_ [ A.id_ "increment", H.onClick_ \_ -> count.modifyT1 (_ + 1) ] [ element "+" ]
     ]

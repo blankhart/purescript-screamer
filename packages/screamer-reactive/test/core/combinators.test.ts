@@ -65,9 +65,9 @@ describe('prototype checks', () => {
     const m = merge(a, b);
     const seen: string[] = [];
     const stop = scope(() => { effect(() => { seen.push(m.read()); }); });
-    b.write('b1');
-    a.write('a1');
-    batch(() => { a.write('a2'); b.write('b2'); });
+    b.putT1('b1');
+    a.putT1('a1');
+    batch(() => { a.putT1('a2'); b.putT1('b2'); });
     assert.equal(seen.join(' '), 'a0 b1 a1 a2');
     stop();
   });
@@ -79,8 +79,8 @@ describe('prototype checks', () => {
     let m: Readable<string> | null = null;
     const s1 = scope(() => { effect(() => { t.read(); if (!m) m = merge(a, b); }); });
     const s2 = scope(() => { effect(() => { m!.read(); }); });
-    t.write(1);
-    b.write('b1');
+    t.putT1(1);
+    b.putT1('b1');
     assert.equal(m!.read(), 'b1');
     s1();
     s2();
@@ -91,9 +91,9 @@ describe('prototype checks', () => {
     const evens = latestWhere((x: number) => x % 2 === 0, 0, s);
     const seen: number[] = [];
     const stop = scope(() => { effect(() => { seen.push(evens.read()); }); });
-    s.write(2);
-    s.write(3);
-    s.write(4);
+    s.putT1(2);
+    s.putT1(3);
+    s.putT1(4);
     assert.equal(seen.join(' '), '0 2 4');
     stop();
   });
@@ -106,14 +106,14 @@ describe('gateSignal', () => {
     const f = gateSignal(cond, 0, src);
     const seen: number[] = [];
     const stop = scope(() => { effect(() => { seen.push(f.read()); }); });
-    src.write(2);
-    cond.write(false);
-    src.write(3);
-    src.write(4);
-    cond.write(true);
-    src.write(5);
-    batch(() => { cond.write(false); src.write(6); });
-    batch(() => { cond.write(true); src.write(7); });
+    src.putT1(2);
+    cond.putT1(false);
+    src.putT1(3);
+    src.putT1(4);
+    cond.putT1(true);
+    src.putT1(5);
+    batch(() => { cond.putT1(false); src.putT1(6); });
+    batch(() => { cond.putT1(true); src.putT1(7); });
     assert.deepEqual(seen, [1, 2, 4, 5, 7]);
     stop();
   });
@@ -131,10 +131,10 @@ describe('stateful event nodes', () => {
     const open = cell(false);
     const src = eventSource<number>();
     const r = record(gate(open, src));
-    src.fire(1);
-    batch(() => { src.fire(2); open.write(true); });
-    src.fire(3);
-    batch(() => { src.fire(4); open.write(false); });
+    src.fireT1(1);
+    batch(() => { src.fireT1(2); open.putT1(true); });
+    src.fireT1(3);
+    batch(() => { src.fireT1(4); open.putT1(false); });
     assert.deepEqual(r.seen, [2, 3]);
     r.stop();
   });
@@ -146,7 +146,7 @@ describe('combining', () => {
   test('oneOf interleaves every input by fire order', () => {
     const [a, b, c] = [eventSource<string>(), eventSource<string>(), eventSource<string>()];
     const r = record(oneOf([a, b, c]));
-    batch(() => { c.fire('c1'); a.fire('a1'); b.fire('b1'); c.fire('c2'); });
+    batch(() => { c.fireT1('c1'); a.fireT1('a1'); b.fireT1('b1'); c.fireT1('c2'); });
     assert.deepEqual(r.seen, ['c1', 'a1', 'b1', 'c2']);
     r.stop();
   });
@@ -154,8 +154,8 @@ describe('combining', () => {
   test('leftmost keeps the leftmost input that fired in the round', () => {
     const [a, b] = [eventSource<string>(), eventSource<string>()];
     const r = record(leftmost([a, b]));
-    batch(() => { b.fire('b1'); a.fire('a1'); a.fire('a2'); });
-    b.fire('b2');
+    batch(() => { b.fireT1('b1'); a.fireT1('a1'); a.fireT1('a2'); });
+    b.fireT1('b2');
     assert.deepEqual(r.seen, ['a1', 'a2', 'b2']);
     r.stop();
   });
@@ -166,7 +166,7 @@ describe('combining', () => {
     const e = mergeWith((x: number, y: number) => `both${x},${y}`, (x: number) => `L${x}`, (y: number) => `R${y}`,
       mapEvent((x: number) => x, src), alt(mapEvent((x: number) => -x, src), other));
     const r = record(e);
-    batch(() => { src.fire(1); other.fire(9); src.fire(2); });
+    batch(() => { src.fireT1(1); other.fireT1(9); src.fireT1(2); });
     assert.deepEqual(r.seen, ['both1,-1', 'R9', 'both2,-2']);
     r.stop();
   });
@@ -174,10 +174,10 @@ describe('combining', () => {
   test('zip pairs the nth with the nth, across rounds and within one', () => {
     const [a, b] = [eventSource<string>(), eventSource<string>()];
     const r = record(zip(pair, a, b));
-    batch(() => { a.fire('a1'); a.fire('a2'); b.fire('b1'); });
-    b.fire('b2');
-    b.fire('b3');
-    a.fire('a3');
+    batch(() => { a.fireT1('a1'); a.fireT1('a2'); b.fireT1('b1'); });
+    b.fireT1('b2');
+    b.fireT1('b3');
+    a.fireT1('a3');
     assert.deepEqual(r.seen, ['a1b1', 'a2b2', 'a3b3']);
     r.stop();
   });
@@ -187,12 +187,12 @@ describe('combining', () => {
     const z = zip(pair, a, b);
     const keep = scope(() => { holdEvent(a); holdEvent(b); });
     let r = record(z);
-    a.fire('a1');
-    a.fire('a2');
+    a.fireT1('a1');
+    a.fireT1('a2');
     r.stop();
     r = record(z);
-    b.fire('b1');
-    a.fire('a3');
+    b.fireT1('b1');
+    a.fireT1('a3');
     assert.deepEqual(r.seen, ['a3b1']);
     r.stop();
     keep();
@@ -201,9 +201,9 @@ describe('combining', () => {
   test('race follows the first input to fire, the leftmost on a tie', () => {
     const [a, b, c] = [eventSource<string>(), eventSource<string>(), eventSource<string>()];
     const r = record(race([a, b, c]));
-    batch(() => { c.fire('c1'); b.fire('b1'); });
-    a.fire('a1');
-    b.fire('b2');
+    batch(() => { c.fireT1('c1'); b.fireT1('b1'); });
+    a.fireT1('a1');
+    b.fireT1('b2');
     assert.deepEqual(r.seen, ['b1', 'b2']);
     r.stop();
   });
@@ -214,7 +214,7 @@ describe('combining', () => {
     const seen: string[] = [];
     let runs = 0;
     const stop = scope(() => { effect(() => { seen.push(all.read().join()); runs++; }); });
-    batch(() => { cs[0].write(4); cs[2].write(6); });
+    batch(() => { cs[0].putT1(4); cs[2].putT1(6); });
     assert.deepEqual(seen, ['1,2,3', '4,2,6']);
     assert.equal(runs, 2);
     stop();
@@ -227,9 +227,9 @@ describe('combining', () => {
     const w = withLatest((x: number, y: number) => `${x}/${y}`, total, a);
     const seen: string[] = [];
     const stop = scope(() => { effect(() => { seen.push(w.read()); }); });
-    src.fire(5);
-    src.fire(5);
-    a.write(2);
+    src.fireT1(5);
+    src.fireT1(5);
+    a.putT1(2);
     assert.deepEqual(seen, ['1/0', '2/10']);
     stop();
   });
@@ -240,11 +240,11 @@ describe('flattening', () => {
     const [a, b] = [eventSource<string>(), eventSource<string>()];
     const set = cell<EventLike<string>[]>([a]);
     const r = record(mergeAll(set));
-    a.fire('a1');
-    set.write([a, b]);
-    batch(() => { b.fire('b1'); a.fire('a2'); });
-    set.write([b]);
-    a.fire('a3');
+    a.fireT1('a1');
+    set.putT1([a, b]);
+    batch(() => { b.fireT1('b1'); a.fireT1('a2'); });
+    set.putT1([b]);
+    a.fireT1('a3');
     assert.deepEqual(r.seen, ['a1', 'b1', 'a2']);
     assert.equal(a.targets.size, 0);
     r.stop();
@@ -453,8 +453,8 @@ function eventFuzz(seed: number, graphs = 60): { checks: number; bad: number; fi
         else writes.set(3 + pick(2), pick(4));
       }
       batch(() => {
-        for (const f of fires) real[f.src].fire(f.v);
-        for (const [c, v] of writes) real[c].write(v);
+        for (const f of fires) real[f.src].fireT1(f.v);
+        for (const [c, v] of writes) real[c].putT1(v);
       });
       const occ = evalRound(fires, writes, ++stampCounter + 1000000);
       for (const k of watched) {
@@ -653,7 +653,7 @@ function oracleFuzz(seed: number, graphs = 100): { checks: number; bad: number; 
       // Write each chosen cell at most once per batch, so a value changes
       // exactly when its version does.
       const targets = [...new Set(Array.from({ length: 1 + pick(3) }, () => pick(nCells)))];
-      batch(() => { for (const c of targets) cells[c].write(pick(5)); });
+      batch(() => { for (const c of targets) cells[c].putT1(pick(5)); });
       const { ev, observed } = evaluate(cells.map((c) => c.value));
       for (const k of watched) {
         checks++;

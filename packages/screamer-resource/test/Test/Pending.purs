@@ -13,7 +13,7 @@ import Screamer.Owned (child, runOwned)
 import Screamer.Pending (pending, settled)
 import Screamer.Resource (Remote(..), resource)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Source (signalSource)
 import Screamer.Test (observe)
 import Test.Spec (Spec, describe, it)
@@ -58,11 +58,11 @@ spec = describe "Screamer.Pending" do
       res <- resource input.signal req.request
       pure { s, res }
     o <- liftEffect $ observe r.value.s
-    liftEffect (read r.value.res) >>= shouldEqual Loading
+    liftEffect (readT0 r.value.res) >>= shouldEqual Loading
     liftEffect $ req.answer 10
     yield
-    liftEffect (read r.value.res) >>= shouldEqual (Loaded 10)
-    liftEffect $ input.put 2
+    liftEffect (readT0 r.value.res) >>= shouldEqual (Loaded 10)
+    liftEffect $ input.putT1 2
     liftEffect $ req.answer 20
     yield
     liftEffect o.trace >>= shouldEqual [ false, true, false, true ]

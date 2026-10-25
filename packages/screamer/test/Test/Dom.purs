@@ -15,7 +15,7 @@ import Screamer.Element (Element, component, dyn, each, element, element_, forei
 import Screamer.Owned (onCleanup)
 import Screamer.Runtime (readStats)
 import Screamer.Event as Event
-import Screamer.Signal (Signal, read, subscribe)
+import Screamer.Signal (Signal, readT0, subscribe)
 import Screamer.Signal as Signal
 import Screamer.Source (signalSource)
 import Screamer.Test.Dom (click, fakeWidget, currentTag, innerHTML, liveListeners, mutationsDuring, resetBody, rowNodes, sameNode, textsOf)
@@ -52,9 +52,9 @@ spec = describe "Screamer.Element" do
     liftEffect (innerHTML "#root") >>= shouldEqual
       """<div style="color: red;" title="Ada">Hi Ada</div>"""
     liftEffect do
-      name.put "Grace"
-      hidden.put true
-      colour.put "blue"
+      name.putT1 "Grace"
+      hidden.putT1 true
+      colour.putT1 "blue"
     liftEffect (innerHTML "#root") >>= shouldEqual
       """<div style="color: blue;" title="Grace" hidden="">Hi Grace</div>"""
 
@@ -62,7 +62,7 @@ spec = describe "Screamer.Element" do
     liftEffect resetBody
     v <- liftEffect $ signalSource "one"
     _ <- liftEffect $ mount "#root" $ element_ "input" [ property "value" v.signal ] []
-    liftEffect $ v.put "two"
+    liftEffect $ v.putT1 "two"
     -- A property, not an attribute: the markup has no value attribute.
     liftEffect (innerHTML "#root") >>= shouldEqual "<input>"
 
@@ -73,7 +73,7 @@ spec = describe "Screamer.Element" do
     _ <- liftEffect $ mount "#root" $
       div' [ attribute "class" cls.signal ] (chans <#> \c -> element_ "p" [] [ text c.signal ])
     n <- liftEffect $ mutationsDuring "#root" do
-      for_ (Array.index chans 1) \c -> c.put "B"
+      for_ (Array.index chans 1) \c -> c.putT1 "B"
     n `shouldEqual` 1
     liftEffect (textsOf "#root p") >>= shouldEqual [ "a", "B", "c" ]
 
@@ -82,7 +82,7 @@ spec = describe "Screamer.Element" do
     before <- liftEffect readStats
     count <- liftEffect $ signalSource 0
     unmount <- liftEffect $ mount "#root" $
-      div' [ on_ "click" \_ -> count.modify (_ + 1) ]
+      div' [ on_ "click" \_ -> count.modifyT1 (_ + 1) ]
         [ text (show <$> count.signal)
         , dyn $ count.signal <#> \n -> element_ "span" [ on_ "mouseover" \_ -> pure unit, on_ "toggle" \_ -> pure unit ] [ element n ]
         , each identity (pure [ 1, 2, 3 ]) \s -> element_ "i" [ on_ "click" \_ -> pure unit, on_ "toggle" \_ -> pure unit ] [ text (show <$> s) ]
@@ -103,7 +103,7 @@ spec = describe "Screamer.Element" do
     liftEffect resetBody
     log <- liftEffect $ signalSource []
     shown <- liftEffect $ signalSource true
-    let record x = log.modify (_ <> [ x ])
+    let record x = log.modifyT1 (_ <> [ x ])
     _ <- liftEffect $ mount "#root" $
       element_ "section" [ on_ "click" \_ -> record "section" ]
         [ div' [ on_ "click" \e -> record ("div " <> currentTag e) ]
@@ -112,10 +112,10 @@ spec = describe "Screamer.Element" do
         ]
     liftEffect $ click "#root b"
     liftEffect $ click "#root u"
-    liftEffect (read log.signal) >>= shouldEqual [ "b", "div DIV", "section", "u" ]
-    liftEffect $ log.put []
-    liftEffect $ shown.put false
-    liftEffect (read log.signal) >>= shouldEqual []
+    liftEffect (readT0 log.signal) >>= shouldEqual [ "b", "div DIV", "section", "u" ]
+    liftEffect $ log.putT1 []
+    liftEffect $ shown.putT1 false
+    liftEffect (readT0 log.signal) >>= shouldEqual []
 
   it "dyn disposes its previous branch's effects" do
     liftEffect resetBody
@@ -129,10 +129,10 @@ spec = describe "Screamer.Element" do
     _ <- liftEffect $ mount "#root" $ div' [] [ dyn (branch <$> tab.signal) ]
     first <- liftEffect readStats
     liftEffect do
-      src.put 1
-      tab.put "b"
-      tab.put "c"
-      src.put 2
+      src.putT1 1
+      tab.putT1 "b"
+      tab.putT1 "c"
+      src.putT1 2
     later <- liftEffect readStats
     (later.liveEffects - first.liveEffects) `shouldEqual` 0
     (later.liveScopes - first.liveScopes) `shouldEqual` 0
@@ -147,7 +147,7 @@ spec = describe "Screamer.Element" do
       let
         step xs = do
           before <- liftEffect $ rowNodes "#root li"
-          liftEffect $ items.put xs
+          liftEffect $ items.putT1 xs
           after <- liftEffect $ rowNodes "#root li"
           map _.key after `shouldEqual` map show xs
           for_ after \a -> for_ (Array.find (\b -> b.key == a.key) before) \b ->
@@ -171,7 +171,7 @@ spec = describe "Screamer.Element" do
       _ <- liftEffect $ mount "#root" $ element_ "ul" []
         [ each _.id items.signal \s -> element_ "li" [ attribute "data-key" (show <<< _.id <$> s) ] [ text (_.label <$> s) ] ]
       before <- liftEffect $ rowNodes "#root li"
-      liftEffect $ items.put [ { id: 2, label: "TWO" }, { id: 1, label: "one" } ]
+      liftEffect $ items.putT1 [ { id: 2, label: "TWO" }, { id: 1, label: "one" } ]
       liftEffect (textsOf "#root li") >>= shouldEqual [ "TWO", "one" ]
       after <- liftEffect $ rowNodes "#root li"
       case Array.index before 1, Array.index after 0 of
@@ -193,7 +193,7 @@ spec = describe "Screamer.Element" do
     liftEffect (Ref.read setups) >>= shouldEqual 2
     liftEffect u1
     liftEffect (Ref.read cleanups) >>= shouldEqual 1
-    liftEffect $ shared.put 7
+    liftEffect $ shared.putT1 7
     liftEffect (innerHTML "#root") >>= shouldEqual "<b>7</b>"
 
   it "foreign_ runs its setup once per instance and cleans up on dyn switch and unmount" do
@@ -213,9 +213,9 @@ spec = describe "Screamer.Element" do
     unmount <- liftEffect $ mount "#root" $ div' [] [ dyn (widget <$> tab.signal) ]
     liftEffect (innerHTML "#root") >>= shouldEqual """<div><!----><section class="x"><i>widget a</i></section><!----></div>"""
     -- Attribute updates leave the widget's own children alone.
-    liftEffect $ cls.put "y"
+    liftEffect $ cls.putT1 "y"
     liftEffect (innerHTML "#root") >>= shouldEqual """<div><!----><section class="y"><i>widget a</i></section><!----></div>"""
-    liftEffect $ tab.put "b"
+    liftEffect $ tab.putT1 "b"
     liftEffect (innerHTML "#root") >>= shouldEqual """<div><!----><section class="y"><i>widget b</i></section><!----></div>"""
     liftEffect unmount
     liftEffect (Ref.read log) >>= shouldEqual [ "setup a", "cleanup a", "setup b", "cleanup b" ]
@@ -250,15 +250,15 @@ app = component do
   count <- liftEffect $ signalSource 0
   items <- liftEffect $ signalSource ([] :: Array Int)
   let
-    remove n = items.modify (Array.filter (_ /= n))
+    remove n = items.modifyT1 (Array.filter (_ /= n))
   pure $ div' []
-    [ element_ "button" [ attribute "id" (pure "inc"), on_ "click" \_ -> count.modify (_ + 1) ] [ element "+" ]
+    [ element_ "button" [ attribute "id" (pure "inc"), on_ "click" \_ -> count.modifyT1 (_ + 1) ] [ element "+" ]
     , element_ "span" [ attribute "id" (pure "count") ] [ text (show <$> count.signal) ]
     , element_ "button"
         [ attribute "id" (pure "add")
         , on_ "click" \_ -> do
             n <- read' count.signal
-            items.modify (_ <> [ n ])
+            items.modifyT1 (_ <> [ n ])
         ]
         [ element "add" ]
     , element_ "ul" [ attribute "id" (pure "items") ]
@@ -269,4 +269,4 @@ app = component do
     ]
   where
   read' :: forall a. Signal a -> Effect a
-  read' = Signal.read
+  read' = Signal.readT0

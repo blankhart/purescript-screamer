@@ -21,7 +21,7 @@ import Screamer.Html as E
 import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
-import Screamer.Signal (Signal, read)
+import Screamer.Signal (Signal, readT0)
 import Screamer.Source (SignalSource, batch, signalSource)
 
 ---------------------------------------------------
@@ -83,30 +83,30 @@ benchmark = component do
       id <- Ref.modify' (\i -> { state: i + n, value: i }) nextId
       randomRows id n
 
-    clear = table.put []
+    clear = table.putT1 []
 
-    create n = table.put =<< new n
+    create n = table.putT1 =<< new n
 
     append n = do
       rows <- new n
-      table.modify (_ <> rows)
+      table.modifyT1 (_ <> rows)
 
-    remove id = table.modify (Array.filter (\a -> a.id /= id))
+    remove id = table.modifyT1 (Array.filter (\a -> a.id /= id))
 
     select highlight = batch do
       Ref.read selected >>= case _ of
-        Just previous -> previous.put ""
+        Just previous -> previous.putT1 ""
         Nothing -> pure unit
-      highlight.put "danger"
+      highlight.putT1 "danger"
       Ref.write (Just highlight) selected
 
     updateEvery nth = batch do
-      rows <- read table.signal
+      rows <- readT0 table.signal
       forWithIndex_ rows \ix row ->
         when (ix `mod` nth == 0) $
-          row.label.modify (_ <> " !!!")
+          row.label.modifyT1 (_ <> " !!!")
 
-    swap = table.modify $ \array -> STArray.run do
+    swap = table.modifyT1 $ \array -> STArray.run do
       rows <- STArray.thaw array
       a' <- STArray.peek 1 rows
       b' <- STArray.peek 998 rows
@@ -167,7 +167,7 @@ button' { id, text, handler } =
 -- | A row's fields never change for a given key, so the row reads them once.
 row' :: (SignalSource String -> Effect Unit) -> (Int -> Effect Unit) -> Signal TableRow -> Element
 row' select remove rowSignal = component do
-  { id, label, highlight } <- liftEffect $ read rowSignal
+  { id, label, highlight } <- liftEffect $ readT0 rowSignal
   pure $ E.tr_
     [ A.class_ highlight.signal ]
     [ E.td_ [ A.class_ "col-md-1" ] [ element id ]

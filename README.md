@@ -7,9 +7,9 @@ counter :: Element
 counter = component do
   count <- liftEffect $ signalSource 0
   pure $ E.div_ [ A.class_ "counter" ]
-    [ E.button_ [ H.onClick_ \_ -> count.modify (_ - 1) ] [ element "-" ]
+    [ E.button_ [ H.onClick_ \_ -> count.modifyT1 (_ - 1) ] [ element "-" ]
     , E.span_ [] [ text (show <$> count.signal) ]
-    , E.button_ [ H.onClick_ \_ -> count.modify (_ + 1) ] [ element "+" ]
+    , E.button_ [ H.onClick_ \_ -> count.modifyT1 (_ + 1) ] [ element "+" ]
     ]
 
 main :: Effect Unit
@@ -73,9 +73,9 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 
 **State is created in `Owned`.** `merge`, `latestWhere`, `gate`, `withPrevious` and `history` keep state, as do `Event.fold`, `stepper`, `take` and the other operators that remember past occurrences. Each returns `Owned`, as in `count <- Event.fold (+) 0 clicks`: its state starts from the seed when the action runs, it belongs to the current scope, and it steps for the scope's whole life, whether or not anything displays it, until the scope is disposed. Because state does not depend on who observes it, every signal and event is a plain value that can be shared or inlined without changing what a program does, and a pure function such as the one given to `>>=` can only refer to state that already exists.
 
-**Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.Source`) gives `{ signal, put, modify }`. Writes made inside `batch` are delivered once, when the outermost batch returns.
+**Sources are where change comes from.** `signalSource x` (in `Effect`, from `Screamer.Source`) gives `{ signal, readT1, putT1, modifyT1 }`. Names that read or write say which timestep they act on: T0 is the current one, T1 the next. `readT0` reads a signal's value in the current timestep; `putT1` and `modifyT1` take effect when the next one starts, and `readT1` gives the value it will start with. Writes made inside `batch` (an event handler is one) are delivered together, when the outermost batch returns.
 
-**Events sit next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (`Screamer.Event`, imported qualified) carries occurrences instead, such as clicks or messages, and delivers every one, in fire order, even repeats and several in one batch. `eventSource` (in `Effect`, from `Screamer.Source`) gives `{ event, fire }`, and a typed handler takes `fire` directly. `Event.fold`, `stepper`, `changes`, `tag`, `attachWith` and `Event.subscribe` connect events and signals.
+**Events sit next to signals.** A signal always has a current value and drops a change equal to the last one. An `Event` (`Screamer.Event`, imported qualified) carries occurrences instead, such as clicks or messages, and delivers every one, in fire order, even repeats and several in one batch. `eventSource` (in `Effect`, from `Screamer.Source`) gives `{ event, fireT1 }`, and a typed handler takes `fireT1` directly. `Event.fold`, `stepper`, `changes`, `tag`, `attachWith` and `Event.subscribe` connect events and signals.
 
 **Effects have owners.** Only effects (DOM bindings, `subscribe`, `hold`, stateful nodes, `dyn`, `each`) are attached to the graph for as long as they live. Each one belongs to a scope. `Owned` is the monad for code that creates them: `Signal.subscribe`, `Signal.hold`, `Event.subscribe`, `Event.hold`, `onCleanup`, `child` and `onError` all run in a scope. Disposing a scope disposes its children, newest first, and then runs its own cleanups in reverse order.
 
@@ -115,12 +115,12 @@ Most RxJS operators have a counterpart, pure where it can be and `Owned` where i
 |---|---|
 | `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.Source` (`signalSource`, `batch`) |
 | `Screamer.Channel`, `Channel`, `channel` | `Screamer.Source`, `SignalSource`, `signalSource` |
-| `get` | `read` |
+| `get` | `readT0` |
 | `elements_` | `each key` (keyed rows, each row receives a `Signal` of its item) |
 | `distinct`, `nonequal` | `dropRepeats` (or nothing: every signal already cuts off by `Object.is`) |
 | `a <> b` on signals, meaning "the latest of the two" | `a <|> b` (`<>` now combines the values: `append <$> a <*> b`) |
 | `Signal (Effect a)` for dynamic content | `dyn` over a signal of elements, with `component` for per-instance setup |
-| `emit` | keep the action in a `Ref`, or `put` to a signal source |
+| `emit` | keep the action in a `Ref`, or `putT1` to a signal source |
 | `S.mount` returning `Unit` | `mount` returning the unmount action |
 | `Screamer.DOM.Event` | the `Web.*` event types, passed to handlers directly |
 

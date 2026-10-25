@@ -17,7 +17,7 @@ import Screamer.Flatten (concatOwned, exhaustOwned, mergeOwned, switchOwned)
 import Screamer.Owned (Owned, onCleanup, runOwned)
 import Screamer.Resource (Remote(..), Strategy(..), request, resourceWith)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Signal.Extra as Signal
 import Screamer.Source (eventSource, signalSource)
 import Screamer.Time as Time
@@ -39,10 +39,10 @@ pure_ = describe "pure" do
     b <- liftEffect $ signalSource 10
     which <- liftEffect $ signalSource a.signal
     o <- liftEffect $ observe (Signal.switchLatest which.signal)
-    liftEffect $ a.put 2
-    liftEffect $ which.put b.signal
-    liftEffect $ a.put 3
-    liftEffect $ b.put 11
+    liftEffect $ a.putT1 2
+    liftEffect $ which.putT1 b.signal
+    liftEffect $ a.putT1 3
+    liftEffect $ b.putT1 11
     liftEffect o.trace >>= shouldEqual [ 1, 2, 10, 11 ]
     liftEffect o.stop
 
@@ -51,10 +51,10 @@ pure_ = describe "pure" do
     b <- liftEffect eventSource
     which <- liftEffect $ signalSource a.event
     o <- liftEffect $ observeE (Event.switchEvent which.signal)
-    liftEffect $ a.fire "a1"
-    liftEffect $ which.put b.event
-    liftEffect $ a.fire "a2"
-    liftEffect $ b.fire "b1"
+    liftEffect $ a.fireT1 "a1"
+    liftEffect $ which.putT1 b.event
+    liftEffect $ a.fireT1 "a2"
+    liftEffect $ b.fireT1 "b1"
     liftEffect o.trace >>= shouldEqual [ "a1", "b1" ]
     liftEffect o.stop
 
@@ -79,10 +79,10 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
       afterDo (Milliseconds 100.0) (Ref.modify_ (_ <> [ "fired " <> x ]) log)
       onCleanup (Ref.modify_ (_ <> [ "disposed " <> x ]) log)
       pure (x <> "!")
-    liftEffect (read r.value) >>= shouldEqual "a!"
+    liftEffect (readT0 r.value) >>= shouldEqual "a!"
     liftEffect Fake.pendingTimers >>= shouldEqual 1
-    liftEffect $ input.put "b"
-    liftEffect (read r.value) >>= shouldEqual "b!"
+    liftEffect $ input.putT1 "b"
+    liftEffect (readT0 r.value) >>= shouldEqual "b!"
     liftEffect Fake.pendingTimers >>= shouldEqual 1
     liftEffect $ Fake.advance 150.0
     liftEffect r.dispose
@@ -96,7 +96,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
     r <- liftEffect $ runOwned $ mergeOwned src.event \n done -> do
       emitAfter (Milliseconds (toNumber n)) n done
     o <- liftEffect $ observeE r.value
-    liftEffect $ traverse_ src.fire [ 300, 100, 200 ]
+    liftEffect $ traverse_ src.fireT1 [ 300, 100, 200 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 3
     liftEffect $ Fake.advance 1000.0
     liftEffect o.trace >>= shouldEqual [ 100, 200, 300 ]
@@ -108,7 +108,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
     r <- liftEffect $ runOwned $ concatOwned src.event \n done -> do
       emitAfter (Milliseconds (toNumber n)) n done
     o <- liftEffect $ observeE r.value
-    liftEffect $ traverse_ src.fire [ 300, 100, 200 ]
+    liftEffect $ traverse_ src.fireT1 [ 300, 100, 200 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 1
     liftEffect $ Fake.advance 350.0
     liftEffect o.trace >>= shouldEqual [ 300 ]
@@ -121,9 +121,9 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
     r <- liftEffect $ runOwned $ exhaustOwned src.event \n done -> do
       emitAfter (Milliseconds 100.0) n done
     o <- liftEffect $ observeE r.value
-    liftEffect $ traverse_ src.fire [ 1, 2 ]
+    liftEffect $ traverse_ src.fireT1 [ 1, 2 ]
     liftEffect $ Fake.advance 150.0
-    liftEffect $ src.fire 3
+    liftEffect $ src.fireT1 3
     liftEffect $ Fake.advance 150.0
     liftEffect o.trace >>= shouldEqual [ 1, 3 ]
     liftEffect (o.stop *> r.dispose)
@@ -133,7 +133,7 @@ owned = before_ (liftEffect Fake.installFakeTimers) $ after_ (liftEffect Fake.un
     r <- liftEffect $ runOwned $ mergeOwned src.event \_ _ -> do
       void $ Time.after (Milliseconds 100.0)
       pure (Event.changes (pure 0))
-    liftEffect $ traverse_ src.fire [ 1, 2, 3 ]
+    liftEffect $ traverse_ src.fireT1 [ 1, 2, 3 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 3
     liftEffect r.dispose
     liftEffect Fake.pendingTimers >>= shouldEqual 0
@@ -165,8 +165,8 @@ requests = describe "request strategies" do
     input <- liftEffect eventSource
     r <- liftEffect $ runOwned (request Switch input.event s.request)
     o <- liftEffect $ observeE r.value
-    liftEffect $ input.fire 1
-    liftEffect $ input.fire 2
+    liftEffect $ input.fireT1 1
+    liftEffect $ input.fireT1 2
     yield
     s.resolve 1 "one"
     s.resolve 2 "two"
@@ -179,7 +179,7 @@ requests = describe "request strategies" do
     input <- liftEffect eventSource
     r <- liftEffect $ runOwned (request Merge input.event s.request)
     o <- liftEffect $ observeE r.value
-    liftEffect $ traverse_ input.fire [ 1, 2 ]
+    liftEffect $ traverse_ input.fireT1 [ 1, 2 ]
     yield
     s.resolve 2 "two"
     s.resolve 1 "one"
@@ -191,7 +191,7 @@ requests = describe "request strategies" do
     input <- liftEffect eventSource
     r <- liftEffect $ runOwned (request Concat input.event s.request)
     o <- liftEffect $ observeE r.value
-    liftEffect $ traverse_ input.fire [ 1, 2 ]
+    liftEffect $ traverse_ input.fireT1 [ 1, 2 ]
     yield
     s.resolve 2 "early"
     liftEffect (shown <$> o.trace) >>= shouldEqual []
@@ -204,23 +204,23 @@ requests = describe "request strategies" do
     s <- server
     input <- liftEffect $ signalSource 1
     r <- liftEffect $ runOwned (resourceWith Exhaust input.signal s.request)
-    liftEffect $ input.put 2
+    liftEffect $ input.putT1 2
     yield
     s.resolve 2 "two"
-    liftEffect (read r.value) >>= shouldEqual Loading
+    liftEffect (readT0 r.value) >>= shouldEqual Loading
     s.resolve 1 "one"
-    liftEffect (read r.value) >>= shouldEqual (Loaded "one")
-    liftEffect $ input.put 3
+    liftEffect (readT0 r.value) >>= shouldEqual (Loaded "one")
+    liftEffect $ input.putT1 3
     yield
     s.resolve 3 "three"
-    liftEffect (read r.value) >>= shouldEqual (Loaded "three")
+    liftEffect (readT0 r.value) >>= shouldEqual (Loaded "three")
     liftEffect r.dispose
 
   it "disposing the scope kills every running request" do
     s <- server
     input <- liftEffect eventSource
     r <- liftEffect $ runOwned (request Merge input.event s.request)
-    liftEffect $ traverse_ input.fire [ 1, 2, 3 ]
+    liftEffect $ traverse_ input.fireT1 [ 1, 2, 3 ]
     yield
     liftEffect r.dispose
     yield
@@ -230,7 +230,7 @@ requests = describe "request strategies" do
     input <- liftEffect eventSource
     r <- liftEffect $ runOwned (request Switch input.event \_ -> makeAff \cb -> cb (Left (error "boom")) $> mempty)
     o <- liftEffect $ observeE (r.value :: Event (Either Error Unit))
-    liftEffect $ input.fire unit
+    liftEffect $ input.fireT1 unit
     yield
     trace <- liftEffect o.trace
     map (either message (const "ok")) trace `shouldEqual` [ "boom" ]

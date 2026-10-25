@@ -46,10 +46,10 @@ spec = describe "Screamer.Renderer" do
     r <- liftEffect $ guardDocument do
       r <- instantiateWith rec.backend identity app
       rec.attach r.node
-      label.put "b"
-      on.put false
-      items.put [ 3, 1 ]
-      items.put []
+      label.putT1 "b"
+      on.putT1 false
+      items.putT1 [ 3, 1 ]
+      items.putT1 []
       rec.click "#app"
       pure r
     liftEffect rec.html >>= shouldEqual

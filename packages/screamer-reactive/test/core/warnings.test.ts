@@ -47,7 +47,7 @@ describe('development warnings', () => {
   test('a write inside a derivation is an error in development', () => {
     const a = cell(1);
     const b = cell(0);
-    assert.throws(() => map((x: number) => { b.write(x); return x; }, a).read(), /write inside a derivation/);
+    assert.throws(() => map((x: number) => { b.putT1(x); return x; }, a).read(), /write inside a derivation/);
   });
 
   test('with __DEV__ false nothing warns', async () => {
@@ -63,7 +63,7 @@ describe('development warnings', () => {
       // The write guard is off too.
       const a = R.cell(1);
       const b = R.cell(0);
-      assert.doesNotThrow(() => R.map((x: number) => { b.write(x); return x; }, a).read());
+      assert.doesNotThrow(() => R.map((x: number) => { b.putT1(x); return x; }, a).read());
     } finally {
       delete (globalThis as any).__DEV__;
     }

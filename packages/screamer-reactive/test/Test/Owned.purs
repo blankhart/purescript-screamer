@@ -11,7 +11,7 @@ import Effect.Ref as Ref
 import Screamer.Owned (child, onCleanup, runOwned)
 import Screamer.Runtime (readStats)
 import Screamer.Event as Event
-import Screamer.Signal (read, subscribe)
+import Screamer.Signal (readT0, subscribe)
 import Screamer.Source (signalSource)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
@@ -68,12 +68,12 @@ spec = describe "Screamer.Owned" do
         d <- Ref.modify (_ + 1) depth
         Ref.modify_ (max d) maxDepth
         record log ("a " <> show x)
-        b.put (x * 2)
-        when (x > 0 && x < 3) (a.put (x + 1))
+        b.putT1 (x * 2)
+        when (x > 0 && x < 3) (a.putT1 (x + 1))
         record log ("a done " <> show x)
         Ref.modify_ (_ - 1) depth
       subscribe b.signal \y -> record log ("b " <> show y)
-    liftEffect $ a.put 1
+    liftEffect $ a.putT1 1
     -- A write from a subscriber is deferred to the start of the next
     -- timestep, so `b` sees each value one timestep after `a`'s subscriber
     -- wrote it, whatever the order the two subscribed in.
@@ -89,8 +89,8 @@ spec = describe "Screamer.Owned" do
 
   it "surfaces an effect loop as an exception" do
     a <- liftEffect $ signalSource 0
-    r <- liftEffect $ runOwned $ subscribe a.signal \x -> when (x > 0) (a.put (x + 1))
-    result <- liftEffect $ try (a.put 100)
+    r <- liftEffect $ runOwned $ subscribe a.signal \x -> when (x > 0) (a.putT1 (x + 1))
+    result <- liftEffect $ try (a.putT1 100)
     liftEffect r.dispose
     case result of
       Left e -> unless (contains (Pattern "effect loop") (message e)) $ fail (message e)
@@ -101,13 +101,13 @@ spec = describe "Screamer.Owned" do
     n <- liftEffect $ signalSource 1
     seen <- liftEffect $ Ref.new []
     r <- liftEffect $ runOwned do
-      subscribe a.signal \x -> when (x > 0) (n.modify (_ + 1))
+      subscribe a.signal \x -> when (x > 0) (n.modifyT1 (_ + 1))
       subscribe a.signal \x -> when (x > 0) do
-        n.modify (_ * 10)
+        n.modifyT1 (_ * 10)
         -- Not yet: the writes are deferred to the next timestep.
-        read n.signal >>= \v -> Ref.modify_ (_ <> [ v ]) seen
-    liftEffect $ a.put 1
-    liftEffect (read n.signal) >>= shouldEqual 20
+        readT0 n.signal >>= \v -> Ref.modify_ (_ <> [ v ]) seen
+    liftEffect $ a.putT1 1
+    liftEffect (readT0 n.signal) >>= shouldEqual 20
     liftEffect (Ref.read seen) >>= shouldEqual [ 1 ]
     liftEffect r.dispose
 
@@ -115,12 +115,12 @@ spec = describe "Screamer.Owned" do
     clicks <- liftEffect $ signalSource 0
     r <- liftEffect $ runOwned $ child (Event.fold (\_ n -> n + 1) 0 (Event.changes clicks.signal))
     let count = r.value.value
-    liftEffect $ clicks.put 1
-    liftEffect $ clicks.put 2
-    liftEffect (read count) >>= shouldEqual 2
+    liftEffect $ clicks.putT1 1
+    liftEffect $ clicks.putT1 2
+    liftEffect (readT0 count) >>= shouldEqual 2
     liftEffect r.value.dispose
-    liftEffect $ clicks.put 3
-    liftEffect (read count) >>= shouldEqual 2
+    liftEffect $ clicks.putT1 3
+    liftEffect (readT0 count) >>= shouldEqual 2
     liftEffect r.dispose
 
   it "leaves nothing live after disposal" do
@@ -130,7 +130,7 @@ spec = describe "Screamer.Owned" do
       subscribe (map (_ + 1) a.signal) \_ -> pure unit
       void $ Event.fold (+) 0 (Event.changes a.signal)
       void $ child (subscribe a.signal \_ -> pure unit)
-    liftEffect $ a.put 1
+    liftEffect $ a.putT1 1
     liftEffect r.dispose
     after <- liftEffect readStats
     { effects: after.liveEffects - before.liveEffects, scopes: after.liveScopes - before.liveScopes, links: after.links - before.links }

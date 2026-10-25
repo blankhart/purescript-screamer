@@ -183,8 +183,8 @@ resourceWith :: forall a b. Strategy -> Signal a -> (a -> Aff b) -> Owned (Signa
 resourceWith strategy input req = do
   result <- liftEffect $ signalSource Loading
   run <- runner strategy req
-    { started: result.put Loading
-    , settled: \outcome -> result.put case outcome of
+    { started: result.putT1 Loading
+    , settled: \outcome -> result.putT1 case outcome of
         Left e -> Failed e
         Right b -> Loaded b
     }
@@ -198,7 +198,7 @@ resourceWith strategy input req = do
 request :: forall a b. Strategy -> Event a -> (a -> Aff b) -> Owned (Event (Either Error b))
 request strategy input req = do
   results <- liftEffect eventSource
-  run <- runner strategy req { started: pure unit, settled: results.fire }
+  run <- runner strategy req { started: pure unit, settled: results.fireT1 }
   Event.subscribe input run
   pure results.event
 

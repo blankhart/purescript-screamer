@@ -12,7 +12,7 @@ import Effect.Exception (error)
 import Effect.Ref as Ref
 import Screamer.Owned (runOwned)
 import Screamer.Resource (Remote(..), resource)
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Source (signalSource)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -32,30 +32,30 @@ spec = describe "Screamer.Resource" do
     input <- liftEffect $ signalSource 1
     r <- liftEffect $ runOwned (resource input.signal request)
     yield
-    liftEffect (read r.value) >>= shouldEqual Loading
-    liftEffect $ input.put 2
+    liftEffect (readT0 r.value) >>= shouldEqual Loading
+    liftEffect $ input.putT1 2
     yield
     liftEffect $ resolve 1 "one"
     yield
-    liftEffect (read r.value) >>= shouldEqual Loading
+    liftEffect (readT0 r.value) >>= shouldEqual Loading
     liftEffect $ resolve 2 "two"
     yield
-    liftEffect (read r.value) >>= shouldEqual (Loaded "two")
+    liftEffect (readT0 r.value) >>= shouldEqual (Loaded "two")
     liftEffect (Ref.read killed) >>= shouldEqual [ 1 ]
-    liftEffect $ input.put 3
+    liftEffect $ input.putT1 3
     yield
     liftEffect r.dispose
     yield
     liftEffect $ resolve 3 "three"
     yield
-    liftEffect (read r.value) >>= shouldEqual Loading
+    liftEffect (readT0 r.value) >>= shouldEqual Loading
     liftEffect (Ref.read killed) >>= shouldEqual [ 1, 3 ]
 
   it "reports a failed request" do
     input <- liftEffect $ signalSource unit
     r <- liftEffect $ runOwned (resource input.signal \_ -> makeAff \cb -> cb (Left (error "boom")) $> mempty)
     yield
-    liftEffect (read r.value) >>= shouldEqual (Failed (error "boom") :: Remote Unit)
+    liftEffect (readT0 r.value) >>= shouldEqual (Failed (error "boom") :: Remote Unit)
     liftEffect r.dispose
 
 -- | Let fibers launched from inside the test's own fiber run: the Aff

@@ -75,9 +75,9 @@ spec = describe "framework primitives" do
           element_ "div" [] [ dyn (shown.signal <#> if _ then dialog else element "closed") ]
         liftEffect (innerHTML "#modal") >>= shouldEqual "<p>hello Ada</p>"
         liftEffect (innerHTML "#root") >>= shouldEqual "<div><!----><!----><!----></div>"
-        liftEffect $ shown.put false
+        liftEffect $ shown.putT1 false
         liftEffect (innerHTML "#modal") >>= shouldEqual ""
-        liftEffect $ shown.put true
+        liftEffect $ shown.putT1 true
         liftEffect (innerHTML "#modal") >>= shouldEqual "<p>hello Ada</p>"
         liftEffect unmount
         liftEffect (innerHTML "#modal") >>= shouldEqual ""
@@ -106,10 +106,10 @@ spec = describe "framework primitives" do
               element_ "i" [] [ text (n.signal <#> \x -> if x > 1 then crash "too big" else show x) ]
           ]
         liftEffect (innerHTML "#root") >>= shouldEqual "<div><!----><i>1</i><!----></div>"
-        liftEffect $ n.put 2
+        liftEffect $ n.putT1 2
         liftEffect (innerHTML "#root") >>= shouldEqual "<div><!----><b>too big</b><!----></div>"
         -- The failed child is gone: further writes reach nothing.
-        liftEffect $ n.put 3
+        liftEffect $ n.putT1 3
         liftEffect (innerHTML "#root") >>= shouldEqual "<div><!----><b>too big</b><!----></div>"
         liftEffect unmount
       l `shouldEqual` noLeak
@@ -166,7 +166,7 @@ spec = describe "framework primitives" do
         unmount <- liftEffect $ mount "#root" $ element_ "ul" []
           [ withLeave hook $ each identity items.signal \s -> element_ "li" [] [ text (show <$> s) ] ]
         mid <- leaks do
-          liftEffect $ items.put [ 1, 3 ]
+          liftEffect $ items.putT1 [ 1, 3 ]
         -- The row's scope (and its text effect) is gone, its node is not.
         mid `shouldEqual` { effects: -1, scopes: -1, links: -2 }
         liftEffect (innerHTML "#root") >>= shouldEqual "<ul><!----><li>1</li><li>2</li><li>3</li><!----></ul>"
@@ -187,9 +187,9 @@ spec = describe "framework primitives" do
         tabs = withLeave hook $ dyn (tab.signal <#> \t -> element_ "p" [] [ element t ])
       unmount <- liftEffect $ mount "#root" $ element_ "div" []
         [ dyn (shown.signal <#> if _ then tabs else element "none") ]
-      liftEffect $ tab.put "b"
+      liftEffect $ tab.putT1 "b"
       liftEffect (innerHTML "#root") >>= shouldEqual "<div><!----><!----><p>a</p><p>b</p><!----><!----></div>"
-      liftEffect $ shown.put false
+      liftEffect $ shown.putT1 false
       liftEffect (innerHTML "#root") >>= shouldEqual "<div><!---->none<!----></div>"
       -- A late done is harmless.
       liftEffect $ Ref.read leaving >>= \ds -> for_ ds identity

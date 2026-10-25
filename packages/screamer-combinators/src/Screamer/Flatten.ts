@@ -34,7 +34,7 @@ export const switchOwnedImpl = <A, B>(s: Scope) => (sig: Runtime.Readable<A>) =>
       const made = runChild(s, f(a));
       child = made.scope;
       if (out === null) out = R.cell(made.value);
-      else out.write(made.value);
+      else out.putT1(made.value);
     });
   });
   return out!;
@@ -68,7 +68,7 @@ const flattenImpl =
         running--;
         R.batch(() => {
           if (scope !== null) scope.dispose();
-          live.modify((cs) => cs.filter((c) => c !== entry));
+          live.modifyT1((cs) => cs.filter((c) => c !== entry));
           if (queue.length > 0 && !s.disposed) start(queue.shift()!);
         });
       };
@@ -80,7 +80,7 @@ const flattenImpl =
         return;
       }
       entry.event = made.value;
-      live.modify((cs) => cs.concat([entry]));
+      live.modifyT1((cs) => cs.concat([entry]));
     };
     R.subscribeEvent(s, e, (a) => {
       if (running > 0 && strategy === CONCAT) queue.push(a);
