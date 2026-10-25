@@ -3,7 +3,7 @@
 -- | A `Form props i o` edits a state of type `i` and validates it into an
 -- | `o`. The state lives in one signal source that `build` creates per instance;
 -- | each field reads its part of the state through a signal and writes it
--- | back through `modify`. Because the state is plain data, going back a step
+-- | back through `modifyT1`. Because the state is plain data, going back a step
 -- | in a wizard or resetting the form shows the values the user entered.
 -- |
 -- | ```purescript
@@ -71,7 +71,7 @@ import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Owned (Owned(..), child)
-import Screamer.Signal (Signal, read)
+import Screamer.Signal (Signal, readT0)
 import Screamer.Source (SignalSource, batch, signalSource)
 import Screamer.Source as Source
 import Type.Proxy (Proxy)
@@ -229,7 +229,7 @@ password = textInput InputPassword
 
 textInput :: forall props. InputType -> Form props String String
 textInput t = Form \c -> pure
-  { fields: [ E.input_ [ A.type_ t, A.value_ c.state.signal, H.onInput_ (inputValue (c.state.modify <<< const)) ] [] ]
+  { fields: [ E.input_ [ A.type_ t, A.value_ c.state.signal, H.onInput_ (inputValue (c.state.modifyT1 <<< const)) ] [] ]
   , result: Right <$> c.state.signal
   }
 
@@ -237,7 +237,7 @@ textInput t = Form \c -> pure
 -- | `Nothing` when it is blank or not a number.
 number :: forall props. Form props String (Maybe Number)
 number = Form \c -> pure
-  { fields: [ E.input_ [ A.type_ InputNumber, A.value_ c.state.signal, H.onInput_ (inputValue (c.state.modify <<< const)) ] [] ]
+  { fields: [ E.input_ [ A.type_ InputNumber, A.value_ c.state.signal, H.onInput_ (inputValue (c.state.modifyT1 <<< const)) ] [] ]
   , result: c.state.signal <#> \s -> Right (Number.fromString (String.trim s))
   }
 
@@ -248,7 +248,7 @@ checkbox = Form \c -> pure
       [ E.input_
           [ A.type_ InputCheckbox
           , A.checked_ c.state.signal
-          , H.onChange_ \e -> for_ (target e >>= Input.fromEventTarget) \i -> Input.checked i >>= c.state.modify <<< const
+          , H.onChange_ \e -> for_ (target e >>= Input.fromEventTarget) \i -> Input.checked i >>= c.state.modifyT1 <<< const
           ]
           []
       ]
@@ -264,7 +264,7 @@ select placeholder options = Form \c -> pure
       [ E.select_
           [ H.onChange_ \e -> for_ (target e >>= Select.fromEventTarget) \s -> do
               index <- Select.selectedIndex s
-              c.state.modify \_ -> _.value <$> Array.index options (index - 1)
+              c.state.modifyT1 \_ -> _.value <$> Array.index options (index - 1)
           ]
           ( [ E.option_ [ A.value_ "", A.selected_ (isNothing <$> c.state.signal) ] [ element placeholder ] ]
               <> Array.mapWithIndex
@@ -299,8 +299,8 @@ build props initial (Form f) = do
     { element: E.div_ [ A.class_ "screamer-form" ] r.fields
     , state
     , result: r.result
-    , reveal: revealed.put true
-    , reset: batch (state.put initial *> revealed.put false)
+    , reveal: revealed.putT1 true
+    , reset: batch (state.putT1 initial *> revealed.putT1 false)
     }
 
 -- | A sequence of forms over one state, shown one step at a time. Each step's
@@ -353,16 +353,16 @@ wizard (Step first) = Form \c -> do
   current <- liftEffect $ signalSource initial
   let
     go form back = do
-      read current.signal >>= _.dispose
-      current.put =<< open form back
+      readT0 current.signal >>= _.dispose
+      current.putT1 =<< open form back
     next = do
-      cur <- read current.signal
-      read cur.rendered.result >>= case _ of
+      cur <- readT0 current.signal
+      readT0 cur.rendered.result >>= case _ of
         Right (Step form) -> go form (Array.snoc cur.back cur.form)
         Right (Done _) -> pure unit
-        Left _ -> cur.reveal.put true
+        Left _ -> cur.reveal.putT1 true
     previous = do
-      cur <- read current.signal
+      cur <- readT0 current.signal
       for_ (Array.unsnoc cur.back) \{ init, last } -> go last init
     stepResult = current.signal >>= _.rendered.result
     position = current.signal <#> \cur -> Array.length cur.back + 1

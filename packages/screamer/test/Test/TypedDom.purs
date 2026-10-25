@@ -22,7 +22,7 @@ spec = describe "Screamer.Html" do
     v <- liftEffect $ signalSource "hello"
     _ <- liftEffect $ mount "#root" $ E.input_ [ A.value_ v.signal, A.type_ A.InputText ] []
     liftEffect (propertyOf "#root input" "value") >>= shouldEqual "hello"
-    liftEffect $ v.put "world"
+    liftEffect $ v.putT1 "world"
     liftEffect (propertyOf "#root input" "value") >>= shouldEqual "world"
     liftEffect (innerHTML "#root") >>= shouldEqual """<input type="text">"""
 
@@ -36,7 +36,7 @@ spec = describe "Screamer.Html" do
     off <- liftEffect $ signalSource true
     _ <- liftEffect $ mount "#root" $ E.button_ [ A.disabled_ off.signal ] []
     liftEffect (innerHTML "#root") >>= shouldEqual """<button disabled=""></button>"""
-    liftEffect $ off.put false
+    liftEffect $ off.putT1 false
     liftEffect (innerHTML "#root") >>= shouldEqual """<button></button>"""
 
   it "accept-charset and http-equiv keep their hyphens" do
@@ -56,7 +56,7 @@ spec = describe "Screamer.Html" do
     colour <- liftEffect $ signalSource "red"
     _ <- liftEffect $ mount "#root" $ E.div_ [ A.style_ { color: colour.signal, "margin-top": "2px" } ] []
     liftEffect (innerHTML "#root") >>= shouldEqual """<div style="color: red; margin-top: 2px;"></div>"""
-    liftEffect $ colour.put "blue"
+    liftEffect $ colour.putT1 "blue"
     liftEffect (innerHTML "#root") >>= shouldEqual """<div style="color: blue; margin-top: 2px;"></div>"""
 
   it "creates SVG elements in the SVG namespace" do

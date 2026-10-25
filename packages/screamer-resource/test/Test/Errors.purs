@@ -12,7 +12,7 @@ import Effect.Exception (error, message, throw)
 import Effect.Ref as Ref
 import Screamer.Owned (child, onError, runOwned)
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry, toMaybe, withDefault)
-import Screamer.Signal (read, subscribe)
+import Screamer.Signal (readT0, subscribe)
 import Screamer.Signal as Signal
 import Screamer.Source (signalSource)
 import Screamer.Test.Clock as Fake
@@ -29,15 +29,15 @@ spec = describe "Error handling" do
       safe = Signal.catching (const (-1)) risky
       both = Tuple <$> safe <*> s.signal
     o <- liftEffect $ observe (map (\t -> show t) both)
-    liftEffect $ s.put 0
-    liftEffect $ s.put 5
+    liftEffect $ s.putT1 0
+    liftEffect $ s.putT1 5
     liftEffect o.trace >>= shouldEqual [ "(Tuple 10 1)", "(Tuple -1 0)", "(Tuple 2 5)" ]
     liftEffect o.stop
 
   it "attempt exposes the error" do
     s <- liftEffect $ signalSource 0
     let r = Signal.attempt (s.signal <#> \n -> if n == 0 then unsafeThrow "zero" else n)
-    liftEffect (read r) >>= case _ of
+    liftEffect (readT0 r) >>= case _ of
       Left e -> message e `shouldEqual` "zero"
       Right _ -> shouldEqual "Left" "Right"
 
@@ -47,7 +47,7 @@ spec = describe "Error handling" do
     r <- liftEffect $ runOwned do
       onError \e -> Ref.write (Just (message e)) failed
       child $ subscribe s.signal \n -> when (n == 0) (throw "broken")
-    liftEffect $ s.put 0
+    liftEffect $ s.putT1 0
     liftEffect (Ref.read failed) >>= shouldEqual (Just "broken")
     liftEffect r.dispose
 
@@ -67,11 +67,11 @@ spec = describe "Error handling" do
     s <- liftEffect $ signalSource (Loading :: Remote Int)
     o <- liftEffect $ observeOwned (keepLast s.signal)
     liftEffect do
-      s.put (Loaded 1)
-      s.put Loading
-      s.put (Loaded 2)
-      s.put (Failed (error "x"))
-      s.put Loading
+      s.putT1 (Loaded 1)
+      s.putT1 Loading
+      s.putT1 (Loaded 2)
+      s.putT1 (Failed (error "x"))
+      s.putT1 Loading
     liftEffect o.trace >>= shouldEqual [ Loading, Loaded 1, Loaded 2, Failed (error "x"), Loading ]
     liftEffect o.stop
 
@@ -97,7 +97,7 @@ spec = describe "Error handling" do
       liftEffect $ Fake.advance 1.0
       yield
       liftEffect (Ref.read attempts) >>= shouldEqual 3
-      liftEffect (read r.value) >>= shouldEqual (Loaded 3)
+      liftEffect (readT0 r.value) >>= shouldEqual (Loaded 3)
       liftEffect r.dispose
 
     it "gives up after the last retry with the last failure" do
@@ -109,10 +109,10 @@ spec = describe "Error handling" do
       yield
       liftEffect $ Fake.advance 50.0
       yield
-      liftEffect (read r.value) >>= shouldEqual (Loading :: Remote Unit)
+      liftEffect (readT0 r.value) >>= shouldEqual (Loading :: Remote Unit)
       liftEffect $ Fake.advance 50.0
       yield
-      liftEffect (read r.value) >>= shouldEqual (Failed (error "down") :: Remote Unit)
+      liftEffect (readT0 r.value) >>= shouldEqual (Failed (error "down") :: Remote Unit)
       liftEffect r.dispose
 
     it "disposing mid-backoff cancels the pending retry" do

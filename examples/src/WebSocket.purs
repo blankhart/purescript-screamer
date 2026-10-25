@@ -14,7 +14,7 @@ import Screamer.Html as E
 import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Source (signalSource)
 import Screamer.Web.WebSocket (ConnectionState(..), connect)
 import Web.Event.Event (preventDefault, target)
@@ -33,15 +33,15 @@ chat url = component do
   count <- liftEffect $ signalSource 0
   let
     add text mine = do
-      index <- read count.signal
-      count.put (index + 1)
-      lines.modify (_ <> [ { index, text, mine } ])
+      index <- readT0 count.signal
+      count.putT1 (index + 1)
+      lines.modifyT1 (_ <> [ { index, text, mine } ])
     submit = do
-      text <- read draft.signal
+      text <- readT0 draft.signal
       when (text /= "") do
         socket.send text
         add text true
-        draft.put ""
+        draft.putT1 ""
   Event.subscribe socket.messages \m -> add m false
   pure $ E.div_ []
     [ E.p_ [ A.id_ "status" ] [ text (socket.state <#> status) ]
@@ -56,7 +56,7 @@ chat url = component do
             , A.value_ draft.signal
             , A.placeholder_ "Say something"
             , H.onInput_ \e -> case Input.fromEventTarget =<< target e of
-                Just input -> draft.put =<< Input.value input
+                Just input -> draft.putT1 =<< Input.value input
                 Nothing -> pure unit
             ]
             []

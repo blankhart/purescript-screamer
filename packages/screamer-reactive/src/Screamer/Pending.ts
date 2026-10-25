@@ -27,7 +27,7 @@ function countOf(s: Scope): Runtime.Cell<number> {
 
 const add = (cells: Runtime.Cell<number>[], d: number) =>
   R.batch(() => {
-    for (const c of cells) c.writeNow(c.value + d);
+    for (const c of cells) c.putT0(c.value + d);
   });
 
 const noop = () => {};

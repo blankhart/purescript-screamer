@@ -12,7 +12,7 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Screamer.Event as Event
 import Screamer.Owned (Owned, runOwned)
-import Screamer.Signal (Signal, dropRepeats, merge, read, sampleManyWith)
+import Screamer.Signal (Signal, dropRepeats, merge, readT0, sampleManyWith)
 import Screamer.Source (SignalSource, batch, signalSource)
 import Screamer.Test (observe)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
@@ -60,7 +60,7 @@ law lhs rhs script = do
   l <- observe ls.value
   r <- observe rs.value
   for_ script.batches \writes -> batch do
-    for_ writes \{ chan, value } -> for_ (Array.index chans chan) \ch -> ch.put value
+    for_ writes \{ chan, value } -> for_ (Array.index chans chan) \ch -> ch.putT1 value
   lt <- dedup <$> l.trace
   rt <- dedup <$> r.trace
   l.stop
@@ -138,7 +138,7 @@ spec = describe "Screamer.Signal" do
       x <- liftEffect $ signalSource "a"
       y <- liftEffect $ signalSource "b"
       o <- liftEffect $ observe (x.signal <> y.signal <> mempty)
-      liftEffect $ y.put "c"
+      liftEffect $ y.putT1 "c"
       liftEffect o.trace >>= shouldEqual [ "ab", "ac" ]
 
   describe "sampleManyWith" do
@@ -147,20 +147,20 @@ spec = describe "Screamer.Signal" do
       y <- liftEffect $ signalSource 10
       let s = sampleManyWith { x: x.signal } { y: y.signal } \r -> r.x + r.y
       o <- liftEffect $ observe s
-      liftEffect $ x.put 2
-      liftEffect $ y.put 20
-      liftEffect $ x.put 3
+      liftEffect $ x.putT1 2
+      liftEffect $ y.putT1 20
+      liftEffect $ x.putT1 3
       liftEffect o.trace >>= shouldEqual [ 11, 22 ]
-      liftEffect (read s) >>= shouldEqual 22
+      liftEffect (readT0 s) >>= shouldEqual 22
 
   describe "dropRepeats" do
     it "suppresses structurally equal records" do
       ch :: SignalSource { n :: Int } <- liftEffect $ signalSource { n: 1 }
       o <- liftEffect $ observe (dropRepeats ch.signal)
       raw <- liftEffect $ observe ch.signal
-      liftEffect $ ch.put { n: 1 }
-      liftEffect $ ch.put { n: 2 }
-      liftEffect $ ch.put { n: 2 }
+      liftEffect $ ch.putT1 { n: 1 }
+      liftEffect $ ch.putT1 { n: 2 }
+      liftEffect $ ch.putT1 { n: 2 }
       liftEffect o.trace >>= shouldEqual [ { n: 1 }, { n: 2 } ]
       liftEffect (Array.length <$> raw.trace) >>= shouldEqual 4
 

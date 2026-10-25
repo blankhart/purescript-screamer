@@ -9,8 +9,9 @@ export const signalSource = <A>(a: A) => () => {
   const c = R.cell(a);
   return {
     signal: c,
-    put: (x: A) => () => c.write(x),
-    modify: (f: (x: A) => A) => () => c.modify(f),
+    readT1: (): A => c.readT1(),
+    putT1: (x: A) => () => c.putT1(x),
+    modifyT1: (f: (x: A) => A) => () => c.modifyT1(f),
   };
 };
 
@@ -18,7 +19,7 @@ export const eventSource = <A>() => {
   const src = R.eventSource<A>();
   return {
     event: src,
-    fire: (x: A) => () => src.fire(x),
+    fireT1: (x: A) => () => src.fireT1(x),
   };
 };
 

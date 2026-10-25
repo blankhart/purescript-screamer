@@ -108,7 +108,7 @@ location :: Owned (Signal Location)
 location = do
   env <- router
   loc <- liftEffect $ signalSource =<< env.current
-  stop <- liftEffect $ env.listen (loc.put =<< env.current)
+  stop <- liftEffect $ env.listen (loc.putT1 =<< env.current)
   onCleanup stop
   pure loc.signal
 

@@ -20,7 +20,7 @@ import Screamer.Html as E
 import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Source (signalSource)
 import Type.Proxy (Proxy(..))
 import Web.Event.Event (preventDefault)
@@ -77,10 +77,10 @@ signup = component do
   form <- build unit blankSignup signupForm
   submitted <- liftEffect $ signalSource ""
   let
-    submit = read form.result >>= case _ of
+    submit = readT0 form.result >>= case _ of
       Left _ -> form.reveal
       Right a -> do
-        submitted.put $ "Welcome, " <> a.name <> " (" <> a.email <> ", " <> toStringWith (fixed 0) a.age <> ", " <> show a.plan <> ")"
+        submitted.putT1 $ "Welcome, " <> a.name <> " (" <> a.email <> ", " <> toStringWith (fixed 0) a.age <> ", " <> show a.plan <> ")"
         form.reset
   pure $ E.form_ [ A.id_ "signup", H.onSubmit_ \e -> preventDefault e *> submit ]
     [ E.h2_ [] [ element "Sign up" ]

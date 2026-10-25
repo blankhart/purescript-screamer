@@ -52,14 +52,14 @@ spec = describe "Screamer.Host" do
     r <- liftEffect $ runOwned $ withHost fake.host $ Time.debounce (Milliseconds 100.0) src.event
     o <- liftEffect $ observeE r.value
     liftEffect do
-      src.fire 1
+      src.fireT1 1
       fake.advance 50.0
-      src.fire 2
+      src.fireT1 2
       fake.advance 99.0
     liftEffect o.trace >>= shouldEqual []
     liftEffect $ fake.advance 1.0
     liftEffect o.trace >>= shouldEqual [ 2 ]
-    liftEffect $ src.fire 3
+    liftEffect $ src.fireT1 3
     liftEffect (o.stop *> r.dispose)
     liftEffect fake.scheduled >>= shouldEqual 0
     after <- liftEffect readStats
