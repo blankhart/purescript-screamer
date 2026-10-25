@@ -15,7 +15,11 @@
 //   change, as `Screamer.Element` does for static attributes and text.
 // - `subscribeEvent`: the one way an effect consumes each occurrence once;
 //   its version bookkeeping is internal to the runtime.
-// - `Cell`: the type `cell` returns.
+// - `Cell` and `EventSourceNode`: the types `cell` and `eventSource`
+//   return. Setting `commutes` on either turns off the development warning
+//   for writes from several subscribers in one timestep.
+// - `inTimestep`: whether a timestep is running, for development warnings
+//   about code that expects to run between timesteps.
 // - `contextOf`, `lookupContext` and the `Context` type (#48): how FFI
 //   reads the values `Screamer.Context.provide` puts on scopes.
 // - `development` is `DEV`: an FFI module may export only names that are
@@ -60,6 +64,7 @@ export const lookupContext = R.lookupContext;
 // Batching and reading
 export const batch = R.batch;
 export const isBatching = R.isBatching;
+export const inTimestep = R.inTimestep;
 export const sample = R.sample;
 export const untracked = R.untracked;
 
@@ -75,5 +80,6 @@ export type EventStep<S, T> = Runtime.EventStep<S, T>;
 export type Scope = Runtime.Scope;
 export type Context = Runtime.Context;
 export type Cell<T> = Runtime.Cell<T>;
+export type EventSourceNode<T> = Runtime.EventSourceNode<T>;
 export type Constant<T> = Runtime.Constant<T>;
 export type Accum<S, B> = Runtime.Accum<S, B>;

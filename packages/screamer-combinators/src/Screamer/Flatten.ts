@@ -56,6 +56,9 @@ interface Child<B> {
 const flattenImpl =
   (strategy: number) => <A, B>(s: Scope) => (e: Ev<A>) => (f: (a: A) => (done: Eff<void>) => Owned<Ev<B>>) => (): Ev<B> => {
     const live = R.cell<Child<B>[]>([]);
+    // Children start and finish from their own subscribers; adding and
+    // removing different children commutes.
+    live.commutes = true;
     const queue: A[] = [];
     let running = 0;
     const start = (a: A): void => {
