@@ -10,15 +10,35 @@
 -- | next. `readT0` (in `Screamer.Signal`) gives the value of T0. `putT1`,
 -- | `modifyT1` and `fireT1` take effect when T1 starts, and `readT1` gives
 -- | the value T1 will start with. Outside any timestep and any `batch`, as
--- | in a lone write from a timer callback, T1 starts as soon as the write is
--- | made, so a `readT0` after it returns the new value.
+-- | in a lone write from a foreign callback, T1 starts as soon as the write
+-- | is made, so a `readT0` after it returns the new value.
+-- |
+-- | **Order within a timestep.** Writes and fires made for one timestep are
+-- | applied in the order they were made. For one subscriber, one event
+-- | handler or one component's setup code, that is the order of the code.
+-- | Between different subscribers it is the order they run in: subscribers
+-- | notified in a timestep run in the order they were created, and one
+-- | created during a timestep (in a component that `dyn` or `each` mounts)
+-- | runs once when it is created. So when two subscribers write one source
+-- | for the same timestep, the `putT1` of the one created last is the one
+-- | applied, `modifyT1`s compose in creation order, and `fireT1`s deliver
+-- | their occurrences in creation order. This order is part of the
+-- | semantics, but it is not one the program states, and it changes when a
+-- | component moves or mounts in a different order: swapping two
+-- | independent `Owned` actions whose subscribers write one source can
+-- | change the result. In development the runtime warns when it happens
+-- | (see `commutingSignalSource` for writes that don't depend on it). To
+-- | state an order, feed both causes into one event, or write from one
+-- | subscriber.
 module Screamer.Source
   ( SignalSource
   , signalSource
+  , commutingSignalSource
   , focus
   , prop
   , EventSource
   , eventSource
+  , commutingEventSource
   , batch
   ) where
 
@@ -47,6 +67,12 @@ type SignalSource a =
   }
 
 foreign import signalSource :: forall a. a -> Effect (SignalSource a)
+
+-- | `signalSource` for a source whose writes from different subscribers in
+-- | one timestep commute, such as increments of a counter or inserts of
+-- | different keys. It turns off the development warning for such writes;
+-- | they still apply in subscriber order.
+foreign import commutingSignalSource :: forall a. a -> Effect (SignalSource a)
 
 -- | A source for part of another source's value. Its `signal` is the part,
 -- | through `get`; `readT1` reads the parent's through `get`, and `putT1`
@@ -82,6 +108,11 @@ type EventSource a =
   }
 
 foreign import eventSource :: forall a. Effect (EventSource a)
+
+-- | `eventSource` for an event whose consumers don't depend on the order of
+-- | occurrences fired by different subscribers in one timestep. It turns off
+-- | the development warning for such fires.
+foreign import commutingEventSource :: forall a. Effect (EventSource a)
 
 -- | Run an action as one step. Its writes and fires take effect together in
 -- | the timestep that starts when the outermost batch returns, and the

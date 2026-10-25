@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { cell, stateful, scope, effect, sample, map, stepper, eventSource } from '../../src/Screamer/Runtime.ts';
+import { cell, stateful, scope, effect, sample, map, stepper, eventSource, untracked, batch } from '../../src/Screamer/Runtime.ts';
 
 /** Run `f`, returning the messages it passed to `console.warn`. */
 function warnings(f: () => void): string[] {
@@ -42,6 +42,101 @@ describe('development warnings', () => {
       again();
     });
     assert.deepEqual(seen, []);
+  });
+
+  describe('writes from two subscribers in one timestep (#72)', () => {
+    /** Two subscribers to `a` that each run `w` with their own argument when `a` turns positive. */
+    function twoWriters(w: (x: number) => void): () => void {
+      const a = cell(0);
+      const stop = scope(() => {
+        effect(() => { if (a.read() > 0) untracked(() => w(1)); });
+        effect(() => { if (a.read() > 0) untracked(() => w(2)); });
+      });
+      a.putT1(1);
+      return stop;
+    }
+
+    test('two subscribers writing different values to one source warn once', () => {
+      const c = cell(0);
+      const seen = warnings(() => {
+        const stop = twoWriters((x) => c.putT1(x));
+        stop();
+      });
+      assert.equal(seen.length, 1);
+      assert.match(seen[0], /one signal source was written by two subscribers/);
+      assert.equal(c.read(), 2);
+    });
+
+    test('two modifies from two subscribers warn', () => {
+      const c = cell(1);
+      const seen = warnings(() => { twoWriters((x) => c.modifyT1((n) => n * 10 + x))(); });
+      assert.equal(seen.length, 1);
+    });
+
+    test('equal values, one subscriber writing twice, and commuting sources do not warn', () => {
+      const same = cell(0);
+      const once = cell(0);
+      const counter = cell(0);
+      counter.commutes = true;
+      const seen = warnings(() => {
+        twoWriters(() => same.putT1(7))();
+        twoWriters((x) => { if (x === 1) { once.putT1(1); once.putT1(2); } })();
+        twoWriters((x) => counter.modifyT1((n) => n + x))();
+      });
+      assert.deepEqual(seen, []);
+      assert.equal(counter.read(), 3);
+    });
+
+    test('writes in one event handler batch, and setup code with its own subscriber, do not warn', () => {
+      const c = cell(0);
+      const seen = warnings(() => {
+        batch(() => { c.putT1(1); c.putT1(2); });
+        const stop = scope(() => {
+          c.putT1(3);
+          effect(() => { untracked(() => c.putT1(4)); });
+        });
+        stop();
+      });
+      assert.deepEqual(seen, []);
+      assert.equal(c.read(), 4);
+    });
+
+    test('two components mounted in one timestep writing one source warn', () => {
+      const a = cell(0);
+      const c = cell(0);
+      const seen = warnings(() => {
+        const stop = scope(() => {
+          effect(() => {
+            if (a.read() > 0) {
+              untracked(() => {
+                scope(() => { c.putT1(1); });
+                scope(() => { c.putT1(2); });
+              });
+            }
+          });
+        });
+        a.putT1(1);
+        stop();
+      });
+      assert.equal(seen.length, 1);
+    });
+
+    test('two subscribers firing one event source warn, unless it commutes', () => {
+      const src = eventSource<number>();
+      const quiet = eventSource<number>();
+      quiet.commutes = true;
+      const seen = warnings(() => {
+        const keep = scope(() => {
+          const last = stepper(0, src);
+          const lastQuiet = stepper(0, quiet);
+          effect(() => { last.read(); lastQuiet.read(); });
+        });
+        twoWriters((x) => { src.fireT1(x); quiet.fireT1(x); })();
+        keep();
+      });
+      assert.equal(seen.length, 1);
+      assert.match(seen[0], /one event source was fired by two subscribers/);
+    });
   });
 
   test('a write inside a derivation is an error in development', () => {

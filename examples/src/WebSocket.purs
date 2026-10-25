@@ -4,6 +4,7 @@ module Screamer.Examples.WebSocket where
 
 import Prelude
 
+import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -30,12 +31,10 @@ chat url = component do
   socket <- connect url
   draft <- liftEffect $ signalSource ""
   lines <- liftEffect $ signalSource ([] :: Array Line)
-  count <- liftEffect $ signalSource 0
   let
-    add text mine = do
-      index <- readT0 count.signal
-      count.putT1 (index + 1)
-      lines.modifyT1 (_ <> [ { index, text, mine } ])
+    -- One `modifyT1`, so that lines added in one timestep compose and get
+    -- distinct indices.
+    add text mine = lines.modifyT1 \ls -> ls <> [ { index: Array.length ls, text, mine } ]
     submit = do
       text <- readT0 draft.signal
       when (text /= "") do

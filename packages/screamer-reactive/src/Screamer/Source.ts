@@ -5,8 +5,7 @@ import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 
 const R: typeof Runtime = runtime;
 
-export const signalSource = <A>(a: A) => () => {
-  const c = R.cell(a);
+const signalSourceOf = <A>(c: Runtime.Cell<A>) => {
   return {
     signal: c,
     readT1: (): A => c.readT1(),
@@ -15,12 +14,27 @@ export const signalSource = <A>(a: A) => () => {
   };
 };
 
-export const eventSource = <A>() => {
-  const src = R.eventSource<A>();
+export const signalSource = <A>(a: A) => () => signalSourceOf(R.cell(a));
+
+export const commutingSignalSource = <A>(a: A) => () => {
+  const c = R.cell(a);
+  c.commutes = true;
+  return signalSourceOf(c);
+};
+
+const eventSourceOf = <A>(src: Runtime.EventSourceNode<A>) => {
   return {
     event: src,
     fireT1: (x: A) => () => src.fireT1(x),
   };
+};
+
+export const eventSource = <A>() => eventSourceOf(R.eventSource<A>());
+
+export const commutingEventSource = <A>() => {
+  const src = R.eventSource<A>();
+  src.commutes = true;
+  return eventSourceOf(src);
 };
 
 export const batch = <A>(e: () => A) => (): A => R.batch(e);
