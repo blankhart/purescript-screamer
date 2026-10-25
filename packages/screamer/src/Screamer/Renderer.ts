@@ -106,6 +106,25 @@ interface Bound {
  * module loads where there is none. Each backend keeps its own delegation
  * registry: the handlers it binds and the document listeners it adds.
  */
+const warnedHandler = new Set<string>();
+
+/**
+ * Warn, once per event type, when a DOM handler runs inside a timestep:
+ * a subscriber dispatched the event synchronously (`click()`,
+ * `dispatchEvent`). The handler's writes are then deferred with the
+ * subscriber's, and ordered among other subscribers' writes by creation
+ * order rather than by real time.
+ */
+function warnHandlerInTimestep(name: string): void {
+  if (warnedHandler.has(name)) return;
+  warnedHandler.add(name);
+  console.warn(
+    `screamer: a ${name} handler ran inside a timestep, because a subscriber dispatched the event synchronously. ` +
+      'Its writes take effect with the subscriber\'s, in subscriber order. Write from the subscriber directly, ' +
+      'or dispatch the event after the timestep (queueMicrotask).',
+  );
+}
+
 export const createBrowserBackend = (): BrowserBackend => {
   // Handlers are stored on the elements under a per-backend symbol.
   const HANDLERS = Symbol('screamer.handlers');
@@ -113,6 +132,7 @@ export const createBrowserBackend = (): BrowserBackend => {
 
   function dispatch(e: Event): void {
     const name = e.type;
+    if (R.development && R.inTimestep()) warnHandlerInTimestep(name);
     let node = e.target as Node | null;
     Object.defineProperty(e, 'currentTarget', { configurable: true, get: () => node });
     try {

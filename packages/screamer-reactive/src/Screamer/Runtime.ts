@@ -73,6 +73,8 @@ let flushing = 0;
 let fired: EventSourceNode<any>[] = [];
 /** Greater than zero while an effect's function runs. */
 let inEffect = 0;
+/** The effect whose function is running, if any; for the conflict warning. */
+let runningEffect: EffectNode | null = null;
 /** Cells written by effects or during a flush since the last round started. */
 let written: Cell<any>[] = [];
 /**
@@ -219,6 +221,14 @@ export class Cell<T> implements Source<T> {
   /** The value of a deferred write, meaningful only if `deferred`. */
   next: T = UNSET;
   deferred = false;
+  /** Where the deferred write came from, for the conflict warning (`DEV` only). */
+  writer: Writer | null = null;
+  /**
+   * Writes from several places in one round are expected to commute, so
+   * they don't warn: runtime bookkeeping, or a source made with
+   * `commutingSignalSource`.
+   */
+  commutes = false;
   constructor(public value: T, public eq: Eq<T> = Object.is) {}
 
   refresh(): void {}
@@ -243,6 +253,9 @@ export class Cell<T> implements Source<T> {
       if (!this.deferred) {
         this.deferred = true;
         written.push(this);
+        if (DEV) this.writer = currentWriter();
+      } else if (DEV && !this.commutes && !this.eq(x, this.next)) {
+        checkWriter(this, 'signal source', this.writer);
       }
       this.next = x;
       return;
@@ -595,6 +608,56 @@ function warnPausedRead(n: Stateful<any>): void {
   );
 }
 
+/**
+ * Where a deferred write or fire came from: the scope whose setup code is
+ * running (which may be a component that an effect such as `dyn` mounts),
+ * or else the effect running it. Code outside both (an event handler's
+ * batch) has one real order and is not tracked.
+ */
+interface Writer {
+  effect: EffectNode | null;
+  scope: Scope;
+}
+
+function currentWriter(): Writer | null {
+  if (owner !== null) return { effect: null, scope: owner };
+  if (runningEffect !== null) return { effect: runningEffect, scope: runningEffect.scope };
+  return null;
+}
+
+/**
+ * Whether two writers' writes to one source in one round have no order the
+ * program states. Writes from one effect, or from one scope's setup code and
+ * the effects it creates, do have one.
+ */
+function conflicting(a: Writer, b: Writer): boolean {
+  if (a.effect !== null && b.effect !== null) return a.effect !== b.effect;
+  return a.scope !== b.scope;
+}
+
+const warnedConflict: WeakSet<object> = new WeakSet();
+
+/**
+ * Warn, once per source, when a source is written or fired for one round by
+ * two writers with no stated order between them (#72). The runtime then
+ * applies them in the order the writers ran, which is creation order.
+ */
+function checkWriter(src: Cell<any> | EventSourceNode<any>, kind: string, first: Writer | null): void {
+  const w = currentWriter();
+  if (first === null) {
+    src.writer = w;
+    return;
+  }
+  if (w === null || !conflicting(first, w) || warnedConflict.has(src)) return;
+  warnedConflict.add(src);
+  console.warn(
+    `screamer: one ${kind} was ${kind === 'event source' ? 'fired' : 'written'} by two subscribers (or two components' setup) in one timestep. ` +
+      'They apply in the order the subscribers were created, which the program does not state, so the result can change when ' +
+      'a component moves or mounts in a different order. Combine the causes into one event, write from one subscriber, ' +
+      'or make the source with commutingSignalSource or commutingEventSource if the order does not matter.',
+  );
+}
+
 /** Run a pure function: untracked, with no owner, and with writes rejected. */
 function pure<T>(fn: () => T): T {
   const prev = current;
@@ -848,8 +911,10 @@ export class EffectNode implements Target, Computation {
     if (this.disposed) return;
     if (DEV) stats.effectRuns++;
     const prevOwner = owner;
+    const prevRunning = runningEffect;
     const prev = startCapture(this);
     owner = null;
+    runningEffect = this;
     inEffect++;
     try {
       this.fn();
@@ -858,6 +923,7 @@ export class EffectNode implements Target, Computation {
     } finally {
       current = prev;
       owner = prevOwner;
+      runningEffect = prevRunning;
       inEffect--;
     }
     if (this.disposed) {
@@ -931,6 +997,11 @@ export function isBatching(): boolean {
   return batchDepth > 0;
 }
 
+/** Whether a timestep is running: an effect, or the flush that runs effects. */
+export function inTimestep(): boolean {
+  return flushing > 0 || inEffect > 0;
+}
+
 function flush(): void {
   let rounds = 0;
   let loopError: unknown = null;
@@ -946,6 +1017,7 @@ function flush(): void {
         for (const c of written) {
           c.deferred = false;
           c.next = UNSET;
+          c.writer = null;
         }
         written = [];
         loopError = new Error('effect loop');
@@ -1067,6 +1139,7 @@ function startRound(): void {
     const x = c.next;
     c.deferred = false;
     c.next = UNSET;
+    c.writer = null;
     if (c.eq(x, c.value)) continue;
     c.value = x;
     c.version++;
@@ -1076,6 +1149,7 @@ function startRound(): void {
     const src = fs[i];
     src.value = src.pending;
     src.pending = [];
+    src.writer = null;
     src.version++;
   }
   for (let i = 0; i < changed.length; i++) {
@@ -1095,6 +1169,10 @@ export class EventSourceNode<T> implements EventLike<T> {
   _diff = 0;
   /** Occurrences fired since the last round started. */
   pending: Occ<T>[] = [];
+  /** Where the pending occurrences came from, for the conflict warning (`DEV` only). */
+  writer: Writer | null = null;
+  /** Fires from several places in one round are expected; see `Cell.commutes`. */
+  commutes = false;
 
   refresh(): void {}
 
@@ -1103,7 +1181,12 @@ export class EventSourceNode<T> implements EventLike<T> {
     if (DEV && inDerived > 0) throw new Error('fire inside a derivation');
     // Nothing observes the event, so the occurrence goes nowhere.
     if (this.targets.size === 0) return;
-    if (this.pending.length === 0) fired.push(this);
+    if (this.pending.length === 0) {
+      fired.push(this);
+      if (DEV && batchDepth > 0) this.writer = currentWriter();
+    } else if (DEV && batchDepth > 0 && !this.commutes) {
+      checkWriter(this, 'event source', this.writer);
+    }
     this.pending.push({ s: ++stamp, v: x });
     if (batchDepth === 0) flush();
   }
