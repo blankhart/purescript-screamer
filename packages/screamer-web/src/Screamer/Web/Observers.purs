@@ -39,6 +39,6 @@ observe initial start el = do
   if not live then pure (pure initial)
   else do
     src <- liftEffect $ signalSource initial
-    stop <- liftEffect $ start el \v -> batch (src.put v)
+    stop <- liftEffect $ start el \v -> batch (src.putT1 v)
     onCleanup stop
     pure src.signal

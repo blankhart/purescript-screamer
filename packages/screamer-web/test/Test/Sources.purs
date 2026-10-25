@@ -56,7 +56,7 @@ spec = describe "Screamer.Web sources" do
       let
         theme = do
           src <- Storage.localStorage "theme" "light"
-          Owned.liftEffect $ Ref.write (Just src.put) put
+          Owned.liftEffect $ Ref.write (Just src.putT1) put
           pure src.signal
       showing theme \shown -> do
         shown >>= shouldEqual "\"light\""

@@ -18,7 +18,7 @@ import Effect.Ref as Ref
 import Screamer.Event (Event)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Renderer (interactive)
-import Screamer.Signal (Signal, read)
+import Screamer.Signal (Signal, readT0)
 import Screamer.Source (EventSource, SignalSource, batch, eventSource, signalSource)
 
 data ConnectionState = Connecting | Open | Closing | Closed
@@ -75,24 +75,24 @@ open' url state messages = do
   socket <- liftEffect $ Ref.new Nothing
   let
     onOpen = do
-      state.put Open
+      state.putT1 Open
       Ref.read socket >>= case _ of
         Just ws -> do
           pending <- Ref.modify' (\q -> { state: [], value: q }) queue
           for_ pending (sendImpl ws)
         Nothing -> pure unit
-    onClose = state.put Closed
-    onMessage text = batch $ messages.fire text
+    onClose = state.putT1 Closed
+    onMessage text = batch $ messages.fireT1 text
   ws <- liftEffect $ open { url, onOpen, onClose, onMessage }
   liftEffect $ Ref.write (Just ws) socket
   onCleanup do
     Ref.write Nothing socket
-    state.put Closing
+    state.putT1 Closing
     closeImpl ws
   let
     send text = Ref.read socket >>= case _ of
       Nothing -> pure unit
-      Just w -> read state.signal >>= case _ of
+      Just w -> readT0 state.signal >>= case _ of
         Connecting -> Ref.modify_ (_ <> [ text ]) queue
         Open -> sendImpl w text
         _ -> pure unit

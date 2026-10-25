@@ -115,7 +115,7 @@ spiral = component do
   position <- liftEffect $ signalSource origin
   isBig <- liftEffect $ signalSource false
   ticks <- Time.frames
-  Event.subscribe ticks \_ -> heartbeat.modify (_ + 1)
+  Event.subscribe ticks \_ -> heartbeat.modifyT1 (_ + 1)
   let
     dotAttrs = sampleManyWith { pos: position.signal, n: numerosity.signal } { hb: heartbeat.signal } toDotAttrs
     cursor = sampleOn heartbeat.signal position.signal
@@ -123,10 +123,10 @@ spiral = component do
     [ animationPicker numerosity
     , E.div_
         [ A.id_ "spiral"
-        , H.onPointerMove_ \e -> position.put =<< fromCentre (toMouseEvent e)
-        , H.onPointerDown_ \e -> preventDefault (toEvent (toMouseEvent e)) *> isBig.put true
-        , H.onPointerUp_ \_ -> isBig.put false
-        , H.onPointerLeave_ \_ -> isBig.put false *> position.put origin
+        , H.onPointerMove_ \e -> position.putT1 =<< fromCentre (toMouseEvent e)
+        , H.onPointerDown_ \e -> preventDefault (toEvent (toMouseEvent e)) *> isBig.putT1 true
+        , H.onPointerUp_ \_ -> isBig.putT1 false
+        , H.onPointerLeave_ \_ -> isBig.putT1 false *> position.putT1 origin
         ]
         -- The dots are positioned relative to a point at the centre.
         [ E.div_ [ A.class_ "origin" ]
@@ -160,7 +160,7 @@ animationPicker numerosity = E.div_ [ A.class_ "picker" ]
   , fragment_ $ counts <#> \n ->
       E.button_
         [ A.class_ (numerosity.signal <#> \m -> if m == n then "active" else "")
-        , H.onClick_ \_ -> numerosity.put n
+        , H.onClick_ \_ -> numerosity.putT1 n
         ]
         [ element (show n) ]
   ]

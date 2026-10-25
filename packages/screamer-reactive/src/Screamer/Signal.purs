@@ -42,7 +42,7 @@ module Screamer.Signal
   , merge
   , latestWhere
   , gate
-  , read
+  , readT0
   , subscribe
   , hold
   , class SignalRecord
@@ -168,17 +168,17 @@ gate cond seed s = owned (gateImpl cond seed s)
 foreign import gateImpl :: forall a. Signal Boolean -> a -> Signal a -> Effect (Signal a)
 
 -- | The current value, without recording a dependency.
-foreign import read :: forall a. Signal a -> Effect a
+foreign import readT0 :: forall a. Signal a -> Effect a
 
 foreign import subscribeImpl :: forall a. Scope -> Signal a -> (a -> Effect Unit) -> Effect Unit
 
 -- | Call the function with the signal's value now and whenever it changes,
 -- | until the current scope is disposed. The callback runs untracked; writes
 -- | it makes are deferred to the start of the next timestep, so every
--- | subscriber in a timestep sees the same values, and a `read` right after
+-- | subscriber in a timestep sees the same values, and a `readT0` right after
 -- | a write still returns the value the timestep started with. Of several
 -- | writes to one source made in one timestep, the last made is the one
--- | applied; `modify` applies its function to the result of the earlier
+-- | applied; `modifyT1` applies its function to the result of the earlier
 -- | ones. The callback never runs re-entrantly.
 subscribe :: forall a. Signal a -> (a -> Effect Unit) -> Owned Unit
 subscribe sig cb = Owned \s -> subscribeImpl s sig cb

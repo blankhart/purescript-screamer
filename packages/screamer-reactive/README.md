@@ -4,7 +4,7 @@ The reactive core: signals, events, sources and scopes, with no DOM. It builds w
 
 | Module | What it has |
 |---|---|
-| `Screamer.Signal` | `Signal`, its instances, `sampleOn`, `dropRepeats*`, `withPrevious`, `merge`, `latestWhere`, `gate`, `catching`, `attempt`, `read`, `subscribe`, `hold` |
+| `Screamer.Signal` | `Signal`, its instances, `sampleOn`, `dropRepeats*`, `withPrevious`, `merge`, `latestWhere`, `gate`, `catching`, `attempt`, `readT0`, `subscribe`, `hold` |
 | `Screamer.Event` | `Event`, its instances, `changes`, `stepper`, `fold`, `tag`, `attach*`, `mapAccum`, `withPrevious`, `startWith`, `dropRepeats*`, `gate`, `oneOf`, `switchEvent`, `subscribe`, `hold` |
 | `Screamer.Source` | `signalSource`, `eventSource`, `batch`, and `focus` and `prop` for a source over part of another's value |
 | `Screamer.Owned` | `Owned`, `onCleanup`, `child`, `runOwned`, `onError` |

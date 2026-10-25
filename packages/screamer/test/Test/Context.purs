@@ -100,8 +100,8 @@ spec = describe "Screamer.Context" do
         ]
     liftEffect (innerHTML "#root") >>= shouldEqual
       "<div><!----><i>a:dark</i><!----><!----><i>row:dark</i><!----><i>plain:dark</i></div>"
-    liftEffect $ tab.put "b"
-    liftEffect $ items.put [ "x", "y" ]
+    liftEffect $ tab.putT1 "b"
+    liftEffect $ items.putT1 [ "x", "y" ]
     liftEffect (innerHTML "#root") >>= shouldEqual
       "<div><!----><i>b:dark</i><!----><!----><i>row:dark</i><i>row:dark</i><!----><i>plain:dark</i></div>"
     liftEffect unmount

@@ -411,13 +411,13 @@ export const eachImpl =
       const m = rows.length;
       let head = 0;
       while (head < n && head < m && compare(keyOf(list[head]))(rows[head].key) === 0) {
-        rows[head].cell.write(list[head]);
+        rows[head].cell.putT1(list[head]);
         head++;
       }
       let tailNew = n;
       let tailOld = m;
       while (tailNew > head && tailOld > head && compare(keyOf(list[tailNew - 1]))(rows[tailOld - 1].key) === 0) {
-        rows[tailOld - 1].cell.write(list[tailNew - 1]);
+        rows[tailOld - 1].cell.putT1(list[tailNew - 1]);
         tailNew--;
         tailOld--;
       }
@@ -479,7 +479,7 @@ export const eachImpl =
           row = makeRow(keys[i], list[i], parent, anchor);
           next[i] = row;
         } else {
-          row.cell.write(list[i]);
+          row.cell.putT1(list[i]);
           if (stay[i] === 0) moveBefore(b, parent, row, anchor);
         }
         anchor = row.first;

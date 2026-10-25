@@ -13,7 +13,7 @@ import Screamer.Owned (Owned, runOwned)
 import Screamer.Pending (settled)
 import Screamer.Renderer (rendererKey)
 import Screamer.Runtime (readStats)
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Test (runSpec)
 import Screamer.Web.MediaQuery as MediaQuery
 import Screamer.Web.Observers as Observers
@@ -34,7 +34,7 @@ onServer setup = do
     calm <- settled
     pure { get, calm }
   value <- liftEffect r.value.get
-  liftEffect (read r.value.calm) >>= shouldEqual true
+  liftEffect (readT0 r.value.calm) >>= shouldEqual true
   liftEffect r.dispose
   after <- liftEffect readStats
   { effects: after.liveEffects - before.liveEffects, scopes: after.liveScopes - before.liveScopes, links: after.links - before.links }
@@ -46,29 +46,29 @@ main = runSpec do
   it "Storage holds the default and drops writes" do
     v <- onServer do
       src <- Storage.localStorage "theme" "light"
-      pure (src.put "dark" *> read src.signal)
+      pure (src.putT1 "dark" *> readT0 src.signal)
     v `shouldEqual` "light"
-    s <- onServer (read <<< _.signal <$> Storage.sessionStorage "tab" "one")
+    s <- onServer (readT0 <<< _.signal <$> Storage.sessionStorage "tab" "one")
     s `shouldEqual` "one"
 
   it "MediaQuery.matches is false" do
-    v <- onServer (read <$> MediaQuery.matches "(min-width: 600px)")
+    v <- onServer (readT0 <$> MediaQuery.matches "(min-width: 600px)")
     v `shouldEqual` false
 
   it "Observers hold their initial values" do
-    size <- onServer (read <$> Observers.resize noElement)
+    size <- onServer (readT0 <$> Observers.resize noElement)
     size `shouldEqual` { width: 0.0, height: 0.0 }
-    seen <- onServer (read <$> Observers.intersecting noElement)
+    seen <- onServer (readT0 <$> Observers.intersecting noElement)
     seen `shouldEqual` false
 
   it "Page.visible and Page.online are true" do
-    v <- onServer (read <$> Page.visible)
+    v <- onServer (readT0 <$> Page.visible)
     v `shouldEqual` true
-    o <- onServer (read <$> Page.online)
+    o <- onServer (readT0 <$> Page.online)
     o `shouldEqual` true
 
   it "WebSocket.connect opens nothing, stays Connecting and drops sends" do
     st <- onServer do
       sock <- WebSocket.connect "ws://example.test/"
-      pure (sock.send "hello" *> (show <$> read sock.state))
+      pure (sock.send "hello" *> (show <$> readT0 sock.state))
     st `shouldEqual` "Connecting"

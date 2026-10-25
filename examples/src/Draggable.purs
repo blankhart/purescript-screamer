@@ -77,7 +77,7 @@ draggable = component do
         , Svg.r_ "30"
         , Svg.fill_ colour
         , Svg.stroke_ (drag <#> \d -> if map _.index d.dragging == Just i then "black" else "none")
-        , H.onPointerDown_ \e -> pointer.fire (Down i (point e))
+        , H.onPointerDown_ \e -> pointer.fireT1 (Down i (point e))
         ]
         []
     position :: Int -> (Point -> Number) -> Signal String
@@ -91,8 +91,8 @@ draggable = component do
         , Svg.height_ "200"
         , Svg.viewBox_ "0 0 400 200"
         , A.style_ { "touch-action": "none", display: "block" }
-        , H.onPointerMove_ \e -> pointer.fire (Move (point e))
-        , H.onPointerUp_ \_ -> pointer.fire Up
+        , H.onPointerMove_ \e -> pointer.fireT1 (Move (point e))
+        , H.onPointerUp_ \_ -> pointer.fireT1 Up
         ]
         (Array.mapWithIndex circle colours)
     ]

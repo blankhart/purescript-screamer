@@ -37,6 +37,6 @@ follow now listen = do
   if not live then pure (pure true)
   else do
     src <- liftEffect $ signalSource =<< now
-    stop <- liftEffect $ listen (batch (src.put =<< now))
+    stop <- liftEffect $ listen (batch (src.putT1 =<< now))
     onCleanup stop
     pure src.signal

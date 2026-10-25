@@ -18,10 +18,14 @@
 // graph. A node bumps its version only when its value changes under its
 // equality, so unchanged results stop propagation.
 //
-// A write made by an effect, or anywhere during a flush, is deferred to the
-// start of the next round, as a fire is. So every effect in a round sees the same
+// Names that write say which round they act on: T0 is the current round, T1
+// the next. `putT1`, `modifyT1` and `fireT1` take effect when the next round
+// starts. A write made by an effect, during a flush or inside a batch is
+// deferred to then, as a fire is, so every effect in a round sees the same
 // value of every cell, whatever order the effects were created in, and a
-// read right after such a write still returns the round's value.
+// read right after such a write still returns the round's value. `readT1`
+// gives the value the next round will start with. A write outside all of
+// these starts the next round at once.
 
 declare const __DEV__: boolean | undefined;
 
@@ -225,14 +229,17 @@ export class Cell<T> implements Source<T> {
   }
 
   /**
-   * Set the value. A write made by an effect, or anywhere during a flush,
-   * is deferred to the start of the next round, like a fire: every effect
-   * in a round sees the value the round started with. Of several writes to
-   * one cell deferred from one round, the last made is the one applied.
+   * Set the value from the start of the next round. A write made by an
+   * effect, during a flush or inside a batch is deferred to then, like a
+   * fire: every effect in a round sees the value the round started with,
+   * and `read` returns it until the next round. Of several writes to one
+   * cell deferred to one round, the last made is the one applied. A write
+   * outside all of these starts the next round at once.
    */
-  write(x: T): void {
+  putT1(x: T): void {
     if (DEV && inDerived > 0) throw new Error('write inside a derivation');
-    if (inEffect > 0 || flushing > 0) {
+    // Effects only run inside a batch or a flush, both of which count here.
+    if (batchDepth > 0) {
       if (!this.deferred) {
         this.deferred = true;
         written.push(this);
@@ -240,16 +247,16 @@ export class Cell<T> implements Source<T> {
       this.next = x;
       return;
     }
-    this.writeNow(x);
+    this.putT0(x);
   }
 
   /**
    * Set the value at once, even inside an effect or a flush. For runtime
    * bookkeeping that the writer reads back synchronously, such as the
    * pending-work counts behind `suspense`; it brings back the order
-   * dependence that `write` avoids. A cell uses one or the other.
+   * dependence that `putT1` avoids. A cell uses one or the other.
    */
-  writeNow(x: T): void {
+  putT0(x: T): void {
     if (DEV && inDerived > 0) throw new Error('write inside a derivation');
     if (this.eq(x, this.value)) return;
     this.value = x;
@@ -265,13 +272,13 @@ export class Cell<T> implements Source<T> {
   }
 
   /** The value including a deferred write: what the next round will start with. */
-  latest(): T {
+  readT1(): T {
     return this.deferred ? this.next : this.value;
   }
 
-  /** Write `f` of the latest value, so deferred updates compose. */
-  modify(f: (x: T) => T): void {
-    this.write(f(this.latest()));
+  /** `putT1` of `f` of `readT1()`, so deferred updates compose. */
+  modifyT1(f: (x: T) => T): void {
+    this.putT1(f(this.readT1()));
   }
 }
 
@@ -986,7 +993,7 @@ function flush(): void {
 // list, and otherwise takes nothing. So each consumer sees each occurrence
 // once, however many times it is read.
 //
-// - Rounds. `fire` queues an occurrence on its source. Each pass of the flush
+// - Rounds. `fireT1` queues an occurrence on its source. Each pass of the flush
 //   loop starts a round: queued occurrences become their sources' values
 //   (one version step per source per round) and observers are notified.
 //   Occurrences fired while a round runs belong to the next round.
@@ -1092,7 +1099,7 @@ export class EventSourceNode<T> implements EventLike<T> {
   refresh(): void {}
 
   /** Add an occurrence. It is delivered when the next round starts. */
-  fire(x: T): void {
+  fireT1(x: T): void {
     if (DEV && inDerived > 0) throw new Error('fire inside a derivation');
     // Nothing observes the event, so the occurrence goes nowhere.
     if (this.targets.size === 0) return;

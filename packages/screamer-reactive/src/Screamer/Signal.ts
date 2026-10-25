@@ -88,7 +88,7 @@ export const latestWhereImpl = <A>(p: (a: A) => boolean) => (seed: A) => (s: S<A
 
 export const gateImpl = <A>(cond: S<boolean>) => (seed: A) => (s: S<A>) => (): S<A> => gateSignal(cond, seed, s);
 
-export const read = <A>(s: S<A>) => (): A => R.sample(s);
+export const readT0 = <A>(s: S<A>) => (): A => R.sample(s);
 
 export const subscribeImpl = <A>(s: Runtime.Scope) => (sig: S<A>) => (cb: (a: A) => () => void) => () => {
   R.runInScope(s, () => {

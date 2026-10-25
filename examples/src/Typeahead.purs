@@ -28,7 +28,7 @@ import Screamer.Html.Attributes (InputType(..))
 import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry)
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Source (eventSource, signalSource)
 import Screamer.Time as Time
 import Web.Event.Event (preventDefault, target)
@@ -111,12 +111,12 @@ typeahead = component do
           Failed e -> "Search failed: " <> message e
           _ -> count (Array.length rs)
     choose = do
-      rs <- read shown
-      s <- read selection
-      for_ (Array.index rs s.index) chosen.put
+      rs <- readT0 shown
+      s <- readT0 selection
+      for_ (Array.index rs s.index) chosen.putT1
     onKey e = case key e of
-      "ArrowDown" -> preventDefault (toEvent e) *> keys.fire Down
-      "ArrowUp" -> preventDefault (toEvent e) *> keys.fire Up
+      "ArrowDown" -> preventDefault (toEvent e) *> keys.fireT1 Down
+      "ArrowUp" -> preventDefault (toEvent e) *> keys.fireT1 Up
       "Enter" -> preventDefault (toEvent e) *> choose
       _ -> pure unit
     rows = shown <#> Array.mapWithIndex \index name -> { index, name }
@@ -129,8 +129,8 @@ typeahead = component do
         , H.onInput_ \e -> case Input.fromEventTarget =<< target e of
             Just input -> do
               q <- Input.value input
-              draft.put q
-              typed.fire q
+              draft.putT1 q
+              typed.fireT1 q
             Nothing -> pure unit
         , H.onKeyDown_ onKey
         ]

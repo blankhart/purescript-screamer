@@ -45,7 +45,7 @@ import Screamer.Event (Event)
 import Screamer.Event as Event
 import Screamer.Host (host)
 import Screamer.Owned (Owned, onCleanup)
-import Screamer.Signal (Signal, hold, read)
+import Screamer.Signal (Signal, hold, readT0)
 import Screamer.Source (batch, eventSource, signalSource)
 
 -- | The scope's host, with each callback run inside `batch`.
@@ -89,7 +89,7 @@ clock :: Milliseconds -> Owned (Signal Instant)
 clock (Milliseconds ms) = do
   t <- timers
   time <- liftEffect $ signalSource <<< toInstant =<< t.now
-  cancel <- liftEffect $ t.interval ms (time.put <<< toInstant =<< t.now)
+  cancel <- liftEffect $ t.interval ms (time.putT1 <<< toInstant =<< t.now)
   onCleanup cancel
   pure time.signal
 
@@ -98,7 +98,7 @@ interval :: Milliseconds -> Owned (Event Unit)
 interval (Milliseconds ms) = do
   t <- timers
   out <- liftEffect eventSource
-  cancel <- liftEffect $ t.interval ms (out.fire unit)
+  cancel <- liftEffect $ t.interval ms (out.fireT1 unit)
   onCleanup cancel
   pure out.event
 
@@ -108,7 +108,7 @@ after :: Milliseconds -> Owned (Event Unit)
 after (Milliseconds ms) = do
   t <- timers
   out <- liftEffect eventSource
-  cancel <- liftEffect $ t.timeout ms (out.fire unit)
+  cancel <- liftEffect $ t.timeout ms (out.fireT1 unit)
   onCleanup cancel
   pure out.event
 
@@ -122,7 +122,7 @@ frames = do
   let
     loop _ = timer.start $ t.frame \ts -> do
       loop unit
-      out.fire ts
+      out.fireT1 ts
   liftEffect $ loop unit
   pure out.event
 
@@ -133,7 +133,7 @@ debounce (Milliseconds ms) input = do
   t <- timers
   out <- liftEffect eventSource
   timer <- slot
-  Event.subscribe input \a -> timer.start (t.timeout ms (timerDone timer *> out.fire a))
+  Event.subscribe input \a -> timer.start (t.timeout ms (timerDone timer *> out.fireT1 a))
   pure out.event
 
 -- | The signal's value once it has stopped changing for the interval. It
@@ -141,9 +141,9 @@ debounce (Milliseconds ms) input = do
 -- | `debounce`.
 debounceSignal :: forall a. Milliseconds -> Signal a -> Owned (Signal a)
 debounceSignal ms input = do
-  out <- liftEffect $ signalSource =<< read input
+  out <- liftEffect $ signalSource =<< readT0 input
   settled <- debounce ms (Event.changes input)
-  Event.subscribe settled out.put
+  Event.subscribe settled out.putT1
   pure out.signal
 
 -- | At most one occurrence per interval. With `leading`, the first
@@ -161,14 +161,14 @@ throttle { leading, trailing } (Milliseconds ms) input = do
     close _ = do
       timerDone timer
       Ref.modify' (\p -> { state: Nothing, value: p }) pending >>= case _ of
-        Just a | trailing -> out.fire a *> open unit
+        Just a | trailing -> out.fireT1 a *> open unit
         _ -> pure unit
   Event.subscribe input \a -> do
     inWindow <- timer.busy
     if inWindow then
       when trailing $ Ref.write (Just a) pending
     else do
-      if leading then out.fire a else Ref.write (Just a) pending
+      if leading then out.fireT1 a else Ref.write (Just a) pending
       open unit
   pure out.event
 
@@ -185,7 +185,7 @@ audit (Milliseconds ms) input = do
     waiting <- timer.busy
     unless waiting $ timer.start $ t.timeout ms do
       timerDone timer
-      Ref.modify' (\l -> { state: Nothing, value: l }) latest >>= traverse_ out.fire
+      Ref.modify' (\l -> { state: Nothing, value: l }) latest >>= traverse_ out.fireT1
   pure out.event
 
 -- | The signal's value at every interval, starting one interval from now.
@@ -196,7 +196,7 @@ sampleEvery (Milliseconds ms) input = do
   t <- timers
   out <- liftEffect eventSource
   _ <- hold input
-  cancel <- liftEffect $ t.interval ms (out.fire =<< read input)
+  cancel <- liftEffect $ t.interval ms (out.fireT1 =<< readT0 input)
   onCleanup cancel
   pure out.event
 
@@ -212,7 +212,7 @@ delay (Milliseconds ms) input = do
     id <- Ref.modify' (\i -> { state: i + 1, value: i }) next
     cancel <- t.timeout ms do
       Ref.modify_ (Array.filter ((_ /= id) <<< _.id)) pending
-      out.fire a
+      out.fireT1 a
     Ref.modify_ (_ <> [ { id, cancel } ]) pending
   onCleanup do
     ps <- Ref.modify' (\ps -> { state: [], value: ps }) pending
@@ -228,10 +228,10 @@ timeout (Milliseconds ms) input = do
   t <- timers
   out <- liftEffect eventSource
   timer <- slot
-  let arm = timer.start (t.timeout ms (timerDone timer *> out.fire (Left unit)))
+  let arm = timer.start (t.timeout ms (timerDone timer *> out.fireT1 (Left unit)))
   liftEffect arm
   Event.subscribe input \a -> do
-    out.fire (Right a)
+    out.fireT1 (Right a)
     arm
   pure out.event
 
@@ -248,7 +248,7 @@ onFrame input = do
     waiting <- timer.busy
     unless waiting $ timer.start $ t.frame \_ -> do
       timerDone timer
-      Ref.modify' (\l -> { state: Nothing, value: l }) latest >>= traverse_ out.fire
+      Ref.modify' (\l -> { state: Nothing, value: l }) latest >>= traverse_ out.fireT1
   pure out.event
 
 -- | Mark the slot's timer as having run, so `busy` turns false.
@@ -267,6 +267,6 @@ bufferFor (Milliseconds ms) input = do
   Event.subscribe input \a -> Ref.modify_ (_ <> [ a ]) held
   cancel <- liftEffect $ t.interval ms do
     xs <- Ref.modify' (\xs -> { state: [], value: xs }) held
-    unless (Array.null xs) $ out.fire xs
+    unless (Array.null xs) $ out.fireT1 xs
   onCleanup (cancel *> Ref.write [] held)
   pure out.event

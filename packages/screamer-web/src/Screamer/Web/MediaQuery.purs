@@ -23,7 +23,7 @@ matches query = do
   if not live then pure (pure false)
   else do
     src <- liftEffect $ signalSource false
-    m <- liftEffect $ matchImpl query \v -> batch (src.put v)
-    liftEffect $ src.put m.now
+    m <- liftEffect $ matchImpl query \v -> batch (src.putT1 v)
+    liftEffect $ src.putT1 m.now
     onCleanup m.stop
     pure src.signal

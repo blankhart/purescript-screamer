@@ -11,7 +11,7 @@ import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Screamer.Owned (runOwned)
 import Screamer.Runtime (Stats, readStats)
-import Screamer.Signal (read)
+import Screamer.Signal (readT0)
 import Screamer.Source (batch, eventSource, signalSource)
 import Screamer.Time as Time
 import Screamer.Test (observe, observeE)
@@ -30,11 +30,11 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     r <- liftEffect $ runOwned (Time.debounce (ms 100.0) src.event)
     o <- liftEffect $ observeE r.value
     liftEffect do
-      src.fire 1
+      src.fireT1 1
       Fake.advance 50.0
-      src.fire 2
+      src.fireT1 2
       Fake.advance 50.0
-      src.fire 3
+      src.fireT1 3
       Fake.advance 99.0
     liftEffect o.trace >>= shouldEqual []
     liftEffect $ Fake.advance 1.0
@@ -48,9 +48,9 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     r <- liftEffect $ runOwned (Time.debounceSignal (ms 100.0) s.signal)
     o <- liftEffect $ observe r.value
     liftEffect do
-      s.put "ab"
+      s.putT1 "ab"
       Fake.advance 50.0
-      s.put "abc"
+      s.putT1 "abc"
       Fake.advance 100.0
     liftEffect o.trace >>= shouldEqual [ "a", "abc" ]
     liftEffect (o.stop *> r.dispose)
@@ -64,14 +64,14 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     ot <- liftEffect $ observeE trail.value
     ob <- liftEffect $ observeE both.value
     liftEffect do
-      src.fire 1
+      src.fireT1 1
       Fake.advance 30.0
-      src.fire 2
+      src.fireT1 2
       Fake.advance 30.0
-      src.fire 3
+      src.fireT1 3
       Fake.advance 100.0
       Fake.advance 300.0
-      src.fire 4
+      src.fireT1 4
       Fake.advance 300.0
     liftEffect ol.trace >>= shouldEqual [ 1, 4 ]
     liftEffect ot.trace >>= shouldEqual [ 3, 4 ]
@@ -83,11 +83,11 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     r <- liftEffect $ runOwned (Time.audit (ms 100.0) src.event)
     o <- liftEffect $ observeE r.value
     liftEffect do
-      src.fire 1
+      src.fireT1 1
       Fake.advance 60.0
-      src.fire 2
+      src.fireT1 2
       Fake.advance 60.0
-      src.fire 3
+      src.fireT1 3
       Fake.advance 100.0
     liftEffect o.trace >>= shouldEqual [ 2, 3 ]
     liftEffect (o.stop *> r.dispose)
@@ -98,7 +98,7 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     o <- liftEffect $ observeE r.value
     liftEffect do
       Fake.advance 100.0
-      s.put 2
+      s.putT1 2
       Fake.advance 100.0
       Fake.advance 100.0
     liftEffect o.trace >>= shouldEqual [ 1, 2, 2 ]
@@ -110,9 +110,9 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     r <- liftEffect $ runOwned (Time.delay (ms 100.0) src.event)
     o <- liftEffect $ observeE r.value
     liftEffect do
-      batch (src.fire 1 *> src.fire 2)
+      batch (src.fireT1 1 *> src.fireT1 2)
       Fake.advance 50.0
-      src.fire 3
+      src.fireT1 3
       Fake.advance 50.0
     liftEffect o.trace >>= shouldEqual [ 1, 2 ]
     liftEffect Fake.pendingTimers >>= shouldEqual 1
@@ -129,9 +129,9 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     liftEffect do
       Fake.advance 100.0
       Fake.advance 500.0
-      src.fire "a"
+      src.fireT1 "a"
       Fake.advance 50.0
-      src.fire "b"
+      src.fireT1 "b"
       Fake.advance 100.0
     liftEffect o.trace >>= shouldEqual [ Left unit, Right "a", Right "b", Left unit ]
     liftEffect (o.stop *> r.dispose)
@@ -140,10 +140,10 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     src <- liftEffect eventSource
     r <- liftEffect $ runOwned (Time.onFrame src.event)
     o <- liftEffect $ observeE r.value
-    liftEffect $ traverse_ src.fire [ 1, 2, 3 ]
+    liftEffect $ traverse_ src.fireT1 [ 1, 2, 3 ]
     liftEffect o.trace >>= shouldEqual []
     liftEffect $ Fake.frame 16.0
-    liftEffect $ src.fire 4
+    liftEffect $ src.fireT1 4
     liftEffect $ Fake.frame 32.0
     liftEffect o.trace >>= shouldEqual [ 3, 4 ]
     liftEffect (o.stop *> r.dispose)
@@ -154,10 +154,10 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
     r <- liftEffect $ runOwned (Time.bufferFor (ms 100.0) src.event)
     o <- liftEffect $ observeE r.value
     liftEffect do
-      traverse_ src.fire [ 1, 2 ]
+      traverse_ src.fireT1 [ 1, 2 ]
       Fake.advance 100.0
       Fake.advance 100.0
-      src.fire 3
+      src.fireT1 3
       Fake.advance 50.0
     liftEffect o.trace >>= shouldEqual [ [ 1, 2 ] ]
     liftEffect r.dispose
@@ -180,14 +180,14 @@ spec = before_ (liftEffect (Fake.installFakeTimers *> Fake.installFakeFrames)) $
       _ <- Time.bufferFor (ms 10.0) src.event
       _ <- Time.sampleEvery (ms 10.0) s.signal
       Time.debounceSignal (ms 10.0) s.signal
-    liftEffect $ src.fire 1
+    liftEffect $ src.fireT1 1
     liftEffect r.dispose
     liftEffect Fake.pendingTimers >>= shouldEqual 0
     liftEffect Fake.pendingFrames >>= shouldEqual 0
     after <- liftEffect readStats
     { effects: after.liveEffects - before.liveEffects, scopes: after.liveScopes - before.liveScopes, links: after.links - before.links }
       `shouldEqual` { effects: 0, scopes: 0, links: 0 }
-    liftEffect (read r.value) >>= shouldEqual 0
+    liftEffect (readT0 r.value) >>= shouldEqual 0
 
 -- | Nothing live is left over from `before`: no effect, scope or link.
 shouldBeReleasedSince :: Stats -> Aff Unit
@@ -202,7 +202,7 @@ sources = describe "sources" do
     before <- liftEffect readStats
     r <- liftEffect $ runOwned (Time.clock (ms 100.0))
     o <- liftEffect $ observe r.value
-    let millis = map (un Milliseconds <<< unInstant) (read r.value)
+    let millis = map (un Milliseconds <<< unInstant) (readT0 r.value)
     t0 <- liftEffect millis
     liftEffect $ Fake.advance 250.0
     t1 <- liftEffect millis

@@ -19,7 +19,7 @@ describe('prototype checks', () => {
       });
     });
     stop();
-    src.write(2);
+    src.putT1(2);
     assert.equal(esc.read(), 20);
   });
 
@@ -44,7 +44,7 @@ describe('prototype checks', () => {
     const r = map((x: number) => x * 2, a);
     const seen: string[] = [];
     scope(() => { effect(() => { seen.push(`${l.read()}/${r.read()}`); }); });
-    a.write(5);
+    a.putT1(5);
     assert.equal(seen.join(' '), '2/2 6/10');
   });
 
@@ -53,8 +53,8 @@ describe('prototype checks', () => {
     const parity = map((x: number) => x % 2, a);
     let runs = 0;
     scope(() => { effect(() => { parity.read(); runs++; }); });
-    a.write(1);
-    a.write(3);
+    a.putT1(1);
+    a.putT1(3);
     assert.equal(runs, 1);
   });
 
@@ -63,9 +63,9 @@ describe('prototype checks', () => {
     const d = derived(() => ({ n: a.read().n }), (x, y) => x.n === y.n);
     let runs = 0;
     scope(() => { effect(() => { d.read(); runs++; }); });
-    a.write({ n: 1 });
+    a.putT1({ n: 1 });
     assert.equal(runs, 1);
-    a.write({ n: 2 });
+    a.putT1({ n: 2 });
     assert.equal(runs, 2);
   });
 
@@ -76,9 +76,9 @@ describe('prototype checks', () => {
     const seen: string[] = [];
     const s = bind(which, (w) => (w ? x : y));
     scope(() => { effect(() => { seen.push(s.read()); }); });
-    which.write(false);
-    x.write('x1');
-    y.write('y1');
+    which.putT1(false);
+    x.putT1('x1');
+    y.putT1('y1');
     assert.equal(seen.join(' '), 'x0 y0 y1');
     assert.equal(x.targets.size, 0);
   });
@@ -102,7 +102,7 @@ describe('prototype checks', () => {
   test('11 writes inside a derivation are rejected', () => {
     const a = cell(0);
     const b = cell(0);
-    assert.throws(() => map((x: number) => { b.write(x); return x; }, a).read(), /write inside a derivation/);
+    assert.throws(() => map((x: number) => { b.putT1(x); return x; }, a).read(), /write inside a derivation/);
   });
 
   test('12a effect writes propagate in a later round', () => {
@@ -110,10 +110,10 @@ describe('prototype checks', () => {
     const b = cell(0);
     const seen: number[] = [];
     scope(() => {
-      effect(() => { b.write(a.read() * 2); });
+      effect(() => { b.putT1(a.read() * 2); });
       effect(() => { seen.push(b.read()); });
     });
-    a.write(1);
+    a.putT1(1);
     assert.equal(seen.join(' '), '0 2');
   });
 
@@ -122,7 +122,7 @@ describe('prototype checks', () => {
     // The first run's write is deferred to the next round, where the effect
     // is linked, so the loop shows up as soon as the scope is set up.
     const s = createScope(null);
-    assert.throws(() => batch(() => runInScope(s, () => { effect(() => { c.write(c.read() + 1); }); })), /effect loop/);
+    assert.throws(() => batch(() => runInScope(s, () => { effect(() => { c.putT1(c.read() + 1); }); })), /effect loop/);
     s.dispose();
   });
 });
@@ -138,12 +138,12 @@ describe('regressions from the previous runtime', () => {
         if (made === null) made = map((x: number) => x + 1, src);
       });
     });
-    trigger.write(1);
-    src.write(5);
+    trigger.putT1(1);
+    src.putT1(5);
     assert.equal(made!.read(), 6);
     const seen: number[] = [];
     const stop2 = scope(() => { effect(() => { seen.push(made!.read()); }); });
-    src.write(7);
+    src.putT1(7);
     assert.deepEqual(seen, [6, 8]);
     stop();
     stop2();
@@ -172,15 +172,15 @@ describe('regressions from the previous runtime', () => {
         t.read();
         if (inner) inner();
         inner = scope(() => {
-          effect(() => { merged.write(a.read()); });
-          effect(() => { merged.write(b.read()); });
+          effect(() => { merged.putT1(a.read()); });
+          effect(() => { merged.putT1(b.read()); });
         }, outer);
       });
     });
-    t.write(1);
-    b.write('b1');
+    t.putT1(1);
+    b.putT1('b1');
     assert.equal(merged.read(), 'b1');
-    a.write('a1');
+    a.putT1('a1');
     assert.equal(merged.read(), 'a1');
     stop();
     assert.equal(a.targets.size + b.targets.size + t.targets.size, 0);
@@ -230,10 +230,10 @@ describe('exceptions', () => {
     const s = createScope(null);
     s.onError = (e) => { errors.push(e); seen.push('error'); };
     runInScope(s, () => effect(() => { seen.push(d.read()); }));
-    a.write(-1);
+    a.putT1(-1);
     assert.equal(errors.length, 1);
     assert.throws(() => d.read(), /negative/);
-    a.write(3);
+    a.putT1(3);
     assert.deepEqual(seen, [2, 'error', 6]);
     s.dispose();
     assert.equal(a.targets.size, 0);
@@ -246,7 +246,7 @@ describe('exceptions', () => {
     const s = createScope(null);
     s.onError = () => { seen.push('error'); };
     runInScope(s, () => effect(() => { seen.push(d.read()); }));
-    a.write(4);
+    a.putT1(4);
     assert.deepEqual(seen, ['error', 4]);
     s.dispose();
     assert.equal(a.targets.size, 0);
@@ -262,8 +262,8 @@ describe('exceptions', () => {
       effect(() => { if (a.read() === 1) throw new Error('boom'); });
       effect(() => { seen.push(a.read()); });
     });
-    a.write(1);
-    a.write(2);
+    a.putT1(1);
+    a.putT1(2);
     assert.deepEqual(seen, [0, 1, 2]);
     assert.equal(errors.length, 1);
     s.dispose();
@@ -276,9 +276,9 @@ describe('exceptions', () => {
       effect(() => { if (a.read() === 1) throw new Error('boom'); });
       effect(() => { seen.push(a.read()); });
     });
-    assert.throws(() => a.write(1), /boom/);
+    assert.throws(() => a.putT1(1), /boom/);
     assert.deepEqual(seen, [0, 1]);
-    a.write(2);
+    a.putT1(2);
     assert.deepEqual(seen, [0, 1, 2]);
     stop();
   });
@@ -299,7 +299,7 @@ describe('misc', () => {
     d.read();
     d.read();
     assert.equal(runs, 1);
-    a.write(2);
+    a.putT1(2);
     d.read();
     d.read();
     assert.equal(runs, 2);
@@ -310,8 +310,8 @@ describe('misc', () => {
     const b = cell(10);
     const seen: number[] = [];
     scope(() => { effect(() => { seen.push(a.read() + sample(b)); }); });
-    b.write(20);
-    a.write(2);
+    b.putT1(20);
+    a.putT1(2);
     assert.deepEqual(seen, [11, 22]);
   });
 
@@ -320,7 +320,7 @@ describe('misc', () => {
     const b = cell(2);
     const seen: number[] = [];
     scope(() => { effect(() => { seen.push(a.read() + b.read()); }); });
-    batch(() => { a.write(10); b.write(20); });
+    batch(() => { a.putT1(10); b.putT1(20); });
     assert.deepEqual(seen, [3, 30]);
   });
 
@@ -332,7 +332,7 @@ describe('misc', () => {
       effect(() => { a.read(); order.push('second'); });
     });
     order.length = 0;
-    a.write(1);
+    a.putT1(1);
     assert.deepEqual(order, ['first', 'second']);
   });
 
@@ -383,7 +383,7 @@ function fuzz(seed: number): { checks: number; bad: number } {
       for (const k of watched) runs[k] = 0;
       batch(() => {
         const n = 1 + Math.floor(rnd() * 3);
-        for (let w = 0; w < n; w++) cells[Math.floor(rnd() * 5)].write(Math.floor(rnd() * 5));
+        for (let w = 0; w < n; w++) cells[Math.floor(rnd() * 5)].putT1(Math.floor(rnd() * 5));
       });
       const vals = cells.map((c) => c.value);
       for (const k of watched) {
@@ -417,13 +417,13 @@ describe('writes from effects (#70)', () => {
     const a = cell(0);
     const c = cell(0);
     const log: string[] = [];
-    const W = () => effect(() => { const v = a.read(); untracked(() => c.write(v * 10)); });
+    const W = () => effect(() => { const v = a.read(); untracked(() => c.putT1(v * 10)); });
     const R = () => effect(() => { log.push(`a=${a.read()} c=${c.read()}`); });
     const stop = scope(() => {
       if (order === 'WR') { W(); R(); } else { R(); W(); }
     });
     log.length = 0;
-    a.write(1);
+    a.putT1(1);
     stop();
     return log;
   };
@@ -440,12 +440,12 @@ describe('writes from effects (#70)', () => {
     const stop = scope(() => {
       effect(() => {
         const v = a.read();
-        untracked(() => { c.write(v + 1); seen.push(c.read()); });
+        untracked(() => { c.putT1(v + 1); seen.push(c.read()); });
       });
     });
     assert.deepEqual(seen, [0]);
     assert.equal(c.read(), 1);
-    a.write(5);
+    a.putT1(5);
     assert.deepEqual(seen, [0, 1]);
     assert.equal(c.read(), 6);
     stop();
@@ -461,10 +461,10 @@ describe('writes from effects (#70)', () => {
       effect(() => {
         const v = a.read();
         if (v === 0) return;
-        untracked(() => { c.write(v); e.fire(v); });
+        untracked(() => { c.putT1(v); e.fireT1(v); });
       });
     });
-    a.write(3);
+    a.putT1(3);
     assert.deepEqual(seen, ['e=3 c=3']);
     stop();
   });
@@ -475,11 +475,11 @@ describe('writes from effects (#70)', () => {
     const seen: string[] = [];
     const stop = scope(() => {
       effect(() => { seen.push(c.read()); });
-      effect(() => { const v = a.read(); untracked(() => c.write(`x${v}`)); });
-      effect(() => { const v = a.read(); untracked(() => c.write(`y${v}`)); });
+      effect(() => { const v = a.read(); untracked(() => c.putT1(`x${v}`)); });
+      effect(() => { const v = a.read(); untracked(() => c.putT1(`y${v}`)); });
     });
     seen.length = 0;
-    a.write(1);
+    a.putT1(1);
     // Effects run in creation order within a round, so y's write is last.
     assert.deepEqual(seen, ['y1']);
     stop();
@@ -489,10 +489,10 @@ describe('writes from effects (#70)', () => {
     const a = cell(0);
     const n = cell(0);
     const stop = scope(() => {
-      effect(() => { if (a.read() > 0) untracked(() => n.modify((x) => x + 1)); });
-      effect(() => { if (a.read() > 0) untracked(() => n.modify((x) => x * 10)); });
+      effect(() => { if (a.read() > 0) untracked(() => n.modifyT1((x) => x + 1)); });
+      effect(() => { if (a.read() > 0) untracked(() => n.modifyT1((x) => x * 10)); });
     });
-    a.write(1);
+    a.putT1(1);
     assert.equal(n.read(), 10);
     stop();
   });
@@ -503,21 +503,29 @@ describe('writes from effects (#70)', () => {
     let runs = 0;
     const stop = scope(() => {
       effect(() => { c.read(); runs++; });
-      effect(() => { a.read(); untracked(() => { c.write(8); c.write(7); }); });
+      effect(() => { a.read(); untracked(() => { c.putT1(8); c.putT1(7); }); });
     });
     const before = runs;
     const v = c.version;
-    a.write(1);
+    a.putT1(1);
     assert.equal(c.version, v);
     assert.equal(runs, before);
     stop();
   });
 
-  test('a write outside any effect or flush still takes effect at once', () => {
+  test('a write inside a batch takes effect when the batch ends', () => {
     const c = cell(0);
     batch(() => {
-      c.write(1);
-      assert.equal(c.read(), 1);
+      c.putT1(1);
+      assert.equal(c.read(), 0);
+      assert.equal(c.readT1(), 1);
     });
+    assert.equal(c.read(), 1);
+  });
+
+  test('a write outside any batch, effect or flush takes effect at once', () => {
+    const c = cell(0);
+    c.putT1(1);
+    assert.equal(c.read(), 1);
   });
 });
