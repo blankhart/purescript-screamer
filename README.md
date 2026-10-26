@@ -93,77 +93,9 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 
 **Embedding JS widgets.** A widget that owns its DOM subtree (an editor, a map, a chart) goes in `foreign_ setup tag attrs`, which creates the host element and runs `setup host :: Owned Unit` once per instance. Create the widget there and destroy it in `onCleanup`. Sync both ways with guards: push a signal in with `subscribe`, skipping values equal to what the widget already shows so the user's edits do not loop back; report the widget's own changes out through a callback wrapped in `batch`, ignoring changes the wrapper made itself. Screamer never touches the host's children. `foreignWithFallback_` adds children shown where the widget cannot run, such as on a server renderer, whose backend is not interactive. See `examples/src/CodeMirror.purs`.
 
-## Combinators
+## Examples
 
-Most RxJS operators have a counterpart, pure where it can be and `Owned` where it starts timers or requests. The common ones:
-
-| RxJS | Screamer |
-|---|---|
-| `map`, `filter`, `scan` | `map`, `filter`, `Event.fold` / `Event.mapAccum` |
-| `distinctUntilChanged` | `Event.dropRepeats`, `Signal.dropRepeats` |
-| `merge`, `combineLatest`, `withLatestFrom` | `<\|>` / `Event.oneOf`, `ado` / `Signal.Extra.combine`, `Event.attachWith` |
-| `switchMap`, `mergeMap`, `concatMap`, `exhaustMap` | `Resource.resourceWith` / `request` with `Switch`, `Merge`, `Concat`, `Exhaust`; `Flatten.switchOwned` etc. for owned inner work |
-| `debounceTime`, `throttleTime`, `delay` | `Time.debounce`, `Time.throttle`, `Time.delay` (`Owned`) |
-| `catchError`, `retry` | `Signal.catching`, `Resource.retry` |
-| `share`, `shareReplay(1)` | bind once with `let`; `hold` / `Event.hold` |
-
-`examples/src/Typeahead.purs` uses them together: a debounced, deduplicated query sent with `resourceWith Switch` and `retry`, results kept on screen with `keepLast` while the next ones load, and keyboard selection as a held `Event.fold`.
-
-## Migrating from the observable API
-
-| Before | Now |
-|---|---|
-| `Screamer.Observable` | `Screamer.Signal` (pure signals) and `Screamer.Source` (`signalSource`, `batch`) |
-| `Screamer.Channel`, `Channel`, `channel` | `Screamer.Source`, `SignalSource`, `signalSource` |
-| `get` | `readT0` |
-| `elements_` | `each key` (keyed rows, each row receives a `Signal` of its item) |
-| `distinct`, `nonequal` | `dropRepeats` (in `Owned`) |
-| `a <> b` on signals, meaning "the latest of the two" | `a <|> b` (`<>` now combines the values: `append <$> a <*> b`) |
-| `Signal (Effect a)` for dynamic content | `dyn` over a signal of elements, with `component` for per-instance setup |
-| `emit` | keep the action in a `Ref`, or `putT1` to a signal source |
-| `S.mount` returning `Unit` | `mount` returning the unmount action |
-| `Screamer.DOM.Event` | the `Web.*` event types, passed to handlers directly |
-
-### Renamed modules
-
-Nothing is called `Core` any more, the two source modules are one, and the generated modules are named for what they contain. `import Screamer` brings in what most components need: `Element`, `text`, `dyn`, `each`, `component`, `mount`, the `Signal` and `Event` types, `signalSource`, `eventSource`, `batch`, `Owned`, `onCleanup` and `liftEffect`.
-
-| Before | Now |
-|---|---|
-| `Screamer.Reactive.Core` | `Screamer.Runtime` |
-| `Screamer.Core` | `Screamer.Element` |
-| `Screamer.SignalSource`, `Screamer.EventSource` | `Screamer.Source` |
-| `Screamer.DOM.Element` | `Screamer.Html` |
-| `Screamer.DOM.Attribute` | `Screamer.Html.Attributes` |
-| `Screamer.DOM.EventHandler` | `Screamer.Html.Handlers` |
-| `Screamer.DOM.Svg` | `Screamer.Svg` |
-| `Screamer.Internal` | removed (unused) |
-| `Screamer.Subscriptions.WebSocket` | `Screamer.Web.WebSocket` (screamer-web) |
-| `Screamer.Subscriptions.Router` | `Screamer.Router` (screamer-router) |
-| `Screamer.Examples.Formlet` | `Screamer.Form` (screamer-forms) |
-| attributes in `Screamer.Element` | `Screamer.Attribute` |
-| `Event.take`, `zip`, `race`, buffering, …; `Signal.combine`, `withLatest`, `history`, `switchLatest` | `Screamer.Event.Extra`, `Screamer.Signal.Extra` (screamer-combinators) |
-
-### Signal and Event alignment
-
-| Before | Now |
-|---|---|
-| `Signal.fold f seed s` | `Event.fold f seed (Event.changes s)`: accumulation is over events |
-| `Owned.subscribe`, `Owned.hold` | `Signal.subscribe`, `Signal.hold`, next to `Event.subscribe`, `Event.hold` |
-| `Signal.filter` | `Signal.latestWhere` |
-| `Signal.filterOn` | `Signal.gate` |
-| `Subscriptions.Timer.every` | `Time.clock :: Milliseconds -> Owned (Signal Instant)` |
-| `Subscriptions.Timer.after ms action` | `Time.after ms :: Owned (Event Unit)`, then `Event.subscribe` |
-| (new) | `Time.interval :: Milliseconds -> Owned (Event Unit)` |
-| `Subscriptions.AnimationFrame.frames`, `.every` | `Time.frames :: Owned (Event Number)` |
-| `Time.debounced` | `Time.debounceSignal` |
-| `WebSocket` `message`, `Message` | `messages :: Event String` (with `Event.stepper` for the latest) |
-
-## Background
-
-Efficient JS frameworks trace state changes to the view changes they cause, and then mutate only the affected sections of the DOM. Virtual DOM frameworks instead build a parallel representation of the DOM from the new state, diff it against the previous one, and apply the differences as patches. See [You Might Not Need The Virtual DOM](https://blog.functorial.com/posts/2018-03-12-You-Might-Not-Need-The-Virtual-DOM.html), and [`purescript-halogen-vdom`](https://github.com/purescript-halogen/purescript-halogen-vdom) and [`purescript-sdom`](https://github.com/paf31/purescript-sdom) for the two approaches in PureScript.
-
-## References
+### References
 
 * The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral).
 
