@@ -21,7 +21,7 @@ import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Event as Event
 import Screamer.Owned (Owned)
-import Screamer.Signal (Signal, dropRepeats, gate, sampleManyWith, sampleOn)
+import Screamer.Signal (Signal, gate, sampleManyWith, sampleOn)
 import Screamer.Source (SignalSource, signalSource)
 import Screamer.Time as Time
 import Web.DOM.Element as Element
@@ -84,12 +84,12 @@ toDotAttrs { pos, n, hb } = { hb, max, pos }
 
 -- | The style of dot `i`. An inactive dot keeps its last position and is
 -- | hidden, so only active dots follow the animation. Keeping the last
--- | position is state, so each dot makes its own `gate`. Whether a dot is
--- | active changes rarely but is computed on every frame, so `dropRepeats`
--- | keeps its `display` from updating on the frames where it stays put.
+-- | position is state, so each dot makes its own `gate`. `isActive` updates
+-- | on every frame, and so does `display`, but the binding skips writing an
+-- | unchanged value; a `dropRepeats` on `isActive` measured slower than that.
 mkDot :: Signal DotAttrs -> Int -> Owned DotStyle
 mkDot dotAttrs i = do
-  isActive <- dropRepeats (dotAttrs <#> \{ max } -> Int.toNumber i < max)
+  let isActive = dotAttrs <#> \{ max } -> Int.toNumber i < max
   activeAttrs <- gate isActive { hb: 0, pos: origin, max: 0.0 } dotAttrs
   pure
     { left: activeAttrs <#> \{ pos, max } -> px (dotCoord i pos.x sin max)

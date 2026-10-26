@@ -500,6 +500,13 @@ export class Stateful<S> implements Source<S>, Target, Settle {
   last: number[];
   /** Some input is an event, whose occurrences last one round. */
   private settles: boolean;
+  /**
+   * Scratch arrays passed to `step`, reused across steps, since a node like
+   * `dropRepeats` steps on every round its input updates. A step must not
+   * keep them.
+   */
+  private changed: boolean[];
+  private values: any[];
 
   constructor(
     public inputs: Source<any>[],
@@ -510,6 +517,8 @@ export class Stateful<S> implements Source<S>, Target, Settle {
   ) {
     this.last = inputs.map(() => -1);
     this.settles = inputs.some(isEvent);
+    this.changed = inputs.map(() => false);
+    this.values = inputs.map(() => undefined);
   }
 
   notify(): void {
@@ -563,27 +572,26 @@ export class Stateful<S> implements Source<S>, Target, Settle {
     try {
       if (!this.started) this.start();
       const n = this.inputs.length;
-      const changed: boolean[] = new Array(n);
-      const versions: number[] = new Array(n);
+      const changed = this.changed;
+      const values = this.values;
       let any = false;
       for (let i = 0; i < n; i++) {
         const d = this.inputs[i];
         d.refresh();
-        versions[i] = d.version;
         changed[i] = d.version !== this.last[i];
         if (changed[i]) any = true;
       }
       if (any) {
         if (DEV) stats.steps++;
-        const values = this.inputs.map((d) => d.value);
-        const state = this.value;
-        const v = pure(() => this.step(changed, values, state));
+        for (let i = 0; i < n; i++) values[i] = this.inputs[i].value;
+        const v = pure(() => this.step(changed, values, this.value));
+        for (let i = 0; i < n; i++) values[i] = undefined;
         if (v !== noUpdate) {
           this.value = v;
           this.version++;
         }
       }
-      this.last = versions;
+      for (let i = 0; i < n; i++) this.last[i] = this.inputs[i].version;
       this.dirty = false;
       this.failed = false;
     } catch (e) {
