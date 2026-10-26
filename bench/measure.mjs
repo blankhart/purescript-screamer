@@ -20,10 +20,18 @@
 //   node bench/measure.mjs [--runs 15] [--mem-runs 3]
 //                          [--frameworks screamer,vanillajs,solid,halogen]
 //                          [--benchmarks create1k,swap,...]
+//                          [--css light|bootstrap] [--results bench/results]
+//
+// `--css bootstrap` (the default) serves the stylesheet upstream uses.
+// `--css light` serves bench/css/light.css in its place: the benchmark's own
+// rules without Bootstrap. Measured on Screamer and VanillaJS (12 runs each),
+// the light stylesheet left script time unchanged within its spread and did
+// not make it steadier; it shortened paint for most operations but doubled
+// it for update10th, so totals under it are not comparable with upstream's.
 //
 // Build first (`npm run bench`); `npm run bench:measure` does both. Each
-// framework's results go to bench/results/<framework>.json, and
-// bench/results/summary.md tabulates every result file present.
+// framework's results go to <results>/<framework>.json, and
+// <results>/summary.md tabulates every result file present.
 
 import fs from 'node:fs';
 import http from 'node:http';
@@ -33,12 +41,16 @@ import { chromium } from 'playwright';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const resultsDir = path.join(here, 'results');
 const args = process.argv.slice(2);
 const opt = (name, dflt) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : dflt;
 };
+const resultsDir = path.resolve(opt('--results', path.join(here, 'results')));
+const css = opt('--css', 'bootstrap');
+if (css !== 'light' && css !== 'bootstrap') throw new Error(`--css must be light or bootstrap, not ${css}`);
+const stylesheet = path.join(here, 'css', 'currentStyle.css');
+const lightStylesheet = path.join(here, 'css', 'light.css');
 const list = (name, dflt) => opt(name, dflt.join(',')).split(',').filter(Boolean);
 
 const frameworks = {
@@ -324,12 +336,14 @@ const round = (x) => Math.round(x * 100) / 100;
 const stats = (xs) => ({ mean: round(mean(xs)), median: round(median(xs)), runs: xs.map(round) });
 
 // Serves the repository root, cross-origin isolated so that the page may
-// call measureUserAgentSpecificMemory.
+// call measureUserAgentSpecificMemory. Under `--css light` the apps'
+// stylesheet is light.css.
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.svg': 'image/svg+xml' };
 function serve() {
   const server = http.createServer((req, res) => {
-    const file = path.join(root, decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
+    let file = path.join(root, decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
+    if (css === 'light' && file === stylesheet) file = lightStylesheet;
     if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       res.writeHead(404).end();
       return;
@@ -422,7 +436,7 @@ function summarise() {
     'parentheses), from a Chrome trace of each run, as krausest/js-framework-benchmark',
     'measures it; see that script for the method. Memory is in MB.',
     '',
-    ...all.map((r) => `* ${r.framework}${r.keyed ? '' : ' (non-keyed)'}: ${r.browser}, ${r.runs} runs, ${r.date}`),
+    ...all.map((r) => `* ${r.framework}${r.keyed ? '' : ' (non-keyed)'}: ${r.browser}, ${r.runs} runs, ${r.css ?? 'bootstrap'} CSS, ${r.date}`),
     '',
     ...head(names),
     ...all.map((r) => `| ${r.framework} | ${names.map((n) => {
@@ -481,6 +495,7 @@ try {
       browser: `chromium ${version}`,
       runs,
       memoryRuns: memRuns,
+      css,
       unit: { duration: 'ms', memory: 'MB' },
       operations,
       memory: mem,
