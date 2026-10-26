@@ -10,13 +10,21 @@
 // - Effects are always linked while alive and belong to a scope, which
 //   disposes them.
 // - Event nodes (see "Events" below) carry the occurrences of one round
-//   instead of a current value, and have no cutoff.
+//   instead of a current value.
 //
 // Writes mark observed dependents dirty and queue effects (push). Reads
 // recompute only nodes whose recorded dependency versions changed (pull).
 // An effect runs at most once per flush round and always sees a consistent
-// graph. A node bumps its version only when its value changes under its
-// equality, so unchanged results stop propagation.
+// graph.
+//
+// A node's version counts its updates, and the moments of update are part
+// of a signal's meaning (#68). A cell updates when it is written a value
+// that differs from its current one under its equality: values are compared
+// only there, at the source. A derived node updates every time it
+// recomputes, which is whenever a dependency updated, whatever value it
+// computes, so a function cannot hide an update. A stateful node updates
+// when it steps, unless its step returns `noUpdate`; `dropRepeatsBy` is
+// the stateful node that does so for repeated values, and the only cutoff.
 //
 // Names that write say which round they act on: T0 is the current round, T1
 // the next. `putT1`, `modifyT1` and `fireT1` take effect when the next round
@@ -344,7 +352,7 @@ export class Derived<T> implements Source<T>, Target, Computation {
   init = false;
   computing = false;
 
-  constructor(private fn: () => T, private eq: Eq<T> = Object.is) {}
+  constructor(private fn: () => T) {}
 
   notify(): void {
     if (this.dirty && !this.failed) return;
@@ -422,10 +430,10 @@ export class Derived<T> implements Source<T>, Target, Computation {
     this.newDeps = [];
     this.newVersions = [];
     if (!ok) throw error;
-    if (!this.init || !this.eq(v, this.value)) {
-      this.value = v;
-      this.version++;
-    }
+    // Recomputed because a dependency updated (or for the first time): an
+    // update, whatever the value.
+    this.value = v;
+    this.version++;
     this.init = true;
     this.dirty = false;
     this.seen = epoch;
@@ -441,8 +449,8 @@ export class Derived<T> implements Source<T>, Target, Computation {
   }
 }
 
-export function derived<T>(fn: () => T, eq?: Eq<T>): Derived<T> {
-  return new Derived(fn, eq);
+export function derived<T>(fn: () => T): Derived<T> {
+  return new Derived(fn);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,8 +460,9 @@ export function derived<T>(fn: () => T, eq?: Eq<T>): Derived<T> {
 //
 // - Start. State begins at the seed (for `merge`, the left input's current
 //   value). Values the input held before observation are not stepped over.
-// - Step. One step per propagation in which an input changed. Writes inside
-//   one batch coalesce, so two writes in one handler step a node once.
+// - Step. One step per propagation in which an input updated. Writes inside
+//   one batch coalesce, so two writes in one handler step a node once. A
+//   step is an update unless it returns `noUpdate`, which keeps the state.
 // - Pause. When the last observer goes, the node unlinks and keeps its state.
 //   `read` returns that state. When observed again it resynchronizes with its
 //   inputs without stepping, then continues.
@@ -464,6 +473,9 @@ export function derived<T>(fn: () => T, eq?: Eq<T>): Derived<T> {
 // same values whenever they are observed over the same interval. Where a
 // program needs one state regardless of who observes it, `hold` observes the
 // signal for the lifetime of the current scope and returns the same node.
+
+/** What a step returns to keep the state and not update. */
+export const noUpdate: any = {};
 
 export type Step<S> = (changed: boolean[], values: any[], state: S) => S;
 
@@ -493,7 +505,6 @@ export class Stateful<S> implements Source<S>, Target, Settle {
     public inputs: Source<any>[],
     private initial: () => S,
     private step: Step<S>,
-    private eq: Eq<S> = Object.is,
     /** The operator that made the node, for development warnings. */
     public label: string = '',
   ) {
@@ -567,7 +578,7 @@ export class Stateful<S> implements Source<S>, Target, Settle {
         const values = this.inputs.map((d) => d.value);
         const state = this.value;
         const v = pure(() => this.step(changed, values, state));
-        if (!this.eq(v, this.value)) {
+        if (v !== noUpdate) {
           this.value = v;
           this.version++;
         }
@@ -674,8 +685,8 @@ function pure<T>(fn: () => T): T {
   }
 }
 
-export function stateful<S>(inputs: Source<any>[], initial: () => S, step: Step<S>, eq?: Eq<S>, label?: string): Stateful<S> {
-  return new Stateful(inputs, initial, step, eq, label);
+export function stateful<S>(inputs: Source<any>[], initial: () => S, step: Step<S>, label?: string): Stateful<S> {
+  return new Stateful(inputs, initial, step, label);
 }
 
 // ---------------------------------------------------------------------------
@@ -723,8 +734,8 @@ export function apply<A, B>(sf: Readable<(a: A) => B>, sa: Readable<A>): Readabl
 
 /**
  * Monadic bind with dynamic dependencies. The inner signal is rebuilt only
- * when the outer signal's version changes, so stateful inner signals keep
- * their state while the outer value stays put.
+ * when the outer signal updates. The result updates when the outer signal
+ * or the current inner one does.
  */
 export function bind<A, B>(s: Readable<A>, f: (a: A) => Readable<B>): Readable<B> {
   let outerVersion = -1;
@@ -739,9 +750,13 @@ export function bind<A, B>(s: Readable<A>, f: (a: A) => Readable<B>): Readable<B
   });
 }
 
-/** Re-emits `s` with a different cutoff equality. */
-export function dropRepeatsBy<A>(eq: Eq<A>, s: Readable<A>): Readable<A> {
-  return derived(() => s.read(), eq);
+/**
+ * `s`, updating only when `s` updates to a value not equivalent to the one
+ * shown. Stateful: it remembers the value shown, so it must be kept
+ * observed (held) from when it is made.
+ */
+export function dropRepeatsBy<A>(eq: Eq<A>, s: Readable<A>): Stateful<A> {
+  return stateful([s], () => s.read(), (_, values, shown) => (eq(values[0], shown) ? noUpdate : values[0]), 'Signal.dropRepeatsBy');
 }
 
 // ---------------------------------------------------------------------------
@@ -1203,7 +1218,7 @@ export const neverEvent: EventLike<any> = new EventSourceNode<any>();
 export interface Inputs {
   /** The input's occurrences that this computation has not seen yet. */
   occ<X>(e: EventLike<X>): Occ<X>[];
-  /** Whether the signal changed since this computation last read it. False on first read. */
+  /** Whether the signal updated since this computation last read it. False on first read. */
   changed(s: Source<any>): boolean;
 }
 
@@ -1560,7 +1575,7 @@ export function signalStamp(): number {
   return flushing > 0 ? roundStamp : ++stamp;
 }
 
-/** An occurrence with the signal's new value in each round in which it changed. */
+/** An occurrence with the signal's new value in each round in which it updated. */
 export function changes<A>(s: Readable<A>): EventLike<A> {
   return eventDerived((r) => (r.changed(s) ? [{ s: signalStamp(), v: s.value }] : NONE));
 }
@@ -1570,7 +1585,7 @@ export function stepper<A>(seed: A, e: EventLike<A>): Readable<A> {
   return stateful([e], () => seed, (_, values) => {
     const os: Occ<A>[] = values[0];
     return os[os.length - 1].v;
-  }, undefined, 'Event.stepper');
+  }, 'Event.stepper');
 }
 
 /** Accumulate from `seed`, one step per occurrence. */
@@ -1579,7 +1594,7 @@ export function foldEvent<A, B>(f: (a: A, b: B) => B, seed: B, e: EventLike<A>):
     const os: Occ<A>[] = values[0];
     for (let i = 0; i < os.length; i++) b = f(os[i].v, b);
     return b;
-  }, undefined, 'Event.fold');
+  }, 'Event.fold');
 }
 
 /** Each occurrence combined with the signal's value at the end of the round. */

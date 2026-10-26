@@ -24,9 +24,6 @@ export const sampleOn = <A>(a: S<A>) => <B>(b: S<B>): S<B> =>
     return R.sample(b);
   });
 
-export const dropRepeatsByImpl = <A>(eq: (x: A) => (y: A) => boolean) => (s: S<A>): S<A> =>
-  R.dropRepeatsBy((x: A, y: A) => eq(x)(y), s);
-
 export const newDropRepeatsBy = <A>(eq: (x: A) => (y: A) => boolean) => (s: S<A>) => (): S<A> =>
   R.dropRepeatsBy((x: A, y: A) => eq(x)(y), s);
 
@@ -35,7 +32,6 @@ export const withPreviousImpl = <A, T>(tuple: (a: A) => (b: A) => T) => (seed: A
     [s],
     () => ({ previous: seed, current: s.read() }),
     (_, values, p) => ({ previous: p.current, current: values[0] }),
-    undefined,
     'Signal.withPrevious',
   );
   return R.map((p) => tuple(p.previous)(p.current), pair);
@@ -54,32 +50,30 @@ export const attemptImpl = <A, T>(left: (e: Error) => T) => (right: (a: A) => T)
 // are wrapped below for PureScript, as effects.
 
 /**
- * The latest of `a` and `b`, starting at `a`'s current value; `a` wins when
- * both change in one batch. A merge reports every step, even one that repeats
- * its value, so nested merges agree on which input changed and merging stays
- * associative.
+ * The latest of `a` and `b`, starting at `a`'s current value. It updates
+ * when either does, with the value of the one that did; `a` wins when both
+ * update in one batch.
  */
 function mergeNode<A>(a: Runtime.Readable<A>, b: Runtime.Readable<A>): Runtime.Readable<A> {
-  return R.stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), never, 'Signal.merge');
+  return R.stateful([a, b], () => a.read(), (changed, values) => (changed[0] ? values[0] : values[1]), 'Signal.merge');
 }
-
-const never = () => false;
 
 /** Values of `s` that satisfy `p`, starting at `seed` unless `s` satisfies `p` at the start. */
 function latestWhereNode<A>(p: (a: A) => boolean, seed: A, s: Runtime.Readable<A>): Runtime.Readable<A> {
   return R.stateful([s], () => {
     const v = s.read();
     return p(v) ? v : seed;
-  }, (_, values, prev) => (p(values[0]) ? values[0] : prev), undefined, 'Signal.latestWhere');
+  }, (_, values) => (p(values[0]) ? values[0] : R.noUpdate), 'Signal.latestWhere');
 }
 
 /**
  * Follows `s` while `cond` is true and holds its last value while `cond` is
  * false. When `cond` becomes true, it takes `s`'s current value. Starts at
- * `s` if `cond` is true at the start, otherwise at `seed`.
+ * `s` if `cond` is true at the start, otherwise at `seed`. It updates when
+ * either input updates and `cond` is then true.
  */
 function gateSignal<A>(cond: Runtime.Readable<boolean>, seed: A, s: Runtime.Readable<A>): Runtime.Readable<A> {
-  return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values, prev) => (values[0] ? values[1] : prev), undefined, 'Signal.gate');
+  return R.stateful([cond, s], () => (cond.read() ? s.read() : seed), (_, values) => (values[0] ? values[1] : R.noUpdate), 'Signal.gate');
 }
 
 export const mergeImpl = <A>(a: S<A>) => (b: S<A>) => (): S<A> => mergeNode(a, b);

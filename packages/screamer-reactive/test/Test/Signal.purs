@@ -3,7 +3,6 @@ module Test.Signal (spec) where
 import Prelude
 
 import Data.Array as Array
-import Data.Array.NonEmpty as NonEmpty
 import Data.Foldable (for_, traverse_)
 import Data.Int (even)
 import Data.Maybe (Maybe(..))
@@ -14,7 +13,7 @@ import Screamer.Event as Event
 import Screamer.Owned (Owned, runOwned)
 import Screamer.Signal (Signal, dropRepeats, merge, readT0, sampleManyWith)
 import Screamer.Source (SignalSource, batch, signalSource)
-import Screamer.Test (observe)
+import Screamer.Test (observe, observeOwned)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
@@ -43,10 +42,10 @@ genScript = do
   pure { initial, batches, k, m }
 
 -- | Make both sides on the same signal sources, each in a scope of its own,
--- | observe them while running the script, and compare the traces of values
--- | shown. Consecutive repeats are dropped: a merge reports every step, so an
--- | observer of a merge can be shown the same value twice where the other
--- | side's observer is not.
+-- | observe them while running the script, and compare the raw traces: one
+-- | entry per update, repeats included. An update is part of a signal's
+-- | meaning (#68), so the sides must agree on when they update as well as
+-- | on the values.
 law :: forall a. Eq a => Show a => (Script -> Chans -> Owned (Signal a)) -> (Script -> Chans -> Owned (Signal a)) -> Script -> Effect Unit
 law lhs rhs script = do
   chans <- for (Array.range 0 2) \i -> signalSource (Array.index script.initial i # fromMaybe0)
@@ -61,8 +60,8 @@ law lhs rhs script = do
   r <- observe rs.value
   for_ script.batches \writes -> batch do
     for_ writes \{ chan, value } -> for_ (Array.index chans chan) \ch -> ch.putT1 value
-  lt <- dedup <$> l.trace
-  rt <- dedup <$> r.trace
+  lt <- l.trace
+  rt <- r.trace
   l.stop
   r.stop
   ls.dispose
@@ -70,7 +69,6 @@ law lhs rhs script = do
   when (lt /= rt) do
     fail $ "traces differ for " <> show script <> ": " <> show lt <> " /= " <> show rt
   where
-  dedup = map NonEmpty.head <<< Array.group
   fromMaybe0 = case _ of
     Just x -> x
     Nothing -> 0
@@ -126,12 +124,28 @@ spec = describe "Screamer.Signal" do
     it "is associative on traces" $ liftEffect $ checkOwnedLaw
       (\_ s -> merge s.a s.b >>= \ab -> merge ab s.c)
       (\_ s -> merge s.b s.c >>= \bc -> merge s.a bc)
-    -- An injective function keeps the law under equality cutoff: a
-    -- non-injective one can hide a left change that the merge on the left
-    -- side still prefers.
-    it "map distributes over merge for injective functions" $ liftEffect $ checkOwnedLaw
+    it "map distributes over merge" $ liftEffect $ checkOwnedLaw
       (\p s -> map (f p) <$> merge s.a s.b)
       (\p s -> merge (f p <$> s.a) (f p <$> s.b))
+    -- A function that is not injective cannot hide an update of the left
+    -- argument from the merge.
+    it "map distributes over merge for a function that is not injective" $ liftEffect $ checkOwnedLaw
+      (\_ s -> map parity <$> merge s.a s.b)
+      (\_ s -> merge (parity <$> s.a) (parity <$> s.b))
+
+  describe "Event.changes" do
+    it "commutes with map, for a function that is not injective" $ liftEffect $ checkOwnedLaw
+      (\_ s -> Event.stepper (-1) (Event.changes (parity <$> s.a)))
+      (\_ s -> Event.stepper (-1) (parity <$> Event.changes s.a))
+
+  describe "updates" do
+    it "map updates whenever its argument does, whatever the function returns" do
+      x <- liftEffect $ signalSource 1
+      o <- liftEffect $ observe (parity <$> x.signal)
+      liftEffect $ x.putT1 3
+      liftEffect $ x.putT1 3
+      liftEffect $ x.putT1 4
+      liftEffect o.trace >>= shouldEqual [ 1, 1, 0 ]
 
   describe "lifted Semigroup and Monoid" do
     it "appends current values" do
@@ -156,13 +170,20 @@ spec = describe "Screamer.Signal" do
   describe "dropRepeats" do
     it "suppresses structurally equal records" do
       ch :: SignalSource { n :: Int } <- liftEffect $ signalSource { n: 1 }
-      o <- liftEffect $ observe (dropRepeats ch.signal)
+      o <- liftEffect $ observeOwned (dropRepeats ch.signal)
       raw <- liftEffect $ observe ch.signal
       liftEffect $ ch.putT1 { n: 1 }
       liftEffect $ ch.putT1 { n: 2 }
       liftEffect $ ch.putT1 { n: 2 }
       liftEffect o.trace >>= shouldEqual [ { n: 1 }, { n: 2 } ]
       liftEffect (Array.length <$> raw.trace) >>= shouldEqual 4
+    it "is the only cutoff after map" do
+      x <- liftEffect $ signalSource 1
+      o <- liftEffect $ observeOwned (dropRepeats (parity <$> x.signal))
+      liftEffect $ x.putT1 3
+      liftEffect $ x.putT1 4
+      liftEffect $ x.putT1 6
+      liftEffect o.trace >>= shouldEqual [ 1, 0 ]
 
   where
   f p x = x * p.k + p.m
@@ -175,3 +196,4 @@ spec = describe "Screamer.Signal" do
   ksum t x = map (_ + x) t
   kmod x = pure (x `mod` 2)
   ktens t y = (\acc -> acc * 10 + y) <$> t
+  parity x = x `mod` 2

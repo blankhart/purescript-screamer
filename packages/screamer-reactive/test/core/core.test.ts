@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cell, derived, map, bind, scope, effect, batch, sample, untracked, stats, createScope, runInScope,
+  cell, derived, map, bind, dropRepeatsBy, scope, effect, batch, sample, untracked, stats, createScope, runInScope,
   eventSource, subscribeEvent,
   Readable,
 } from '../../src/Screamer/Runtime.ts';
@@ -48,19 +48,20 @@ describe('prototype checks', () => {
     assert.equal(seen.join(' '), '2/2 6/10');
   });
 
-  test('4 equality cutoff on equal writes and unchanged derived values', () => {
+  test('4 cutoff on equal writes; a derived node updates whenever an input does (#68)', () => {
     const a = cell(1);
     const parity = map((x: number) => x % 2, a);
     let runs = 0;
     scope(() => { effect(() => { parity.read(); runs++; }); });
     a.putT1(1);
-    a.putT1(3);
     assert.equal(runs, 1);
+    a.putT1(3);
+    assert.equal(runs, 2);
   });
 
-  test('4b custom equality on a derived node', () => {
+  test('4b dropRepeatsBy is the cutoff, with its equivalence', () => {
     const a = cell({ n: 1 });
-    const d = derived(() => ({ n: a.read().n }), (x, y) => x.n === y.n);
+    const d = dropRepeatsBy((x, y) => x.n === y.n, derived(() => ({ n: a.read().n })));
     let runs = 0;
     scope(() => { effect(() => { d.read(); runs++; }); });
     a.putT1({ n: 1 });
