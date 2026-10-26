@@ -163,9 +163,18 @@ instance Show Strategy where
     Exhaust -> "Exhaust"
 
 -- | Run the request for the input's current value, and again whenever the
--- | input changes. The signal is `Loading` while a request runs. A request
--- | still running when the input changes, or when the scope is disposed, is
+-- | input updates. The signal is `Loading` while a request runs. A request
+-- | still running when the input updates, or when the scope is disposed, is
 -- | killed, and its result is never shown. `resourceWith Switch`.
+-- |
+-- | A derived input updates whenever its own arguments do, even when its
+-- | value stays the same, so pass it through `Signal.dropRepeats` first to
+-- | request only when the value changes:
+-- |
+-- | ```purescript
+-- | query <- Signal.dropRepeats (_.query <$> state)
+-- | results <- resource query search
+-- | ```
 resource :: forall a b. Signal a -> (a -> Aff b) -> Owned (Signal (Remote b))
 resource = resourceWith Switch
 

@@ -6,4 +6,4 @@ import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 const R: typeof Runtime = runtime;
 
 export const keepLastImpl = <T>(isLoading: (r: T) => boolean) => (isLoaded: (r: T) => boolean) => (s: Runtime.Readable<T>) => () =>
-  R.stateful<T>([s], () => s.read(), (_, values, prev) => (isLoading(values[0]) && isLoaded(prev) ? prev : values[0]));
+  R.stateful<T>([s], () => s.read(), (_, values, prev) => (isLoading(values[0]) && isLoaded(prev) ? R.noUpdate : values[0]));

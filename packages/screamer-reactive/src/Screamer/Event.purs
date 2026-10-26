@@ -106,9 +106,12 @@ partitionMapE f = map f >>> \e ->
   }
 
 -- | One occurrence, with the new value, in each round in which the signal
--- | changed. A signal's writes coalesce within a batch, so this fires at
+-- | updated. A signal's writes coalesce within a batch, so this fires at
 -- | most once per round, with the final value. Its occurrences come after
--- | every fire of the same round.
+-- | every fire of the same round. A derived signal updates whenever its
+-- | arguments do, so this can fire twice in a row with the same value, and
+-- | `changes (f <$> s) = f <$> changes s`; use `Signal.dropRepeats` first to
+-- | skip repeats.
 foreign import changes :: forall a. Signal a -> Event a
 
 -- | The latest occurrence, starting at the seed. Stateful.
