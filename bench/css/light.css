@@ -1,0 +1,11 @@
+/* The stylesheet `bench/measure.mjs --css light` serves in place of
+   currentStyle.css: the benchmark's own main.css, without Bootstrap. */
+@import url("main.css");
+
+/* Bootstrap's icon font gave the remove icon its size; it is the target of
+   the remove operation's click, so it needs one. */
+.glyphicon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+}
