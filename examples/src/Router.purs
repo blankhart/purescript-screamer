@@ -14,7 +14,7 @@ import Screamer.Element (Element, component, dyn, element)
 import Screamer.Examples.Harness as Harness
 import Screamer.Html as E
 import Screamer.Html.Attributes as A
-import Screamer.Signal (Signal)
+import Screamer.Signal (Signal, dropRepeats)
 import Screamer.Router (Location, link, location)
 import Screamer.Router.Windrose (matchHash)
 import Windrose.Router (type (:<|>), type (:>), C, P, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)
@@ -62,7 +62,9 @@ navLink current id target label =
 app :: Element
 app = component do
   loc <- location
-  let page = toPage <$> loc
+  -- The location updates on every navigation, so keep only the changes of
+  -- page: `dyn` rebuilds the page on each update it sees.
+  page <- dropRepeats (toPage <$> loc)
   pure $ E.div_ [ A.class_ "router" ]
     [ E.nav_ []
         [ navLink page "home" Home "Home"

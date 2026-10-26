@@ -58,10 +58,26 @@ const GROUP = 5;
 
 type Handler = (e: Event) => () => void;
 
-/** Set once for a constant, or with one owned effect for a signal. */
+const UNSET: any = {};
+
+/**
+ * Set once for a constant, or with one owned effect for a signal. A signal
+ * updates whenever its arguments do (#68), so the effect skips a write of
+ * the value it wrote last: the DOM is at the edge of the graph, and nothing
+ * in it can observe the skip.
+ */
 function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
-  if (R.isConstant(sig)) set(sig.value);
-  else R.effectIn(s, () => set(sig.read()));
+  if (R.isConstant(sig)) {
+    set(sig.value);
+    return;
+  }
+  let last: T = UNSET;
+  R.effectIn(s, () => {
+    const v = sig.read();
+    if (Object.is(v, last)) return;
+    last = v;
+    set(v);
+  });
 }
 
 function bindAttr(b: Backend, s: Scope, el: N, a: Attr): void {
@@ -136,7 +152,13 @@ export const textImpl = (sig: Sig<string>) => (s: Scope) => (): N => {
   const b = B;
   if (R.isConstant(sig)) return b.createText(sig.value);
   const node = b.createText('');
-  R.effectIn(s, () => { b.setText(node, sig.read()); });
+  let last: string = UNSET;
+  R.effectIn(s, () => {
+    const v = sig.read();
+    if (v === last) return;
+    last = v;
+    b.setText(node, v);
+  });
   return node;
 };
 

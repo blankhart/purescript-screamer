@@ -11,6 +11,8 @@
 // notice.
 //
 // Beyond the list in #47:
+// - `noUpdate`: what a `stateful` step returns to keep its state without
+//   updating (#68).
 // - `isConstant`: lets a combinator skip the graph when an input can never
 //   change, as `Screamer.Element` does for static attributes and text.
 // - `subscribeEvent`: the one way an effect consumes each occurrence once;
@@ -39,6 +41,7 @@ export const constant = R.constant;
 export const isConstant = <T>(s: Runtime.Readable<T>): boolean => s instanceof R.Constant;
 export const derived = R.derived;
 export const stateful = R.stateful;
+export const noUpdate = R.noUpdate;
 export const eventSource = R.eventSource;
 export const eventDerived = R.eventDerived;
 export const eventStateful = R.eventStateful;

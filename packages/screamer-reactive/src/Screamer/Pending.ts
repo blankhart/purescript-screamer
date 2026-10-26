@@ -58,7 +58,12 @@ export const pendingImpl = (s: Scope) => (): Eff<void> => {
   return done;
 };
 
+// The count updates on every change, so `settled` drops the repeats of
+// `count === 0` itself, and is held in `s` from now on.
 export const settledImpl = (s: Scope) => (): Runtime.Readable<boolean> => {
   const c = countOf(s);
-  return R.derived(() => c.read() === 0);
+  const idle = R.derived(() => c.read() === 0);
+  const node = R.stateful([idle], () => idle.read(), (_, values, shown) => (values[0] === shown ? R.noUpdate : values[0]), 'Pending.settled');
+  R.effectIn(s, () => { node.read(); });
+  return node;
 };

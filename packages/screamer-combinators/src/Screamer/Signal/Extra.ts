@@ -21,8 +21,8 @@ export function combine<A>(ss: Runtime.Readable<A>[]): Runtime.Readable<A[]> {
  * `a`'s value paired with `b`'s, changing only when `a` changes.
  */
 function withLatest<A, B, T>(pair: (a: A, b: B) => T, b: Runtime.Readable<B>, a: Runtime.Readable<A>): Runtime.Readable<T> {
-  return R.stateful<T>([a, b], () => pair(a.read(), b.read()), (changed, values, prev) =>
-    (changed[0] ? pair(values[0], values[1]) : prev));
+  return R.stateful<T>([a, b], () => pair(a.read(), b.read()), (changed, values) =>
+    (changed[0] ? pair(values[0], values[1]) : R.noUpdate));
 }
 
 export const withLatestImpl = <A, B, T>(pair: (a: A) => (b: B) => T) => (b: S<B>) => (a: S<A>) => (): S<T> =>

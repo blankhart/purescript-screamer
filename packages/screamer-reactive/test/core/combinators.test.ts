@@ -347,20 +347,26 @@ function eventFuzz(seed: number, graphs = 60): { checks: number; bad: number; fi
       }
     }
 
-    // Reference: signal values carried across rounds, occurrences per round.
+    // Reference: signal values carried across rounds, and per round each
+    // signal's update flag and each event's occurrences. A cell updates when
+    // written a different value, a fold or stepper on each occurrence, and a
+    // derived signal when an input updated.
     const value: number[] = spec.map((n, i) => (n.kind === 'cell' ? real[i].value : 0));
     const counter: number[] = spec.map(() => 0);
     const previous: (number | null)[] = spec.map(() => null);
     const queues: { a: number[]; b: number[] }[] = spec.map(() => ({ a: [], b: [] }));
     const evalRound = (fires: { src: number; v: number; s: number }[], writes: Map<number, number>, roundStamp: number, init = false) => {
       const occ: { s: number; v: number }[][] = [];
-      const prev = value.slice();
+      const upd: boolean[] = [];
       for (let i = 0; i < spec.length; i++) {
         const n = spec[i];
         occ[i] = [];
+        upd[i] = false;
         switch (n.kind) {
           case 'src': occ[i] = fires.filter((f) => f.src === i).map((f) => ({ s: f.s, v: f.v })); break;
-          case 'cell': if (writes.has(i)) value[i] = writes.get(i)!; break;
+          case 'cell':
+            if (writes.has(i) && !Object.is(writes.get(i)!, value[i])) { value[i] = writes.get(i)!; upd[i] = true; }
+            break;
           case 'map': occ[i] = occ[n.e].map((o) => ({ s: o.s, v: o.v + n.k })); break;
           case 'filter': occ[i] = occ[n.e].filter((o) => o.v % n.m === 0); break;
           case 'alt': {
@@ -373,11 +379,11 @@ function eventFuzz(seed: number, graphs = 60): { checks: number; bad: number; fi
             occ[i] = out.concat(a.slice(x), b.slice(y));
             break;
           }
-          case 'changes': if (!init && !Object.is(prev[n.s], value[n.s])) occ[i] = [{ s: roundStamp, v: value[n.s] }]; break;
+          case 'changes': if (!init && upd[n.s]) occ[i] = [{ s: roundStamp, v: value[n.s] }]; break;
           case 'attach': occ[i] = occ[n.e].map((o) => ({ s: o.s, v: o.v * 10 + value[n.s] })); break;
-          case 'fold': for (const o of occ[n.e]) value[i] = foldStep(o.v, value[i]); break;
-          case 'stepper': if (occ[n.e].length) value[i] = occ[n.e][occ[n.e].length - 1].v; break;
-          case 'sum': value[i] = (value[n.ins[0]] + value[n.ins[1]]) % 7; break;
+          case 'fold': for (const o of occ[n.e]) value[i] = foldStep(o.v, value[i]); upd[i] = occ[n.e].length > 0; break;
+          case 'stepper': if (occ[n.e].length) { value[i] = occ[n.e][occ[n.e].length - 1].v; upd[i] = true; } break;
+          case 'sum': value[i] = (value[n.ins[0]] + value[n.ins[1]]) % 7; upd[i] = upd[n.ins[0]] || upd[n.ins[1]]; break;
           case 'take':
             for (const o of occ[n.e]) if (counter[i] < n.n) { counter[i]++; occ[i].push(o); }
             break;
@@ -561,11 +567,13 @@ function oracleFuzz(seed: number, graphs = 100): { checks: number; bad: number; 
       }
     }
 
-    // Reference state. Versions follow the real nodes' rules: cells, derived
-    // nodes and folds bump when their value changes; a merge bumps on every
-    // step.
+    // Reference state. Versions follow the rules of #68: a cell bumps when
+    // its value changes; a derived node (sum, bind) when it recomputes,
+    // which is when the version of a dependency it read last time differs;
+    // a fold or merge on every step.
     const state: Record<number, number> = {};
     const lastIn: Record<number, number[]> = {};
+    const lastDeps: Record<number, string> = {};
     const refValue: Record<number, number> = {};
     const refVersion: Record<number, number> = {};
     let observedPrev = new Set<number>();
@@ -577,6 +585,15 @@ function oracleFuzz(seed: number, graphs = 100): { checks: number; bad: number; 
         if (always || !(k in refValue) || !Object.is(refValue[k], v)) {
           refValue[k] = v;
           refVersion[k] = (refVersion[k] || 0) + 1;
+        }
+      };
+      // A derived node reads `deps` (already evaluated) and updates when it
+      // is new or a dependency's version moved since it last ran.
+      const derive = (k: number, deps: number[], v: number) => {
+        const key = deps.map((j) => `${j}:${refVersion[j]}`).join(',');
+        if (lastDeps[k] !== key) {
+          lastDeps[k] = key;
+          setValue(k, v, true);
         }
       };
       const ev = (k: number): number => {
@@ -592,20 +609,22 @@ function oracleFuzz(seed: number, graphs = 100): { checks: number; bad: number; 
             case 'sum': {
               const s = spec.ins.reduce((a, j) => a + ev(j), 0);
               v = spec.mod ? s % 3 : s;
-              setValue(k, v);
+              derive(k, spec.ins, v);
               break;
             }
-            case 'bind':
-              v = ev(spec.branches[ev(spec.outer) % 2]);
-              setValue(k, v);
+            case 'bind': {
+              const branch = spec.branches[ev(spec.outer) % 2];
+              v = ev(branch);
+              derive(k, [spec.outer, branch], v);
               break;
+            }
             case 'fold': {
               const x = ev(spec.input);
               const xv = refVersion[spec.input];
               if (!(k in state)) { state[k] = 0; setValue(k, 0); }
               if (observedPrev.has(k) && xv !== lastIn[k][0]) {
                 state[k] = foldStep(x, state[k]);
-                setValue(k, state[k]);
+                setValue(k, state[k], true);
               }
               lastIn[k] = [xv];
               v = state[k];
