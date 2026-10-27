@@ -80,8 +80,11 @@
         "core": {
           "dependencies": [
             "effect",
+            "either",
+            "maybe",
             "prelude",
-            "screamer-reactive"
+            "screamer-reactive",
+            "web-dom"
           ]
         },
         "test": {
@@ -95,7 +98,8 @@
             "screamer",
             "screamer-test",
             "spec",
-            "strings"
+            "strings",
+            "web-dom"
           ]
         }
       },
@@ -120,6 +124,7 @@
             "refs",
             "screamer",
             "screamer-combinators",
+            "screamer-devtools",
             "screamer-forms",
             "screamer-motion",
             "screamer-reactive",

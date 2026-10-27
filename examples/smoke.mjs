@@ -3,14 +3,7 @@
 // or scopes.
 //
 //   node examples/smoke.mjs        (after `npm run build:examples`)
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const executablePath = process.env.CHROMIUM_PATH
-  || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
+import { launch, openExample, origin } from './page.mjs';
 
 const examples = {
   async HelloWorld(page) {
@@ -208,49 +201,14 @@ async function expectClass(page, selector, cls) {
   await page.waitForFunction(([s, c]) => document.querySelector(s)?.className === c, [selector, cls]);
 }
 
-const origin = 'http://screamer.test';
-
-// An in-page WebSocket that echoes what it is sent.
-function mockWebSocket() {
-  window.WebSocket = class extends EventTarget {
-    constructor(url) {
-      super();
-      this.url = url;
-      this.closed = false;
-      window.lastSocket = this;
-      setTimeout(() => this.dispatchEvent(new Event('open')), 0);
-    }
-    send(text) {
-      setTimeout(() => {
-        const e = new MessageEvent('message', { data: text });
-        this.dispatchEvent(e);
-      }, 0);
-    }
-    close() {
-      this.closed = true;
-      setTimeout(() => this.dispatchEvent(new Event('close')), 0);
-    }
-  };
-}
-
-const browser = await chromium.launch({ executablePath });
+const browser = await launch();
 let failed = false;
 for (const [name, interact] of Object.entries(examples)) {
-  const bundle = path.join(here, 'output', `${name}.js`);
-  const stylesheet = path.join(here, 'static', 'examples.css');
-  const page = await browser.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+  let page = null;
   try {
-    if (!fs.existsSync(bundle)) throw new Error(`missing ${bundle}; run \`npm run build:examples\``);
-    // Served from a fake origin, so the History API works.
-    await page.route(`${origin}/**`, (route) => {
-      const url = new URL(route.request().url());
-      if (url.pathname === '/bundle.js') return route.fulfill({ path: bundle, contentType: 'text/javascript' });
-      if (url.pathname === '/examples.css') return route.fulfill({ path: stylesheet, contentType: 'text/css' });
-      return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html data-example="${name}"><head><link rel="stylesheet" href="/examples.css"></head><body><main></main><script src="/bundle.js"></script></body></html>` });
-    });
-    await page.addInitScript(mockWebSocket);
+    const opened = await openExample(browser, name);
+    page = opened.page;
+    const errors = opened.errors;
     await page.goto(`${origin}/`);
     await page.waitForFunction(() => window.screamerExample !== undefined, null, { timeout: 5000 });
     const before = await page.evaluate(() => window.screamerExample.stats());
@@ -270,7 +228,7 @@ for (const [name, interact] of Object.entries(examples)) {
     failed = true;
     console.log(`FAIL   ${name}: ${e.message}`);
   } finally {
-    await page.close();
+    if (page !== null) await page.close();
   }
 }
 await browser.close();

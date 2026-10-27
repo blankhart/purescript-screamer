@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   cell, scope, effect, sample, stepper, eventSource, map, createScope,
   setDevHook, setStrict, tagScope, scopeInfo, rootScopes, effectCount, type DevEvent,
+  setScopeNodes, ownerOfNode, setTrackOrigins, originOf, setConsistencyCheck, registerCheck,
+  nodeKind, nodeInputs, eventSource as es,
 } from '../../src/Screamer/Runtime.ts';
 
 /** Run `f` with a dev hook installed, returning the events it saw. */
@@ -82,5 +84,70 @@ describe('development hook (#84)', () => {
     assert.equal(effectCount([...child.children][0]), 1);
     root.dispose();
     assert.equal(rootScopes().length, before);
+  });
+
+  test('maps nodes to the innermost live scope that recorded them', () => {
+    const root = createScope(null);
+    const inner = createScope(root);
+    const node = {};
+    setScopeNodes(inner, [node]);
+    setScopeNodes(root, [node]);
+    assert.equal(ownerOfNode(node), inner);
+    assert.deepEqual(scopeInfo(root).nodes, [node]);
+    inner.dispose();
+    assert.equal(ownerOfNode(node), null);
+    root.dispose();
+  });
+
+  test('records creation sites only while tracking', () => {
+    const before = cell(0);
+    setTrackOrigins(true);
+    let after;
+    try {
+      after = cell(0);
+    } finally {
+      setTrackOrigins(false);
+    }
+    assert.equal(originOf(before), null);
+    assert.match(originOf(after)!, /devhook\.test\.ts/);
+  });
+
+  test('reports a failed consistency check after the timestep, with its scope', () => {
+    const a = cell(0);
+    const b = cell(0);
+    let shown = 0;
+    setConsistencyCheck(true);
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      const seen = events(() => {
+        const stop = scope((s) => {
+          effect(() => { shown = a.read(); });
+          effect(() => { b.read(); });
+          registerCheck(s, () => (shown === sample(a) ? null : `shows ${shown}`));
+        });
+        a.putT1(1);
+        shown = 5; // behind the effect's back
+        b.putT1(1); // a timestep that does not touch `a`: the check finds it
+        stop();
+      });
+      const w = seen.filter((e) => e.type === 'warning') as Extract<DevEvent, { type: 'warning' }>[];
+      assert.equal(w.length, 1);
+      assert.match(w[0].message, /^screamer SCR003: shows 5/);
+      assert.notEqual(w[0].scope, null);
+    } finally {
+      console.warn = warn;
+      setConsistencyCheck(false);
+    }
+  });
+
+  test('describes nodes and their inputs', () => {
+    const a = cell(1);
+    const m = map((x: number) => x + 1, a);
+    m.read();
+    assert.equal(nodeKind(a), 'signal source');
+    assert.equal(nodeKind(es()), 'event source');
+    assert.equal(nodeKind(m), 'derived signal');
+    assert.deepEqual(nodeInputs(m).inputs, [a]);
   });
 });

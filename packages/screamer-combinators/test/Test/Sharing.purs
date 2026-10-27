@@ -10,7 +10,7 @@ import Screamer.Event.Extra (take) as Event
 import Screamer.Owned (runOwned)
 import Screamer.Signal (readT0)
 import Screamer.Source (eventSource)
-import Screamer.Test (observe, observeE)
+import Screamer.Test (observe, observeE, withoutStrict)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -78,4 +78,5 @@ spec = describe "Sharing" do
     src <- liftEffect eventSource
     r <- liftEffect $ runOwned (Event.fold (+) 0 src.event)
     liftEffect (src.fireT1 1 *> r.dispose *> src.fireT1 10)
-    liftEffect (readT0 r.value) >>= shouldEqual 1
+    -- A read of the paused fold, which warns (SCR001) on purpose.
+    liftEffect (withoutStrict (readT0 r.value)) >>= shouldEqual 1

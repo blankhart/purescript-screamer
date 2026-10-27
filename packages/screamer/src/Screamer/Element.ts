@@ -66,11 +66,12 @@ const UNSET: any = {};
  * the value it wrote last: the DOM is at the edge of the graph, and nothing
  * in it can observe the skip.
  */
-function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
+function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void, shows?: (v: T) => string | null): void {
   if (R.isConstant(sig)) {
     set(sig.value);
     return;
   }
+  if (shows !== undefined) R.registerCheck(s, () => shows(R.sample(sig)));
   let last: T = UNSET;
   R.effectIn(s, () => {
     const v = sig.read();
@@ -80,6 +81,9 @@ function bindValue<T>(s: Scope, sig: Sig<T>, set: (v: T) => void): void {
   });
 }
 
+/** Whether bindings made now should register consistency checks (`DEV` only, and rarely on). */
+const checks = (b: Backend): boolean => R.development && b.interactive && R.consistencyChecking();
+
 function bindAttr(b: Backend, s: Scope, el: N, a: Attr): void {
   const name = a.name;
   switch (a.kind) {
@@ -87,13 +91,19 @@ function bindAttr(b: Backend, s: Scope, el: N, a: Attr): void {
       bindValue(s, a.value, (v) => { b.setProperty(el, name, v); });
       break;
     case ATTRIBUTE:
-      bindValue(s, a.value, (v: string) => { b.setAttribute(el, name, v); });
+      bindValue(s, a.value, (v: string) => { b.setAttribute(el, name, v); }, checks(b) ? (v: string) => {
+        const now = el.getAttribute(name);
+        return now === v ? null : `attribute ${name} shows ${JSON.stringify(now)}, but its signal is ${JSON.stringify(v)}`;
+      } : undefined);
       break;
     case BOOLEAN:
       bindValue(s, a.value, (v: boolean) => {
         if (v) b.setAttribute(el, name, '');
         else b.removeAttribute(el, name);
-      });
+      }, checks(b) ? (v: boolean) => {
+        const now = el.hasAttribute(name);
+        return now === v ? null : `attribute ${name} is ${now ? 'present' : 'absent'}, but its signal is ${v}`;
+      } : undefined);
       break;
     case STYLE:
       bindValue(s, a.value, (v: string) => { b.setStyle(el, name, v); });
@@ -159,6 +169,12 @@ export const textImpl = (sig: Sig<string>) => (s: Scope) => (): N => {
     last = v;
     b.setText(node, v);
   });
+  if (checks(b)) {
+    R.registerCheck(s, () => {
+      const v = R.sample(sig);
+      return node.data === v ? null : `text node shows ${JSON.stringify(node.data)}, but its signal is ${JSON.stringify(v)}`;
+    });
+  }
   return node;
 };
 
@@ -170,6 +186,7 @@ function instantiateIn(b: Backend, parent: Scope, el: El, kind: string, key?: un
   const scope = R.createScope(parent);
   R.tagScope(scope, kind, '', key);
   const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => el(scope)())));
+  if (R.development) R.setScopeNodes(scope, topLevel(b, node));
   return { scope, node };
 }
 
@@ -734,7 +751,14 @@ export const eachImpl =
 export const namedImpl = (name: string) => (el: El) => (s: Scope) => (): N => {
   const scope = R.createScope(s);
   R.tagScope(scope, 'named', name);
-  return R.untracked(() => R.runInScope(scope, () => el(scope)()));
+  const node = R.untracked(() => R.runInScope(scope, () => el(scope)()));
+  if (R.development) R.setScopeNodes(scope, topLevel(B, node));
+  return node;
+};
+
+/** Record, for development tools, the top-level nodes an element built in `s`. */
+export const recordNodes = (b: Backend) => (s: Scope) => (node: N) => (): void => {
+  if (R.development) R.setScopeNodes(s, topLevel(b, node));
 };
 
 // ---------------------------------------------------------------------------
@@ -776,7 +800,10 @@ export const catchErrorImpl = (handler: (e: Error) => El) => (el: El) => (s: Sco
     // build fails on the disposed scope; that is not a new error.
     if (!failed) recover(e);
   }
-  if (!failed) b.insertBefore(f, node, end);
+  if (!failed) {
+    if (R.development) R.setScopeNodes(scope, topLevel(b, node));
+    b.insertBefore(f, node, end);
+  }
   return f;
 };
 
@@ -797,6 +824,7 @@ export const suspenseImpl =
     R.lookupContext(s, boundary.name, boundary.default)({ start, end, settled })();
     // The content builds detached, so its pending work starts at once.
     const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => content(scope)())));
+    if (R.development) R.setScopeNodes(scope, topLevel(b, node));
     if (R.sample(settled)) {
       b.insertBefore(f, node, end);
       return f;

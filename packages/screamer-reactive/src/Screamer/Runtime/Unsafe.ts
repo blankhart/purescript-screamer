@@ -25,7 +25,10 @@
 // - `contextOf`, `lookupContext` and the `Context` type (#48): how FFI
 //   reads the values `Screamer.Context.provide` puts on scopes.
 // - `setDevHook`, `setStrict`, `isStrict`, `scopeInfo`, `tagScope`,
-//   `rootScopes`, `effectCount` and `readStats` (#84): the development hook, strict
+//   `rootScopes`, `effectCount`, `readStats`, `setScopeNodes`,
+//   `ownerOfNode`, `setTrackOrigins`, `originOf`, `setConsistencyCheck`,
+//   `consistencyChecking`, `registerCheck`, `nodeKind`, `nodeLabel`,
+//   `nodeInputs` and `effectDisposed` (#84): the development hook, strict
 //   mode, and what development tools read about scopes. All do nothing, or
 //   return nothing, outside development. `Scope.parent` and
 //   `Scope.children` are part of the contract for walking the tree, read
@@ -86,6 +89,17 @@ export const tagScope = R.tagScope;
 export const rootScopes = R.rootScopes;
 export const effectCount = R.effectCount;
 export const readStats = R.readStats;
+export const setScopeNodes = R.setScopeNodes;
+export const ownerOfNode = R.ownerOfNode;
+export const setTrackOrigins = R.setTrackOrigins;
+export const originOf = R.originOf;
+export const setConsistencyCheck = R.setConsistencyCheck;
+export const consistencyChecking = R.consistencyChecking;
+export const registerCheck = R.registerCheck;
+export const nodeKind = R.nodeKind;
+export const nodeLabel = R.nodeLabel;
+export const nodeInputs = R.nodeInputs;
+export const effectDisposed = R.effectDisposed;
 
 /** Development checks are on: `DEV` in the runtime. */
 export const development: boolean = R.DEV;
@@ -105,3 +119,5 @@ export type Accum<S, B> = Runtime.Accum<S, B>;
 export type DevEvent = Runtime.DevEvent;
 export type DevHook = Runtime.DevHook;
 export type ScopeInfo = Runtime.ScopeInfo;
+export type Source = Runtime.Source;
+export type EffectNode = Runtime.EffectNode;

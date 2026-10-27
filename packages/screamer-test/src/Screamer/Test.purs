@@ -7,6 +7,7 @@ module Screamer.Test
   , observeE
   , observeOwnedE
   , runSpec
+  , withoutStrict
   ) where
 
 import Prelude
@@ -59,9 +60,20 @@ observeOwnedE make = do
 
 foreign import exit :: Int -> Effect Unit
 
+foreign import strict :: Effect Unit
+
 -- | Run the spec with the console reporter, and set the process's exit code
--- | to 1 if anything failed.
+-- | to 1 if anything failed. Strict mode is on (#84): a development warning,
+-- | such as a read of a paused stateful signal (`SCR001`) or unordered
+-- | writes in one timestep (`SCR002`), is thrown as an error, so it fails
+-- | the test that caused it. A test that expects a warning runs it under
+-- | `withoutStrict`.
 runSpec :: Spec Unit -> Effect Unit
 runSpec spec = launchAff_ do
+  liftEffect strict
   results <- un Identity $ evalSpecT (defaultConfig { exit = false }) [ consoleReporter ] spec
   liftEffect $ exit if successful results then 0 else 1
+
+-- | Run the action with strict mode off, for a test that causes a
+-- | development warning on purpose: the warning goes to the console.
+foreign import withoutStrict :: forall a. Effect a -> Effect a
