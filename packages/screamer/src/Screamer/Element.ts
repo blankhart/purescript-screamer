@@ -181,7 +181,7 @@ function removeBetween(b: Backend, start: N, end: N, r: Remover | null = null): 
 }
 
 // ---------------------------------------------------------------------------
-// Leave hooks
+// Enter, move and leave hooks
 
 /** A context key, as `Screamer.Context.key` makes it. */
 interface Key<A> {
@@ -189,23 +189,63 @@ interface Key<A> {
   default: A;
 }
 
-type LeaveHook = (node: N) => (done: () => void) => () => void;
+/** An `Owned Unit` at run time. */
+type OwnedUnit = (s: Scope) => () => void;
+
+type LeaveHook = (node: N) => (done: () => void) => OwnedUnit;
+type EnterHook = (node: N) => OwnedUnit;
+type Rect = { top: number; right: number; bottom: number; left: number; width: number; height: number; x: number; y: number };
+type MoveHook = (m: { node: N; before: Rect; after: Rect }) => OwnedUnit;
+type Enter = { appear: boolean; hook: EnterHook };
+
+/** The keys of the three hooks, as `Screamer.Element` passes them to `dyn` and `each`. */
+interface Hooks {
+  leave: Key<LeaveHook>;
+  enter: Key<Enter>;
+  move: Key<MoveHook>;
+}
 
 /** The default leave hook: detach at once. `dyn` and `each` skip the hook when it is this one. */
-export const immediateLeave: LeaveHook = () => (done) => () => done();
+export const immediateLeave: LeaveHook = () => (done) => () => () => done();
+
+/** The default enter hook, which does nothing. `dyn` and `each` skip it. */
+export const noEnter: EnterHook = () => () => () => {};
+
+/** The default move hook, which does nothing. `each` measures nothing when it is this one. */
+export const noMove: MoveHook = () => () => () => {};
+
+/** Run an `Owned Unit` in a fresh child scope of `parent`, untracked. */
+function runHook(parent: Scope, body: OwnedUnit): Scope {
+  const c = R.createScope(parent);
+  R.untracked(() => R.runInScope(c, () => body(c)()));
+  return c;
+}
+
+/** A node that is leaving, and the scope its hook runs in. */
+interface Leaving {
+  key: any;
+  scope: Scope | null;
+  running: boolean;
+}
+
+const NO_KEY: any = {};
 
 /**
  * Detaches the nodes of removed branches or rows. With a leave hook, each
  * top-level node stays in place until the hook calls its `done`, or until
- * the owning scope is disposed, whichever comes first.
+ * the owning scope is disposed, whichever comes first. Each hook runs in
+ * its own leaving scope, a child of the `dyn` or `each` scope, which is
+ * disposed when the node is detached.
  */
 class Remover {
-  private leaving: Set<N> = new Set();
-  constructor(private b: Backend, private hook: LeaveHook | null) {}
+  private leaving: Map<N, Leaving> = new Map();
+  /** Leaving nodes by row key, for primitive keys; `each` finishes them when the key returns. */
+  private byKey: Map<any, Set<N>> = new Map();
+  constructor(private b: Backend, private s: Scope, private hook: LeaveHook | null) {}
 
   static of(b: Backend, s: Scope, k: Key<LeaveHook>): Remover {
-    const hook = R.lookupContext(s, k.name, k.default);
-    const r = new Remover(b, hook === immediateLeave ? null : hook);
+    const hook = b.interactive ? R.lookupContext(s, k.name, k.default) : immediateLeave;
+    const r = new Remover(b, s, hook === immediateLeave ? null : hook);
     if (r.hook !== null) s.cleanups.push(() => r.flush());
     return r;
   }
@@ -214,30 +254,107 @@ class Remover {
     return this.hook !== null;
   }
 
-  isLeaving(n: N): boolean {
-    return this.hook !== null && this.leaving.has(n);
-  }
-
-  remove(parent: N, n: N): void {
-    if (this.hook === null) {
+  remove(parent: N, n: N, key: any = NO_KEY): void {
+    const hook = this.hook;
+    if (hook === null) {
       this.b.removeChild(parent, n);
       return;
     }
     if (this.leaving.has(n)) return;
-    this.leaving.add(n);
-    this.hook(n)(() => this.finish(n))();
+    const l: Leaving = { key, scope: null, running: true };
+    this.leaving.set(n, l);
+    if (key !== NO_KEY && isPrimitive(key)) {
+      let set = this.byKey.get(key);
+      if (set === undefined) this.byKey.set(key, (set = new Set()));
+      set.add(n);
+    }
+    // `done` may be called while the hook is still running; the scope is
+    // then disposed once the hook returns.
+    try {
+      l.scope = runHook(this.s, hook(n)(() => this.finish(n)));
+    } finally {
+      l.running = false;
+      if (!this.leaving.has(n) && l.scope !== null) l.scope.dispose();
+    }
   }
 
   private finish(n: N): void {
-    if (!this.leaving.delete(n)) return;
+    const l = this.leaving.get(n);
+    if (l === undefined) return;
+    this.leaving.delete(n);
+    if (l.key !== NO_KEY && isPrimitive(l.key)) {
+      const set = this.byKey.get(l.key);
+      if (set !== undefined) {
+        set.delete(n);
+        if (set.size === 0) this.byKey.delete(l.key);
+      }
+    }
+    if (!l.running && l.scope !== null) l.scope.dispose();
     const p = this.b.parentNode(n);
     if (p !== null) this.b.removeChild(p, n);
   }
 
+  /**
+   * Finish at once the nodes still leaving from a row with this key: their
+   * hooks' scopes are disposed and the nodes detached.
+   */
+  finishKey(key: any, compare: (a: any) => (b: any) => number): void {
+    if (this.leaving.size === 0) return;
+    if (isPrimitive(key)) {
+      const set = this.byKey.get(key);
+      if (set !== undefined) for (const n of Array.from(set)) this.finish(n);
+      return;
+    }
+    for (const [n, l] of Array.from(this.leaving)) {
+      if (l.key !== NO_KEY && !isPrimitive(l.key) && compare(l.key)(key) === 0) this.finish(n);
+    }
+  }
+
   /** Detach every node still leaving. */
   flush(): void {
-    for (const n of Array.from(this.leaving)) this.finish(n);
+    for (const n of Array.from(this.leaving.keys())) this.finish(n);
   }
+}
+
+/** The top-level nodes of a built element, before it is inserted. */
+function topLevel(b: Backend, node: N): N[] {
+  if (b.nodeType(node) !== FRAGMENT) return [node];
+  const nodes: N[] = [];
+  for (let n = b.firstChild(node); n !== null; n = b.nextSibling(n)) nodes.push(n);
+  return nodes;
+}
+
+/**
+ * Runs the enter hook on the nodes of branches or rows once they are
+ * inserted. The hook is skipped for the initial build unless it asks to
+ * `appear`, and always when the initial build hydrates.
+ */
+class Enterer {
+  private constructor(private hook: EnterHook | null, private appear: boolean) {}
+
+  static of(b: Backend, s: Scope, k: Key<Enter>): Enterer {
+    const e = b.interactive ? R.lookupContext(s, k.name, k.default) : k.default;
+    const hook = e.hook === noEnter ? null : e.hook;
+    return new Enterer(hook, e.appear && b.hydrating !== true);
+  }
+
+  /** Whether to run the hook for nodes built by the initial build (`initial`) or a later one. */
+  runs(initial: boolean): boolean {
+    return this.hook !== null && (!initial || this.appear);
+  }
+
+  run(scope: Scope, nodes: N[]): void {
+    const hook = this.hook!;
+    for (let i = 0; i < nodes.length; i++) {
+      if (scope.disposed) return;
+      runHook(scope, hook(nodes[i]));
+    }
+  }
+}
+
+function rectOf(el: any): Rect {
+  const r = el.getBoundingClientRect();
+  return { top: r.top, right: r.right, bottom: r.bottom, left: r.left, width: r.width, height: r.height, x: r.x, y: r.y };
 }
 
 /** A fragment holding a pair of anchors, for a range that changes. */
@@ -250,12 +367,14 @@ function anchors(b: Backend): { start: N; end: N; f: N } {
   return { start, end, f };
 }
 
-export const dynImpl = (leave: Key<LeaveHook>) => (sig: Sig<El>) => (s: Scope) => (): N => {
+export const dynImpl = (hooks: Hooks) => (sig: Sig<El>) => (s: Scope) => (): N => {
   if (R.isConstant(sig)) return sig.value(s)();
   const b = B;
   const { start, end, f } = anchors(b);
-  const remover = Remover.of(b, s, leave);
+  const remover = Remover.of(b, s, hooks.leave);
+  const enterer = Enterer.of(b, s, hooks.enter);
   let child: Scope | null = null;
+  let initial = true;
   R.effectIn(s, () => {
     const el = sig.read();
     R.untracked(() => {
@@ -264,7 +383,10 @@ export const dynImpl = (leave: Key<LeaveHook>) => (sig: Sig<El>) => (s: Scope) =
       removeBetween(b, start, end, remover);
       const made = instantiateIn(b, s, el);
       child = made.scope;
+      const entering = enterer.runs(initial) ? topLevel(b, made.node) : null;
+      initial = false;
       b.insertBefore(b.parentNode(end)!, made.node, end);
+      if (entering !== null) enterer.run(made.scope, entering);
     });
   });
   return f;
@@ -279,6 +401,8 @@ interface Row<A> {
   scope: Scope;
   first: N;
   last: N;
+  /** The scope of the row's running move hooks, if any. */
+  move: Scope | null;
 }
 
 /** Indices of a longest strictly increasing subsequence of `xs`, ignoring negative entries. */
@@ -358,14 +482,37 @@ function removeRow(b: Backend, parent: N, row: Row<any>, r: Remover): void {
   let n: N = row.first;
   for (;;) {
     const after = b.nextSibling(n);
-    r.remove(parent, n);
+    r.remove(parent, n, row.key);
     if (n === row.last || after === null) break;
     n = after;
   }
 }
 
+/** The top-level nodes of a row, in order. */
+function rowNodes(b: Backend, row: Row<any>): N[] {
+  const nodes: N[] = [];
+  let n: N = row.first;
+  for (;;) {
+    nodes.push(n);
+    if (n === row.last) break;
+    n = b.nextSibling(n);
+    if (n === null) break;
+  }
+  return nodes;
+}
+
+const ELEMENT = 1;
+
+/** The rects of a row's top-level elements, in order. */
+function measureRow(b: Backend, row: Row<any>): Rect[] {
+  const nodes = rowNodes(b, row);
+  const rects: Rect[] = [];
+  for (let i = 0; i < nodes.length; i++) if (b.nodeType(nodes[i]) === ELEMENT) rects.push(rectOf(nodes[i]));
+  return rects;
+}
+
 export const eachImpl =
-  (leave: Key<LeaveHook>) =>
+  (hooks: Hooks) =>
   <A, K>(compare: (a: K) => (b: K) => number) =>
   (keyOf: (a: A) => K) =>
   (items: Sig<A[]>) =>
@@ -374,10 +521,17 @@ export const eachImpl =
   (): N => {
     const b = B;
     const { start, end, f } = anchors(b);
-    const remover = Remover.of(b, s, leave);
+    const remover = Remover.of(b, s, hooks.leave);
+    const enterer = Enterer.of(b, s, hooks.enter);
+    const moveHook = b.interactive ? R.lookupContext(s, hooks.move.name, hooks.move.default) : noMove;
+    const mover: MoveHook | null = moveHook === noMove ? null : moveHook;
     let rows: Row<A>[] = [];
+    let initial = true;
+    // Rows built by the current reconcile, for the enter hook.
+    let entered: Row<A>[] | null = null;
 
     const makeRow = (key: K, item: A, into: N, before: N | null): Row<A> => {
+      if (remover.delayed) remover.finishKey(key, compare);
       const cell = R.cell(item);
       const { scope, node } = instantiateIn(b, s, render(cell));
       let first: N;
@@ -391,7 +545,9 @@ export const eachImpl =
         last = node;
       }
       b.insertBefore(into, node, before);
-      return { key, cell, scope, first, last };
+      const row = { key, cell, scope, first, last, move: null };
+      if (entered !== null) entered.push(row);
+      return row;
     };
 
     const createAll = (list: A[]): Row<A>[] => {
@@ -418,7 +574,7 @@ export const eachImpl =
       rows = [];
     };
 
-    const reconcile = (list: A[]) => {
+    const reconcileNodes = (list: A[]) => {
       const n = list.length;
       if (n === 0) {
         if (rows.length > 0) clearAll();
@@ -507,6 +663,54 @@ export const eachImpl =
         anchor = row.first;
       }
       rows = next as Row<A>[];
+    };
+
+    /**
+     * Run the move hook on each top-level element of a kept row whose rect
+     * changed. A move still running on the row is disposed first, so the
+     * new rect is measured without it.
+     */
+    const moved = (row: Row<A>, before: Rect[]) => {
+      if (row.move !== null) {
+        row.move.dispose();
+        row.move = null;
+      }
+      const nodes = rowNodes(b, row);
+      let scope: Scope | null = null;
+      for (let i = 0, j = 0; i < nodes.length; i++) {
+        if (b.nodeType(nodes[i]) !== ELEMENT) continue;
+        const was = before[j++];
+        if (was === undefined) break;
+        const now = rectOf(nodes[i]);
+        if (was.left === now.left && was.top === now.top && was.width === now.width && was.height === now.height) continue;
+        if (scope === null) scope = R.createScope(row.scope);
+        const c = scope;
+        const hook = mover!({ node: nodes[i], before: was, after: now });
+        R.untracked(() => R.runInScope(c, () => hook(c)()));
+      }
+      row.move = scope;
+    };
+
+    const reconcile = (list: A[]) => {
+      const runEnter = enterer.runs(initial);
+      initial = false;
+      entered = runEnter ? [] : null;
+      // A copy: removals splice `rows` in place.
+      const old = mover !== null && rows.length > 0 && list.length > 0 ? rows.slice() : null;
+      const rects = old !== null ? old.map((row) => measureRow(b, row)) : null;
+      reconcileNodes(list);
+      if (old !== null) {
+        const kept = new Set(rows);
+        for (let i = 0; i < old.length; i++) if (kept.has(old[i])) moved(old[i], rects![i]);
+      }
+      if (entered !== null) {
+        // In document order: a reorder builds rows from the end.
+        const made = new Set(entered);
+        entered = null;
+        if (made.size === 0) return;
+        const now = rows;
+        for (let i = 0; i < now.length; i++) if (made.has(now[i])) enterer.run(now[i].scope, rowNodes(b, now[i]));
+      }
     };
 
     R.effectIn(s, () => {

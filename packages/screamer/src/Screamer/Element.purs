@@ -20,6 +20,14 @@ module Screamer.Element
   , suspense
   , withLeave
   , LeaveHook
+  , immediateLeave
+  , withEnter
+  , EnterHook
+  , noEnter
+  , withMove
+  , MoveHook
+  , Move
+  , noMove
   , mount
   , instantiate
   , class IsElement
@@ -38,6 +46,7 @@ import Screamer.Renderer (Backend, Boundary, boundaryKey, browserBackend, intera
 import Screamer.Signal (Signal)
 import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
+import Web.DOM.Element (DOMRect)
 import Web.DOM.Element as DOM
 import Web.DOM.Node (Node)
 
@@ -54,11 +63,18 @@ foreign import fragmentImpl :: Array Element -> Scope -> Effect Node
 
 foreign import textImpl :: Signal String -> Scope -> Effect Node
 
-foreign import dynImpl :: Key LeaveHook -> Signal Element -> Scope -> Effect Node
+-- | The context keys of the three hooks, read when a `dyn` or `each` is
+-- | instantiated.
+type Hooks = { leave :: Key LeaveHook, enter :: Key Enter, move :: Key MoveHook }
+
+hooks :: Hooks
+hooks = { leave: key leaveKey, enter: key enterKey, move: key moveKey }
+
+foreign import dynImpl :: Hooks -> Signal Element -> Scope -> Effect Node
 
 foreign import eachImpl
   :: forall k a
-   . Key LeaveHook
+   . Hooks
   -> (k -> k -> Int)
   -> (a -> k)
   -> Signal (Array a)
@@ -84,7 +100,7 @@ text s = Element (Owned (textImpl s))
 -- | Each new value disposes the previous element's scope and nodes, then
 -- | instantiates the new element in a fresh child scope.
 dyn :: Signal Element -> Element
-dyn s = Element (Owned (dynImpl (key leaveKey) s))
+dyn s = Element (Owned (dynImpl hooks s))
 
 -- | Run setup effects once per instance, in the element's scope.
 component :: Owned Element -> Element
@@ -124,7 +140,7 @@ foreignWithFallback_ setup tag attrs fallback = Element $ Owned \s -> do
 -- | update their signal in place, removed keys are disposed, and reorders
 -- | move as few rows as possible.
 each :: forall k a. Ord k => (a -> k) -> Signal (Array a) -> (Signal a -> Element) -> Element
-each rowKey items row = Element (Owned (eachImpl (key leaveKey) cmp rowKey items row))
+each rowKey items row = Element (Owned (eachImpl hooks cmp rowKey items row))
   where
   cmp a b = case compare a b of
     LT -> -1
@@ -171,9 +187,15 @@ suspense fallback content = Element (Owned (suspenseImpl settledIn (key boundary
   settledIn s = let Owned run = settled in run s
 
 -- | How a removed branch or row leaves: given each of its top-level nodes
--- | and the action that detaches it.
-type LeaveHook = Node -> Effect Unit -> Effect Unit
+-- | and the action that detaches it. The hook runs in a leaving scope of
+-- | its own, which is disposed when the node is detached: when the hook
+-- | calls the action, when the enclosing `dyn` or `each` is disposed, or
+-- | when `each` rebuilds the row's key while the node is still leaving. So
+-- | timers, frames and `onCleanup`s inside the hook end with the leave.
+type LeaveHook = Node -> Effect Unit -> Owned Unit
 
+-- | The default leave hook: detach at once. `dyn` and `each` take their
+-- | fast path when the hook is this one.
 foreign import immediateLeave :: LeaveHook
 
 data LeaveKey
@@ -190,13 +212,88 @@ leaveKey = Proxy
 -- | is disposed at once, and each of its top-level nodes stays in the
 -- | document until the hook calls the action it was given. When the scope
 -- | of the `dyn` or `each` itself is disposed, nodes still leaving are
--- | removed at once.
+-- | removed at once. When `each` rebuilds a key whose old nodes are still
+-- | leaving, it finishes those first, so the old and new row are never
+-- | shown together.
+-- |
+-- | The hook is inherited by every `dyn` and `each` inside the element, and
+-- | runs only when the renderer is interactive.
 -- |
 -- | ```purescript
--- | withLeave (\node done -> fadeOut node *> after 200 done) (each ...)
+-- | fadeOut node done = do
+-- |   liftEffect (addClass "leaving" node)
+-- |   ended <- after (Milliseconds 200.0)
+-- |   Event.subscribe ended \_ -> done
+-- |
+-- | withLeave fadeOut (each ...)
 -- | ```
 withLeave :: LeaveHook -> Element -> Element
 withLeave hook el = Element (provide leaveKey hook (instantiate el))
+
+-- | What a new branch or row does once its nodes are in place: given each
+-- | of its top-level nodes, after they are inserted. The hook runs in a
+-- | child scope of the branch's or row's scope, so it is disposed with it.
+type EnterHook = Node -> Owned Unit
+
+-- | The default enter hook, which does nothing and is skipped.
+foreign import noEnter :: EnterHook
+
+type Enter = { appear :: Boolean, hook :: EnterHook }
+
+data EnterKey
+
+instance ContextKey EnterKey Enter where
+  keyName _ = "Screamer.Element.EnterKey"
+  keyDefault _ = { appear: false, hook: noEnter }
+
+enterKey :: Proxy EnterKey
+enterKey = Proxy
+
+-- | Run the hook on the nodes of branches of `dyn` and rows of `each`
+-- | inside the element, once they are inserted, for enter animations.
+-- |
+-- | The hook runs only for branches and rows that a change to that `dyn`'s
+-- | or `each`'s own signal adds, never for its initial build, so a list does
+-- | not animate every row when its parent branch appears. With `appear`
+-- | the initial build runs it too; the enclosing tree may then not be in
+-- | the document yet, so a hook that needs layout should wait a frame. A
+-- | build that hydrates server-rendered nodes never runs it, even with
+-- | `appear`. Like `withLeave`, the hook is inherited by every `dyn` and
+-- | `each` inside the element, and runs only when the renderer is
+-- | interactive.
+withEnter :: { appear :: Boolean } -> EnterHook -> Element -> Element
+withEnter { appear } hook el = Element (provide enterKey { appear, hook } (instantiate el))
+
+-- | One top-level element of an `each` row that moved, with its bounding
+-- | rect before and after the change.
+type Move = { node :: Node, before :: DOMRect, after :: DOMRect }
+
+-- | What a moved row does, for reorder (FLIP) animations.
+type MoveHook = Move -> Owned Unit
+
+-- | The default move hook, which does nothing; `each` then measures nothing.
+foreign import noMove :: MoveHook
+
+data MoveKey
+
+instance ContextKey MoveKey MoveHook where
+  keyName _ = "Screamer.Element.MoveKey"
+  keyDefault _ = noMove
+
+moveKey :: Proxy MoveKey
+moveKey = Proxy
+
+-- | Run the hook when rows of an `each` inside the element move. On each
+-- | change, `each` measures the top-level elements of the rows it keeps
+-- | (`getBoundingClientRect`) before and after it updates the DOM, and runs
+-- | the hook for each element whose rect changed, whether it was moved or
+-- | displaced by rows added or removed around it. The hook runs in a child
+-- | scope of the row's scope, which is disposed before the row is measured
+-- | again, so a move that interrupts another starts from where the element
+-- | is shown. Inherited by every `each` inside the element; runs only when
+-- | the renderer is interactive.
+withMove :: MoveHook -> Element -> Element
+withMove hook el = Element (provide moveKey hook (instantiate el))
 
 foreign import withBackend :: forall a. Backend -> Effect a -> Effect a
 
