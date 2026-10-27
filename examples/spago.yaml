@@ -18,6 +18,7 @@ package:
     - refs
     - screamer
     - screamer-combinators
+    - screamer-devtools
     - screamer-forms
     - screamer-motion
     - screamer-reactive

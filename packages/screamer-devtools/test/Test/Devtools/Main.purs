@@ -11,13 +11,14 @@ import Effect.Class (liftEffect)
 import Effect.Exception (message, try)
 import Effect (Effect)
 import Effect.Ref as Ref
-import Screamer.Devtools (assertNoLeaks, countWork, defaultLogOptions, everything, expectEffectRuns, expectRounds, leaks, snapshotJson, snapshotText, startLog, withStrict)
+import Screamer.Devtools (assertNoLeaks, countWork, defaultLogOptions, everything, expectEffectRuns, expectRounds, leaks, snapshotJson, snapshotText, startLog, withStrict, withoutStrict)
 import Screamer.Element (Element, component, dyn, each, element_, mount, named, text)
 import Screamer.Owned (Owned)
 import Screamer.Signal (Signal)
 import Screamer.Source (signalSource)
 import Screamer.Test (runSpec)
 import Screamer.Test.Dom (resetBody)
+import Test.Devtools.Inspect as Inspect
 import Test.Spec (describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -30,6 +31,7 @@ writer src x = component (liftEffect (src.putT1 x) $> element_ "span" [] [] :: O
 
 main :: Effect Unit
 main = runSpec do
+  Inspect.spec
   describe "snapshots" do
     it "show the scope tree with names, kinds and row keys" do
       liftEffect resetBody
@@ -43,12 +45,12 @@ main = runSpec do
       t `shouldEqual` String.joinWith "\n"
         [ "1 root, 7 scopes, 4 effects"
         , "root"
-        , "  provide (provides Screamer.Renderer.RendererKey)"
-        , "    named:App (2 effects)"
-        , "      each[key=1] (1 effect)"
-        , "      each[key=2] (1 effect)"
-        , "      dyn"
-        , "        named:Panel"
+        , "  provide (provides Screamer.Renderer.RendererKey) <div>"
+        , "    named:App (2 effects) <div>"
+        , "      each[key=1] (1 effect) <li>"
+        , "      each[key=2] (1 effect) <li>"
+        , "      dyn \"on\""
+        , "        named:Panel \"on\""
         ]
       j <- liftEffect snapshotJson
       unless (contains (Pattern "\"path\":\"root/provide/named:App/each[key=2]\"") j) $ fail j
@@ -108,7 +110,7 @@ main = runSpec do
       liftEffect resetBody
       src <- liftEffect $ signalSource 0
       log <- liftEffect $ startLog defaultLogOptions
-      unmount <- liftEffect $ mount "#root" $ element_ "div" [] [ named "A" (writer src 1), named "B" (writer src 2) ]
+      unmount <- liftEffect $ withoutStrict $ mount "#root" $ element_ "div" [] [ named "A" (writer src 1), named "B" (writer src 2) ]
       liftEffect log.stop
       out <- liftEffect $ log.read everything
       let lines = String.split (Pattern "\n") out

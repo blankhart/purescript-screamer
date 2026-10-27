@@ -10,6 +10,12 @@ import * as runtime from '../Screamer.Runtime.Unsafe/foreign.js';
 
 const R: typeof Runtime = runtime;
 
+// ES2021, which every runtime the tools run in has; the build targets ES2020.
+declare class WeakRef<T extends object> {
+  constructor(target: T);
+  deref(): T | undefined;
+}
+
 type Scope = Runtime.Scope;
 type DevEvent = Runtime.DevEvent;
 type DevHook = Runtime.DevHook;
@@ -119,7 +125,30 @@ interface ScopeTree {
   effects: number;
   cleanups: number;
   context: string[];
+  nodes: string[];
   children: ScopeTree[];
+}
+
+/** A node as a short string: `<li#id>`, a text node's text, or `<!---->`. */
+function describeNode(n: any): string {
+  if (n === null || typeof n !== 'object' || typeof n.nodeType !== 'number') return '<node>';
+  switch (n.nodeType) {
+    case 1: {
+      const tag = String(n.tagName).toLowerCase();
+      const id = typeof n.id === 'string' && n.id !== '' ? `#${n.id}` : '';
+      return `<${tag}${id}>`;
+    }
+    case 3: {
+      const t = String(n.data);
+      return JSON.stringify(t.length > 24 ? `${t.slice(0, 24)}…` : t);
+    }
+    case 8:
+      return '<!---->';
+    case 11:
+      return '#fragment';
+    default:
+      return '<node>';
+  }
 }
 
 function treeOf(s: Scope, path: string): ScopeTree {
@@ -136,6 +165,7 @@ function treeOf(s: Scope, path: string): ScopeTree {
     effects,
     cleanups: s.cleanups.length - effects,
     context: s.ctx === null ? [] : Object.keys(s.ctx),
+    nodes: info.nodes.map(describeNode),
     children,
   };
 }
@@ -177,11 +207,72 @@ export const snapshotText = (): string => {
     if (tree.effects > 0) notes.push(plural(tree.effects, 'effect'));
     if (tree.cleanups > 0) notes.push(plural(tree.cleanups, 'cleanup'));
     if (tree.context.length > 0) notes.push(`provides ${tree.context.join(', ')}`);
-    lines.push(`${'  '.repeat(depth)}${last}${notes.length > 0 ? ` (${notes.join('; ')})` : ''}`);
+    const nodes = tree.nodes.length > 0 ? ` ${tree.nodes.join(' ')}` : '';
+    lines.push(`${'  '.repeat(depth)}${last}${notes.length > 0 ? ` (${notes.join('; ')})` : ''}${nodes}`);
     tree.children.forEach((c) => go(c, depth + 1));
   };
   roots.forEach((r) => go(r, 0));
   return lines.join('\n');
+};
+
+// ---------------------------------------------------------------------------
+// Between the page and the tree
+
+/** The live scope at `path`, or null. */
+function findScope(path: string): Scope | null {
+  const parts = path.split('/');
+  let level = R.rootScopes();
+  let found: Scope | null = null;
+  for (const part of parts) {
+    const names = segments(level);
+    const i = names.indexOf(part);
+    if (i < 0) return null;
+    found = level[i];
+    level = Array.from(found.children);
+  }
+  return found;
+}
+
+/** The innermost live scope whose element built `node` or one of its ancestors. */
+function scopeOfNode(node: any): Scope | null {
+  for (let n = node; n !== null && n !== undefined; n = n.parentNode) {
+    const s = R.ownerOfNode(n);
+    if (s !== null) return s;
+  }
+  return null;
+}
+
+export const scopeOfImpl = (just: (s: string) => unknown) => (nothing: unknown) => (node: unknown) => (): unknown => {
+  const s = scopeOfNode(node);
+  return s === null ? nothing : just(pathOf(s)!);
+};
+
+export const nodesOfImpl = (path: string) => (): unknown[] => {
+  const s = findScope(path);
+  return s === null ? [] : R.scopeInfo(s).nodes.slice();
+};
+
+// ---------------------------------------------------------------------------
+// Creation sites
+
+/**
+ * Frames inside the runtime and the `Effect` plumbing, which say nothing
+ * about the program. Frames in `Screamer.Element` stay: they say which
+ * primitive (`mount`, `dyn`, `each`) made a scope.
+ */
+const internal = /node:internal|[\\/]output(-es)?[\\/](Effect|Effect\.[A-Za-z.]+|Control\.[A-Za-z.]+|Data\.[A-Za-z.]+|Test\.Spec[A-Za-z.]*|Screamer\.(Runtime|Runtime\.Unsafe|Owned|Context|Devtools))[\\/]|[\\/]screamer-(reactive|devtools)[\\/]src[\\/]/;
+
+/** The first few frames of `x`'s creation site outside Screamer, or empty when not tracked. */
+function originText(x: object): string {
+  const stack = R.originOf(x);
+  if (stack === null) return '';
+  const frames = stack.split('\n').slice(1).map((l) => l.trim()).filter((l) => l !== '' && !internal.test(l));
+  return frames.slice(0, 3).join('\n');
+}
+
+export const setTrackOrigins = (b: boolean) => (): void => {
+  requireDev('setTrackOrigins');
+  R.setTrackOrigins(b);
 };
 
 // ---------------------------------------------------------------------------
@@ -193,6 +284,7 @@ interface LiveScope {
   name: string;
   scopes: number;
   effects: number;
+  origin: string;
 }
 
 interface Leaks {
@@ -227,7 +319,7 @@ export const leaksImpl = (action: () => void) => (): Leaks => {
     .filter((s) => s.parent === null || !set.has(s.parent))
     .map((s) => {
       const info = R.scopeInfo(s);
-      return { path: pathOf(s)!, kind: info.kind, name: info.name, ...subtree(s) };
+      return { path: pathOf(s)!, kind: info.kind, name: info.name, ...subtree(s), origin: originText(s) };
     });
   const effects = R.readStats().liveEffects - before;
   const parts: string[] = [];
@@ -241,7 +333,10 @@ export const leaksImpl = (action: () => void) => (): Leaks => {
 export const assertNoLeaksImpl = (action: () => void) => (): void => {
   const l = leaksImpl(action)();
   if (l.scopes.length === 0 && l.effects === 0) return;
-  const detail = l.scopes.map((s) => `  ${s.path} (${plural(s.scopes, 'scope')}, ${plural(s.effects, 'effect')})`);
+  const detail = l.scopes.map((s) => {
+    const line = `  ${s.path} (${plural(s.scopes, 'scope')}, ${plural(s.effects, 'effect')})`;
+    return s.origin === '' ? line : `${line}\n${s.origin.split('\n').map((f) => `    ${f}`).join('\n')}`;
+  });
   throw new Error([`screamer-devtools: ${l.summary}`, ...detail].join('\n'));
 };
 
@@ -288,15 +383,20 @@ export const failWork = (message: string) => (): void => {
 // ---------------------------------------------------------------------------
 // Strict mode
 
-export const withStrictImpl = <A>(action: () => A) => (): A => {
+export const withStrictnessImpl = (b: boolean) => <A>(action: () => A) => (): A => {
   requireDev('withStrict');
   const was = R.isStrict();
-  R.setStrict(true);
+  R.setStrict(b);
   try {
     return action();
   } finally {
     R.setStrict(was);
   }
+};
+
+export const setConsistencyCheck = (b: boolean) => (): void => {
+  requireDev('setConsistencyCheck');
+  R.setConsistencyCheck(b);
 };
 
 // ---------------------------------------------------------------------------
@@ -356,6 +456,38 @@ function filterRow(row: Row, keep: (p: string | null) => boolean): Row | null {
   return any > 0 ? r : null;
 }
 
+/** The signal and event sources `n` reads, directly or through derived and stateful nodes. */
+function upstreamSources(n: object, limit = 10000): object[] {
+  const seen: Set<object> = new Set();
+  const found: object[] = [];
+  const stack: object[] = [n];
+  while (stack.length > 0 && seen.size < limit) {
+    const x = stack.pop()!;
+    if (seen.has(x)) continue;
+    seen.add(x);
+    const kind = R.nodeKind(x);
+    if (kind === 'signal source' || kind === 'event source') {
+      found.push(x);
+      continue;
+    }
+    for (const i of R.nodeInputs(x).inputs) stack.push(i);
+  }
+  return found;
+}
+
+/** Why an effect ran: what it saw when its last run started. */
+interface Run {
+  round: number;
+  scope: string;
+  because: { node: number; kind: string; label: string }[];
+  sources: { source: number; kind: string; by: string | null }[];
+}
+
+interface Explanation {
+  summary: string;
+  json: string;
+}
+
 export const startLogImpl = (opts: LogOptions) => () => {
   requireDev('startLog');
   const limit = Math.max(1, opts.limit);
@@ -364,7 +496,9 @@ export const startLogImpl = (opts: LogOptions) => () => {
   let rounds = 0;
   let warnings = 0;
   let errors = 0;
+  // Ids for every node the log mentions, in the order it first sees them.
   const ids: WeakMap<object, number> = new WeakMap();
+  const effects: Map<number, WeakRef<object>> = new Map();
   let nextId = 0;
   const idOf = (x: object): number => {
     let n = ids.get(x);
@@ -373,9 +507,15 @@ export const startLogImpl = (opts: LogOptions) => () => {
   };
   let writes: Cause[] = [];
   let fires: Cause[] = [];
+  // The sources behind `writes` and `fires`, and those of the current round.
+  let pending: Map<object, string | null> = new Map();
+  let current: Map<object, string | null> = new Map();
   let row: Extract<Row, { round: number }> | null = null;
   let started = 0;
   let steps = 0;
+  // The rounds each source was last written or fired for, and each effect's last run.
+  const lastWritten: WeakMap<object, number> = new WeakMap();
+  const runs: Map<number, Run> = new Map();
 
   const push = (r: Row) => {
     rows.push(r);
@@ -384,6 +524,8 @@ export const startLogImpl = (opts: LogOptions) => () => {
       dropped++;
     }
   };
+
+  const describe = (x: object) => ({ node: idOf(x), kind: R.nodeKind(x), label: R.nodeLabel(x) });
 
   const stop = listen((e) => {
     switch (e.type) {
@@ -398,8 +540,11 @@ export const startLogImpl = (opts: LogOptions) => () => {
           warnings: [],
           errors: [],
         };
+        current = pending;
+        for (const src of current.keys()) lastWritten.set(src, row.round);
         writes = [];
         fires = [];
+        pending = new Map();
         steps = R.readStats().steps;
         if (opts.timings) started = performance.now();
         break;
@@ -413,13 +558,27 @@ export const startLogImpl = (opts: LogOptions) => () => {
         break;
       case 'write':
         writes.push({ source: idOf(e.source), by: pathOf(e.scope) });
+        pending.set(e.source, pathOf(e.scope));
         break;
       case 'fire':
         fires.push({ source: idOf(e.source), by: pathOf(e.scope) });
+        pending.set(e.source, pathOf(e.scope));
         break;
-      case 'effectRun':
-        if (row !== null) row.effects.push({ effect: idOf(e.effect), scope: pathOf(e.scope)! });
+      case 'effectRun': {
+        const id = idOf(e.effect);
+        const scope = pathOf(e.scope)!;
+        if (row !== null) row.effects.push({ effect: id, scope });
+        effects.set(id, new WeakRef(e.effect));
+        // The run has not started: the effect's inputs still hold the
+        // versions it saw last time, so a changed version is a cause.
+        const { inputs, versions } = R.nodeInputs(e.effect);
+        const because = inputs.filter((x, i) => versions === null || x.version !== versions[i]).map(describe);
+        const sources = upstreamSources(e.effect)
+          .filter((x) => current.has(x))
+          .map((x) => ({ source: idOf(x), kind: R.nodeKind(x), by: current.get(x)! }));
+        runs.set(id, { round: row === null ? -1 : row.round, scope, because, sources });
         break;
+      }
       case 'scopeCreated':
         if (row !== null) row.scopes.created++;
         break;
@@ -454,5 +613,255 @@ export const startLogImpl = (opts: LogOptions) => () => {
     return [JSON.stringify({ summary }), ...kept.map((r) => JSON.stringify(r))].join('\n');
   };
 
-  return { read, stop };
+  const explain = (summary: string, data: object): Explanation => ({
+    summary,
+    json: JSON.stringify({ version: FORMAT, ...data }),
+  });
+
+  const name = (x: { kind: string; label: string }, id: number) => `${x.kind}${x.label === '' ? '' : ` (${x.label})`} ${id}`;
+
+  const why = (id: number) => (): Explanation => {
+    const run = runs.get(id);
+    if (run === undefined) return explain(`effect ${id} has not run while the log was recording`, { effect: id, ran: false });
+    const e = effects.get(id)?.deref();
+    const origin = e === undefined ? '' : originText(e);
+    const parts: string[] = [];
+    if (run.round < 0) parts.push(`effect ${id} in ${run.scope} last ran when it was created`);
+    else {
+      parts.push(`effect ${id} in ${run.scope} last ran in round ${run.round}`);
+      if (run.because.length > 0) parts.push(`because ${run.because.map((b) => `${name(b, b.node)} updated`).join(', ')}`);
+      if (run.sources.length > 0) {
+        parts.push(`, which ${run.sources.length === 1 ? 'follows' : 'follow'} ${run.sources
+          .map((x) => `${x.kind} ${x.source} ${x.kind === 'event source' ? 'fired' : 'written'} by ${x.by ?? 'an event handler'}`)
+          .join(', ')}`);
+      }
+    }
+    return explain(parts.join(' ').replace(' , which', ', which') + (origin === '' ? '' : `\ncreated at\n${origin}`), { effect: id, ran: true, ...run, origin });
+  };
+
+  const whyNot = (id: number) => (): Explanation => {
+    const e = effects.get(id)?.deref();
+    if (e === undefined) return explain(`effect ${id} is unknown to the log, or has been collected`, { effect: id, known: false });
+    if (R.effectDisposed(e as any)) return explain(`effect ${id} is disposed, so it never runs again`, { effect: id, disposed: true });
+    const run = runs.get(id)!;
+    const { inputs, versions } = R.nodeInputs(e);
+    if (inputs.length === 0) {
+      return explain(`effect ${id} in ${run.scope} read no signal or event when it last ran, so nothing can run it again`, { effect: id, inputs: [] });
+    }
+    const reasons = inputs.map((x, i) => {
+      const d = describe(x);
+      if (versions !== null && x.version !== versions[i]) return { ...d, reason: 'updated; the effect runs in the next round' };
+      if (d.kind === 'signal source' || d.kind === 'event source') {
+        const r = lastWritten.get(x);
+        if (r !== undefined && r > run.round) {
+          return { ...d, reason: `written in round ${r} with the value it already had, so it did not update` };
+        }
+        return { ...d, reason: `not ${d.kind === 'event source' ? 'fired' : 'written'} since the effect last ran` };
+      }
+      const later = upstreamSources(x).filter((src) => (lastWritten.get(src) ?? -1) > run.round);
+      if (later.length > 0) {
+        return {
+          ...d,
+          reason: `upstream ${later.map((src) => `${R.nodeKind(src)} ${idOf(src)}`).join(', ')} changed since, but this node did not update (an equal value, dropRepeats or a filter)`,
+        };
+      }
+      return { ...d, reason: 'no source upstream of it has changed since the effect last ran' };
+    });
+    const summary = [`effect ${id} in ${run.scope} has not run since ${run.round < 0 ? 'it was created' : `round ${run.round}`}:`]
+      .concat(reasons.map((r) => `  ${name(r, r.node)}: ${r.reason}`))
+      .join('\n');
+    return explain(summary, { effect: id, lastRound: run.round, inputs: reasons });
+  };
+
+  return { read, stop, why, whyNot };
+};
+
+// ---------------------------------------------------------------------------
+// Recordings
+//
+// A recording holds the writes and fires made from outside every scope and
+// effect (event handlers, timers, a test's own actions) to sources created
+// while it records, grouped by the round they started. Sources are named by
+// creation order, so a replay that builds the same program creates them in
+// the same order and the writes can be matched to them. Writes that effects
+// make are not recorded: the replay makes them again.
+
+interface Op {
+  source: number;
+  kind: 'write' | 'fire';
+  value?: unknown;
+  opaque?: true;
+}
+
+interface Recording {
+  version: number;
+  steps: Op[][];
+  external: number;
+}
+
+/** Whether `v` survives a trip through JSON unchanged. */
+function encodable(v: unknown, depth = 0): boolean {
+  if (depth > 50) return false;
+  if (v === null || typeof v === 'string' || typeof v === 'boolean') return true;
+  if (typeof v === 'number') return Number.isFinite(v);
+  if (Array.isArray(v)) return v.every((x) => encodable(x, depth + 1));
+  if (typeof v === 'object') {
+    const proto = Object.getPrototypeOf(v);
+    if (proto !== Object.prototype && proto !== null) return false;
+    return Object.values(v as object).every((x) => encodable(x, depth + 1));
+  }
+  return false;
+}
+
+export const startRecording = () => {
+  requireDev('startRecording');
+  const index: WeakMap<object, number> = new WeakMap();
+  let created = 0;
+  const steps: Op[][] = [];
+  let step: Op[] = [];
+  let external = 0;
+  const stopListening = listen((e) => {
+    switch (e.type) {
+      case 'sourceCreated':
+        index.set(e.source, created++);
+        break;
+      case 'write':
+      case 'fire': {
+        if (e.scope !== null) break;
+        const i = index.get(e.source);
+        if (i === undefined) {
+          external++;
+          break;
+        }
+        step.push(encodable(e.value) ? { source: i, kind: e.type, value: e.value } : { source: i, kind: e.type, opaque: true });
+        break;
+      }
+      case 'roundStart':
+        if (step.length > 0) {
+          steps.push(step);
+          step = [];
+        }
+        break;
+    }
+  });
+  return {
+    stop: (): Recording => {
+      stopListening();
+      if (step.length > 0) steps.push(step);
+      return { version: FORMAT, steps, external };
+    },
+  };
+};
+
+export const encodeRecording = (r: Recording): string => JSON.stringify(r);
+
+export const decodeRecordingImpl =
+  (left: (e: string) => unknown) => (right: (r: Recording) => unknown) => (text: string): unknown => {
+    let r: any;
+    try {
+      r = JSON.parse(text);
+    } catch (e) {
+      return left(`not JSON: ${errorMessage(e)}`);
+    }
+    if (r === null || typeof r !== 'object') return left('not a recording');
+    if (r.version !== FORMAT) return left(`recording format ${r.version}, expected ${FORMAT}`);
+    if (!Array.isArray(r.steps) || typeof r.external !== 'number') return left('not a recording');
+    for (const step of r.steps) {
+      if (!Array.isArray(step)) return left('a step is not a list');
+      for (const op of step) {
+        if (op === null || typeof op.source !== 'number' || (op.kind !== 'write' && op.kind !== 'fire')) {
+          return left('an operation is malformed');
+        }
+      }
+    }
+    return right(r as Recording);
+  };
+
+/** How many steps and writes a recording holds. */
+export const recordingSize = (r: Recording) => ({
+  steps: r.steps.length,
+  writes: r.steps.reduce((n, s) => n + s.length, 0),
+  opaque: r.steps.reduce((n, s) => n + s.filter((op) => op.opaque === true).length, 0),
+  external: r.external,
+});
+
+/**
+ * Run `mount` while numbering the sources it creates, then apply the
+ * recording's steps, each in one batch, numbering the sources the steps
+ * create too. Returns `mount`'s result and how many writes were applied and
+ * skipped (opaque values, or sources the replay never created).
+ */
+export const replayImpl = (r: Recording) => <A>(mount: () => A) => () => {
+  requireDev('replay');
+  const sources: object[] = [];
+  let applied = 0;
+  let skipped = 0;
+  const stop = listen((e) => {
+    if (e.type === 'sourceCreated') sources.push(e.source);
+  });
+  try {
+    const value = mount();
+    for (const step of r.steps) {
+      R.batch(() => {
+        for (const op of step) {
+          const src: any = sources[op.source];
+          if (op.opaque === true || src === undefined || R.nodeKind(src) !== (op.kind === 'write' ? 'signal source' : 'event source')) {
+            skipped++;
+            continue;
+          }
+          if (op.kind === 'write') src.putT1(op.value);
+          else src.fireT1(op.value);
+          applied++;
+        }
+      });
+    }
+    return { value, applied, skipped };
+  } finally {
+    stop();
+  }
+};
+
+// ---------------------------------------------------------------------------
+// The page global
+//
+// `window.__SCREAMER_DEVTOOLS__` gives a script in the page (Playwright's
+// `page.evaluate`, or `npm run inspect`) the same data, with plain
+// functions in place of curried effects.
+
+export const exposeGlobalImpl = () => {
+  if (!R.development || typeof globalThis === 'undefined') return;
+  const g: any = globalThis;
+  const api: any = {
+    version: FORMAT,
+    snapshotJson: () => JSON.parse(snapshotJson()),
+    snapshotText: () => snapshotText(),
+    scopeOf: (node: unknown) => {
+      const s = scopeOfNode(node);
+      return s === null ? null : pathOf(s);
+    },
+    nodesOf: (path: string) => nodesOfImpl(path)(),
+    startLog: (o?: Partial<LogOptions>) => {
+      const log = startLogImpl({ limit: o?.limit ?? 1000, timings: o?.timings ?? false })();
+      return {
+        read: (under = '') => log.read({ under })(),
+        stop: () => log.stop(),
+        why: (id: number) => log.why(id)().summary,
+        whyNot: (id: number) => log.whyNot(id)().summary,
+      };
+    },
+    setStrict: (b: boolean) => R.setStrict(b),
+    setTrackOrigins: (b: boolean) => R.setTrackOrigins(b),
+    setConsistencyCheck: (b: boolean) => R.setConsistencyCheck(b),
+    warnings: [] as { code: string; message: string; scope: string | null }[],
+  };
+  // Keep the newest 100 warnings, so a script can read what it missed.
+  listen((e) => {
+    if (e.type !== 'warning') return;
+    api.warnings.push({ code: e.code, message: e.message, scope: pathOf(e.scope) });
+    if (api.warnings.length > 100) api.warnings.shift();
+  });
+  // A script that sets this flag before the page loads gets a log of
+  // everything from the first mount.
+  if (g.__SCREAMER_DEVTOOLS_LOG__ === true) api.log = api.startLog();
+  g.__SCREAMER_DEVTOOLS__ = api;
 };

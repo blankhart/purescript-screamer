@@ -23,6 +23,7 @@
     "test:purs": "tsc && spago build && node scripts/test-purs.mjs",
     "test:compile-fail": "node compile-fail/run.mjs",
     "test:smoke": "node examples/smoke.mjs",
+    "inspect": "node examples/inspect.mjs",
     "set-version": "node scripts/set-version.mjs"
   },
   "devDependencies": {

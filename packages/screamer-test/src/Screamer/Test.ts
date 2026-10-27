@@ -16,3 +16,18 @@ export const observe = <A>(s: Runtime.Readable<A>) => () => {
 export const exit = (code: number) => () => {
   (globalThis as any).process.exitCode = code;
 };
+
+/** Turn strict mode on: development warnings are thrown as errors. */
+export const strict = () => {
+  R.setStrict(true);
+};
+
+export const withoutStrict = <A>(action: () => A) => (): A => {
+  const was = R.isStrict();
+  R.setStrict(false);
+  try {
+    return action();
+  } finally {
+    R.setStrict(was);
+  }
+};
