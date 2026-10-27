@@ -85,3 +85,18 @@ export const addTarget = (id) => () => {
 export const crash = (message) => {
   throw new Error(message);
 };
+
+export const hydrating = (b) => ({ ...b, hydrating: true });
+
+// jsdom lays nothing out: give each element a rect from its place among its
+// parent's element children, 10px tall, one under another.
+export const stubRects = () => {
+  const proto = window.Element.prototype;
+  const saved = proto.getBoundingClientRect;
+  proto.getBoundingClientRect = function () {
+    const i = this.parentNode === null ? 0 : Array.prototype.indexOf.call(this.parentNode.children, this);
+    const top = i * 10;
+    return { top, bottom: top + 10, left: 0, right: 100, width: 100, height: 10, x: 0, y: top };
+  };
+  return () => { proto.getBoundingClientRect = saved; };
+};

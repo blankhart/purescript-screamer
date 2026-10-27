@@ -160,6 +160,34 @@ const examples = {
     if (left !== 0) throw new Error(`${left} editors left after unmount`);
   },
 
+  async Motion(page) {
+    const texts = (sel) => page.evaluate((s) => Array.from(document.querySelectorAll(s)).map((l) => l.textContent).join(), sel);
+    // Animations on the rows (the buttons have CSS hover transitions).
+    const rowAnimations = () => page.evaluate(() => document.getAnimations().filter((a) => a.effect?.target?.tagName === 'LI').length);
+    await page.waitForFunction(() => document.querySelectorAll('#todo li').length === 3);
+    // A task carried to the other list: both copies animate while it moves,
+    // the old one leaves when its animation finishes, and the bar eases.
+    await page.click('#todo li:nth-child(1)');
+    await page.waitForFunction(() => document.getAnimations().some((a) => a.effect?.target?.tagName === 'LI'));
+    await page.waitForFunction(() => document.querySelectorAll('#todo li').length === 2 && !document.getAnimations().some((a) => a.effect?.target?.tagName === 'LI'));
+    if ((await texts('#done li')) !== 'Water the plants,Fix the gate') throw new Error(`done: ${await texts('#done li')}`);
+    await page.waitForFunction(() => document.querySelector('#fill').style.width === '50%');
+    // Reversing moves rows with FLIP; a new task fades in.
+    await page.click('#reverse');
+    await page.waitForFunction(() => document.getAnimations().some((a) => a.effect?.target?.tagName === 'LI'));
+    await page.waitForFunction(() => !document.getAnimations().some((a) => a.effect?.target?.tagName === 'LI'));
+    if ((await texts('#todo li')) !== 'Buy bread,Answer the letter') throw new Error(`todo: ${await texts('#todo li')}`);
+    await page.click('#add');
+    await page.waitForFunction(() => document.getAnimations().some((a) => a.effect?.target?.textContent === 'Task 5'));
+    await page.waitForFunction(() => !document.getAnimations().some((a) => a.effect?.target?.tagName === 'LI'));
+    if ((await texts('#todo li')) !== 'Buy bread,Answer the letter,Task 5') throw new Error(`todo: ${await texts('#todo li')}`);
+    // With reduced motion, a move finishes at once.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.click('#todo li:nth-child(1)');
+    await page.waitForFunction(() => document.querySelectorAll('#todo li').length === 2);
+    if ((await rowAnimations()) !== 0) throw new Error('rows animated under reduced motion');
+  },
+
   async JsFrameworksBenchmark(page) {
     await page.click('#run');
     await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 1000);

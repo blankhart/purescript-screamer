@@ -26,3 +26,10 @@ foreign import addTarget :: String -> Effect Unit
 
 -- | Throw an error from pure code.
 foreign import crash :: forall a. String -> a
+
+-- | The backend, with `hydrating` set.
+foreign import hydrating :: Backend -> Backend
+
+-- | Give every element a rect from its index among its parent's element
+-- | children (10px rows). Returns the action that restores the original.
+foreign import stubRects :: Effect (Effect Unit)

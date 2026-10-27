@@ -25,6 +25,13 @@ export interface Backend<N = any> {
    * and `foreign_` runs no setup (it renders its fallback instead).
    */
   readonly interactive: boolean;
+  /**
+   * True while the backend claims nodes that are already in the document
+   * (a hydrating renderer, before it switches to pass-through). A `dyn` or
+   * `each` whose initial build hydrates runs no enter hook for it, even
+   * with `appear`. Absent means false.
+   */
+  readonly hydrating?: boolean;
   createElement(tag: string): N;
   createElementNS(ns: string, tag: string): N;
   createText(data: string): N;

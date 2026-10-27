@@ -37,6 +37,7 @@ package:
 | [`screamer-web`](packages/screamer-web) | `Screamer.Web.WebSocket` | browser subscriptions |
 | [`screamer-router`](packages/screamer-router) | `Screamer.Router`, `.Router.Windrose` | the location as a signal |
 | [`screamer-forms`](packages/screamer-forms) | `Screamer.Form` | formlets |
+| [`screamer-motion`](packages/screamer-motion) | `Screamer.Motion`, `.Motion.Transition`, `.Motion.Animate`, `.Motion.Value`, `.Motion.ViewTransition`, `.Motion.ReducedMotion` | enter, leave and move animations, crossfades, tweens and springs |
 | [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock` | test helpers |
 
 `npm run build` builds them all, and `npm test` runs every package's tests.
@@ -92,6 +93,8 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 **Formlets.** `Screamer.Form` (in screamer-forms) builds forms the way Lumi Components' `FormBuilder` does. A `Form props i o` edits a state `i` and validates it into an `o`, and forms combine with `Applicative` (`ado` notation). `prop` focuses a form on one field of a record state, `indent` labels it, and `validated` checks it with a `Validator a b = a -> Either String b`, showing the message only once the field has been edited (its state is `Validated a`) or the form has been revealed. The fields are `textbox`, `password`, `number`, `checkbox` and `select`. `build` creates the state source in the current scope and returns the element, the `Signal (Either (Array String) o)` result, and `reveal` and `reset` actions. `wizard` shows a `Wizard`, a monad of `step`s, one step at a time. See `examples/src/Formlets.purs`.
 
 **Embedding JS widgets.** A widget that owns its DOM subtree (an editor, a map, a chart) goes in `foreign_ setup tag attrs`, which creates the host element and runs `setup host :: Owned Unit` once per instance. Create the widget there and destroy it in `onCleanup`. Sync both ways with guards: push a signal in with `subscribe`, skipping values equal to what the widget already shows so the user's edits do not loop back; report the widget's own changes out through a callback wrapped in `batch`, ignoring changes the wrapper made itself. Screamer never touches the host's children. `foreignWithFallback_` adds children shown where the widget cannot run, such as on a server renderer, whose backend is not interactive. See `examples/src/CodeMirror.purs`.
+
+**Motion.** Only `dyn` and `each` know when a node is added, moved or removed, so the core has one seam for each: `withEnter`, `withMove` and `withLeave` provide hooks to every `dyn` and `each` inside an element. A leave hook keeps the node in place until it calls `done`, and runs in a scope of its own, so its timers and animations end with the leave. `Screamer.Motion` (in screamer-motion) builds on them: CSS-class transitions (`transition`, with `fade` and `slide` presets), the Web Animations API (`animate`, `leaveWith`), FLIP reorders (`flipMoves`), shared-element `crossfade`s between lists, animated values that stop requesting frames once they settle (`tween`, `spring`), and `viewTransition`. Durations are always stated, never read from computed styles, and everything honours `prefers-reduced-motion` by default. See `examples/src/Motion.purs`.
 
 ## Examples
 

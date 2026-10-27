@@ -161,14 +161,15 @@ spec = describe "framework primitives" do
       liftEffect resetBody
       items <- liftEffect $ signalSource [ 1, 2, 3 ]
       leaving <- liftEffect $ Ref.new ([] :: Array { node :: Node, done :: Effect Unit })
-      let hook node done = Ref.modify_ (_ <> [ { node, done } ]) leaving
+      let hook node done = liftEffect $ Ref.modify_ (_ <> [ { node, done } ]) leaving
       l <- leaks do
         unmount <- liftEffect $ mount "#root" $ element_ "ul" []
           [ withLeave hook $ each identity items.signal \s -> element_ "li" [] [ text (show <$> s) ] ]
         mid <- leaks do
           liftEffect $ items.putT1 [ 1, 3 ]
         -- The row's scope (and its text effect) is gone, its node is not.
-        mid `shouldEqual` { effects: -1, scopes: -1, links: -2 }
+        -- The hook's leaving scope takes the row scope's place.
+        mid `shouldEqual` { effects: -1, scopes: 0, links: -2 }
         liftEffect (innerHTML "#root") >>= shouldEqual "<ul><!----><li>1</li><li>2</li><li>3</li><!----></ul>"
         pending <- liftEffect $ Ref.read leaving
         Array.length pending `shouldEqual` 1
@@ -183,7 +184,7 @@ spec = describe "framework primitives" do
       leaving <- liftEffect $ Ref.new ([] :: Array (Effect Unit))
       shown <- liftEffect $ signalSource true
       let
-        hook _ done = Ref.modify_ (_ <> [ done ]) leaving
+        hook _ done = liftEffect $ Ref.modify_ (_ <> [ done ]) leaving
         tabs = withLeave hook $ dyn (tab.signal <#> \t -> element_ "p" [] [ element t ])
       unmount <- liftEffect $ mount "#root" $ element_ "div" []
         [ dyn (shown.signal <#> if _ then tabs else element "none") ]

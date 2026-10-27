@@ -9,6 +9,7 @@ import Data.Newtype (un)
 import Data.Time.Duration (Milliseconds(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
+import Effect.Ref as Ref
 import Screamer.Owned (runOwned)
 import Screamer.Runtime (Stats, readStats)
 import Screamer.Signal (readT0)
@@ -249,4 +250,29 @@ sources = describe "sources" do
     liftEffect Fake.pendingFrames >>= shouldEqual 0
     liftEffect $ Fake.frame 50.0
     liftEffect o.trace >>= shouldEqual [ 16.0, 33.0 ]
+    shouldBeReleasedSince before
+
+  it "frameLoop runs while its step returns true, then requests no frame" do
+    before <- liftEffect readStats
+    seen <- liftEffect $ Ref.new []
+    let step ts = Ref.modify_ (_ <> [ ts ]) seen *> pure (ts < 40.0)
+    r <- liftEffect $ runOwned (Time.frameLoop step)
+    liftEffect Fake.pendingFrames >>= shouldEqual 0
+    liftEffect do
+      r.value.start
+      r.value.start
+    liftEffect Fake.pendingFrames >>= shouldEqual 1
+    liftEffect do
+      Fake.frame 16.0
+      Fake.frame 33.0
+      Fake.frame 50.0
+    liftEffect (Ref.read seen) >>= shouldEqual [ 16.0, 33.0, 50.0 ]
+    liftEffect Fake.pendingFrames >>= shouldEqual 0
+    -- It can be started again, and stopped.
+    liftEffect r.value.start
+    liftEffect r.value.stop
+    liftEffect Fake.pendingFrames >>= shouldEqual 0
+    liftEffect r.value.start
+    liftEffect r.dispose
+    liftEffect Fake.pendingFrames >>= shouldEqual 0
     shouldBeReleasedSince before
