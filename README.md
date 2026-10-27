@@ -38,6 +38,7 @@ package:
 | [`screamer-router`](packages/screamer-router) | `Screamer.Router`, `.Router.Windrose` | the location as a signal |
 | [`screamer-forms`](packages/screamer-forms) | `Screamer.Form` | formlets |
 | [`screamer-motion`](packages/screamer-motion) | `Screamer.Motion`, `.Motion.Transition`, `.Motion.Animate`, `.Motion.Value`, `.Motion.ViewTransition`, `.Motion.ReducedMotion` | enter, leave and move animations, crossfades, tweens and springs |
+| [`screamer-devtools`](packages/screamer-devtools) | `Screamer.Devtools` | headless inspection: scope tree snapshots, timestep log, leak checks, work budgets and strict mode |
 | [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock` | test helpers |
 
 `npm run build` builds them all, and `npm test` runs every package's tests.
@@ -95,6 +96,8 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 **Embedding JS widgets.** A widget that owns its DOM subtree (an editor, a map, a chart) goes in `foreign_ setup tag attrs`, which creates the host element and runs `setup host :: Owned Unit` once per instance. Create the widget there and destroy it in `onCleanup`. Sync both ways with guards: push a signal in with `subscribe`, skipping values equal to what the widget already shows so the user's edits do not loop back; report the widget's own changes out through a callback wrapped in `batch`, ignoring changes the wrapper made itself. Screamer never touches the host's children. `foreignWithFallback_` adds children shown where the widget cannot run, such as on a server renderer, whose backend is not interactive. See `examples/src/CodeMirror.purs`.
 
 **Motion.** Only `dyn` and `each` know when a node is added, moved or removed, so the core has one seam for each: `withEnter`, `withMove` and `withLeave` provide hooks to every `dyn` and `each` inside an element. A leave hook keeps the node in place until it calls `done`, and runs in a scope of its own, so its timers and animations end with the leave. `Screamer.Motion` (in screamer-motion) builds on them: CSS-class transitions (`transition`, with `fade` and `slide` presets), the Web Animations API (`animate`, `leaveWith`), FLIP reorders (`flipMoves`), shared-element `crossfade`s between lists, animated values that stop requesting frames once they settle (`tween`, `spring`), and `viewTransition`. Durations are always stated, never read from computed styles, and everything honours `prefers-reduced-motion` by default. See `examples/src/Motion.purs`.
+
+**Development tools.** In development builds the runtime reports scopes, effect runs, rounds, writes, warnings and errors to one optional hook, and every warning has a stable code (`SCR001` for a read of a paused stateful signal, `SCR002` for unordered writes in one timestep, `SCR1xx` for the errors). `Screamer.Devtools` (in screamer-devtools) turns that into data a test or an agent can read: `snapshotText` and `snapshotJson` print the live scope tree with deterministic paths such as `root/provide/named:App/each[key=3]` (`named` in `Screamer.Element` names a subtree), `startLog` records one JSON Lines row per round, `assertNoLeaks` fails with each leaked scope's path, `expectRounds` and `expectEffectRuns` assert work budgets, and `withStrict` turns warnings into errors. A visual overlay is planned in #85.
 
 ## Examples
 

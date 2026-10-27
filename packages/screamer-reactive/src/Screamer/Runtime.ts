@@ -48,6 +48,103 @@ export const stats = { liveEffects: 0, liveScopes: 0, links: 0, effectRuns: 0, s
 export const LOOP_LIMIT = 100;
 
 // ---------------------------------------------------------------------------
+// Development hook and diagnostics (#84)
+//
+// Everything here is used only when `DEV` is on. A bundle built with
+// `__DEV__=false` keeps none of it but the no-op bodies.
+
+/** What the runtime reports to the development hook. */
+export type DevEvent =
+  | { type: 'scopeCreated'; scope: Scope }
+  | { type: 'scopeDisposed'; scope: Scope }
+  | { type: 'effectRun'; effect: EffectNode; scope: Scope }
+  | { type: 'roundStart' }
+  | { type: 'roundEnd' }
+  | { type: 'write'; source: Cell<any>; scope: Scope | null }
+  | { type: 'fire'; source: EventSourceNode<any>; scope: Scope | null }
+  | { type: 'warning'; code: string; message: string; scope: Scope | null }
+  | { type: 'error'; error: unknown; scope: Scope | null };
+
+export type DevHook = (e: DevEvent) => void;
+
+let devHook: DevHook | null = null;
+let strict = false;
+
+/** Install the one development listener, or remove it with null. */
+export function setDevHook(h: DevHook | null): void {
+  if (DEV) devHook = h;
+}
+
+/** Make development warnings throw, with the same message, instead of warning. */
+export function setStrict(b: boolean): void {
+  if (DEV) strict = b;
+}
+
+export function isStrict(): boolean {
+  return strict;
+}
+
+/** An error the runtime throws in development, with its diagnostic code. */
+function devError(code: string, message: string): Error {
+  return new Error(`screamer ${code}: ${message}`);
+}
+
+/**
+ * Report a development warning: to the hook, then as a thrown error under
+ * strict mode or else to the console.
+ */
+function warn(code: string, message: string): void {
+  const text = `screamer ${code}: ${message}`;
+  if (devHook !== null) devHook({ type: 'warning', code, message: text, scope: writerScope() });
+  if (strict) throw new Error(text);
+  console.warn(text);
+}
+
+/** What development tools know about a scope besides its structure. */
+export interface ScopeInfo {
+  /** Creation order, from 0. */
+  id: number;
+  /** What made the scope, such as `dyn` or `each`; empty for a plain scope. */
+  kind: string;
+  /** A name given with `named`, or empty. */
+  name: string;
+  /** The row key of an `each` row, or undefined. */
+  key: unknown;
+}
+
+let nextScopeId = 0;
+const scopeInfos: WeakMap<Scope, ScopeInfo> = new WeakMap();
+/** Root scopes not yet disposed, in creation order (`DEV` only). */
+const liveRoots: Set<Scope> = new Set();
+
+/** What development tools know about `s`. Empty outside development. */
+export function scopeInfo(s: Scope): ScopeInfo {
+  return scopeInfos.get(s) ?? { id: -1, kind: '', name: '', key: undefined };
+}
+
+/** Record what made `s`, for development tools. A no-op outside development. */
+export function tagScope(s: Scope, kind: string, name: string = '', key?: unknown): void {
+  if (!DEV) return;
+  const info = scopeInfos.get(s);
+  if (info === undefined) return;
+  info.kind = kind;
+  info.name = name;
+  info.key = key;
+}
+
+/** The root scopes not yet disposed, in creation order. Empty outside development. */
+export function rootScopes(): Scope[] {
+  return Array.from(liveRoots);
+}
+
+/** How many effects `s` owns directly. */
+export function effectCount(s: Scope): number {
+  let n = 0;
+  for (let i = 0; i < s.cleanups.length; i++) if (s.cleanups[i] instanceof EffectNode) n++;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Global state
 
 /** Bumped on every write. An unobserved derived node read twice in one epoch returns its cache. */
@@ -255,7 +352,8 @@ export class Cell<T> implements Source<T> {
    * outside all of these starts the next round at once.
    */
   putT1(x: T): void {
-    if (DEV && inDerived > 0) throw new Error('write inside a derivation');
+    if (DEV && inDerived > 0) throw devError('SCR101', 'write inside a derivation');
+    if (DEV && devHook !== null) devHook({ type: 'write', source: this, scope: writerScope() });
     // Effects only run inside a batch or a flush, both of which count here.
     if (batchDepth > 0) {
       if (!this.deferred) {
@@ -278,7 +376,7 @@ export class Cell<T> implements Source<T> {
    * dependence that `putT1` avoids. A cell uses one or the other.
    */
   putT0(x: T): void {
-    if (DEV && inDerived > 0) throw new Error('write inside a derivation');
+    if (DEV && inDerived > 0) throw devError('SCR101', 'write inside a derivation');
     if (this.eq(x, this.value)) return;
     this.value = x;
     this.version++;
@@ -387,7 +485,7 @@ export class Derived<T> implements Source<T>, Target, Computation {
     } else if (this.init && !this.failed && this.seen === epoch) {
       return;
     }
-    if (DEV && this.computing) throw new Error('cycle detected among derived signals');
+    if (DEV && this.computing) throw devError('SCR103', 'cycle detected among derived signals');
     try {
       if (this.init && !this.failed && !depsChanged(this.deps, this.versions)) {
         this.dirty = false;
@@ -618,10 +716,11 @@ const warnedPaused: WeakSet<object> = new WeakSet();
 
 /** Warn, once per node, that a paused stateful node was read. */
 function warnPausedRead(n: Stateful<any>): void {
-  if (warnedPaused.has(n)) return;
+  if (warnedPaused.has(n) && !strict) return;
   warnedPaused.add(n);
-  console.warn(
-    `screamer: read of a paused stateful signal${n.label === '' ? '' : ` (${n.label})`}. ` +
+  warn(
+    'SCR001',
+    `read of a paused stateful signal${n.label === '' ? '' : ` (${n.label})`}. ` +
       'It keeps the state it had when its last observer left and does not step until observed again; ' +
       'keep it observed (Signal.hold) if it must stay current.',
   );
@@ -636,6 +735,13 @@ function warnPausedRead(n: Stateful<any>): void {
 interface Writer {
   effect: EffectNode | null;
   scope: Scope;
+}
+
+/** The scope a write or warning comes from, for the development hook. */
+function writerScope(): Scope | null {
+  if (owner !== null) return owner;
+  if (runningEffect !== null) return runningEffect.scope;
+  return null;
 }
 
 function currentWriter(): Writer | null {
@@ -667,10 +773,11 @@ function checkWriter(src: Cell<any> | EventSourceNode<any>, kind: string, first:
     src.writer = w;
     return;
   }
-  if (w === null || !conflicting(first, w) || warnedConflict.has(src)) return;
+  if (w === null || !conflicting(first, w) || (warnedConflict.has(src) && !strict)) return;
   warnedConflict.add(src);
-  console.warn(
-    `screamer: one ${kind} was ${kind === 'event source' ? 'fired' : 'written'} by two subscribers (or two components' setup) in one timestep. ` +
+  warn(
+    'SCR002',
+    `one ${kind} was ${kind === 'event source' ? 'fired' : 'written'} by two subscribers (or two components' setup) in one timestep. ` +
       'They apply in the order the subscribers were created, which the program does not state, so the result can change when ' +
       'a component moves or mounts in a different order. Combine the causes into one event, write from one subscriber, ' +
       'or make the source with commutingSignalSource or commutingEventSource if the order does not matter.',
@@ -791,14 +898,24 @@ export class Scope {
       if (parent.disposed) throw new Error('scope created under a disposed scope');
       parent.children.add(this);
     }
-    if (DEV) stats.liveScopes++;
+    if (DEV) {
+      stats.liveScopes++;
+      scopeInfos.set(this, { id: nextScopeId++, kind: '', name: '', key: undefined });
+      if (parent === null) liveRoots.add(this);
+      if (devHook !== null) devHook({ type: 'scopeCreated', scope: this });
+    }
   }
 
   /** Dispose children (newest first), then run own cleanups in reverse order. Idempotent. */
   dispose(): void {
     if (this.disposed) return;
+    if (DEV) {
+      // Before it leaves its parent, so the hook can still find its path.
+      if (devHook !== null) devHook({ type: 'scopeDisposed', scope: this });
+      liveRoots.delete(this);
+      stats.liveScopes--;
+    }
     this.disposed = true;
-    if (DEV) stats.liveScopes--;
     if (this.parent !== null) this.parent.children.delete(this);
     let error: unknown = null;
     let failed = false;
@@ -886,6 +1003,7 @@ export function onCleanup(f: Cleanup): void {
 
 /** Report an error to the nearest error handler, or rethrow it when the flush completes. */
 export function reportError(s: Scope | null, error: unknown): void {
+  if (DEV && devHook !== null) devHook({ type: 'error', error, scope: s });
   for (let x = s; x !== null; x = x.parent) {
     if (x.onError !== null) {
       try {
@@ -932,7 +1050,10 @@ export class EffectNode implements Target, Computation {
 
   run(): void {
     if (this.disposed) return;
-    if (DEV) stats.effectRuns++;
+    if (DEV) {
+      stats.effectRuns++;
+      if (devHook !== null) devHook({ type: 'effectRun', effect: this, scope: this.scope });
+    }
     const prevOwner = owner;
     const prevRunning = runningEffect;
     const prev = startCapture(this);
@@ -1043,9 +1164,10 @@ function flush(): void {
           c.writer = null;
         }
         written = [];
-        loopError = new Error('effect loop');
+        loopError = devError('SCR105', 'effect loop');
         break;
       }
+      if (DEV && devHook !== null) devHook({ type: 'roundStart' });
       startRound();
       const es = queue;
       queue = [];
@@ -1056,6 +1178,7 @@ function flush(): void {
         if (!e.disposed && e.stale()) e.run();
       }
       settle();
+      if (DEV && devHook !== null) devHook({ type: 'roundEnd' });
     }
   } finally {
     batchDepth--;
@@ -1201,9 +1324,10 @@ export class EventSourceNode<T> implements EventLike<T> {
 
   /** Add an occurrence. It is delivered when the next round starts. */
   fireT1(x: T): void {
-    if (DEV && inDerived > 0) throw new Error('fire inside a derivation');
+    if (DEV && inDerived > 0) throw devError('SCR102', 'fire inside a derivation');
     // Nothing observes the event, so the occurrence goes nowhere.
     if (this.targets.size === 0) return;
+    if (DEV && devHook !== null) devHook({ type: 'fire', source: this, scope: writerScope() });
     if (this.pending.length === 0) {
       fired.push(this);
       if (DEV && batchDepth > 0) this.writer = currentWriter();
@@ -1288,7 +1412,7 @@ export class EventDerived<T> implements EventLike<T>, Target, Computation, Input
 
   refresh(): void {
     if (this.linked && !this.dirty) return;
-    if (DEV && this.computing) throw new Error('cycle detected among derived events');
+    if (DEV && this.computing) throw devError('SCR104', 'cycle detected among derived events');
     try {
       if (this.init && !this.failed && !depsChanged(this.deps, this.versions)) {
         this.dirty = false;

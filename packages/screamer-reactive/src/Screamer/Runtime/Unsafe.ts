@@ -24,6 +24,12 @@
 //   about code that expects to run between timesteps.
 // - `contextOf`, `lookupContext` and the `Context` type (#48): how FFI
 //   reads the values `Screamer.Context.provide` puts on scopes.
+// - `setDevHook`, `setStrict`, `isStrict`, `scopeInfo`, `tagScope`,
+//   `rootScopes`, `effectCount` and `readStats` (#84): the development hook, strict
+//   mode, and what development tools read about scopes. All do nothing, or
+//   return nothing, outside development. `Scope.parent` and
+//   `Scope.children` are part of the contract for walking the tree, read
+//   only.
 // - `development` is `DEV`: an FFI module may export only names that are
 //   valid PureScript identifiers, and this one is also the module's foreign
 //   import (purs emits `foreign.js` only for modules that have one).
@@ -71,6 +77,16 @@ export const inTimestep = R.inTimestep;
 export const sample = R.sample;
 export const untracked = R.untracked;
 
+// Development tools
+export const setDevHook = R.setDevHook;
+export const setStrict = R.setStrict;
+export const isStrict = R.isStrict;
+export const scopeInfo = R.scopeInfo;
+export const tagScope = R.tagScope;
+export const rootScopes = R.rootScopes;
+export const effectCount = R.effectCount;
+export const readStats = R.readStats;
+
 /** Development checks are on: `DEV` in the runtime. */
 export const development: boolean = R.DEV;
 
@@ -86,3 +102,6 @@ export type Cell<T> = Runtime.Cell<T>;
 export type EventSourceNode<T> = Runtime.EventSourceNode<T>;
 export type Constant<T> = Runtime.Constant<T>;
 export type Accum<S, B> = Runtime.Accum<S, B>;
+export type DevEvent = Runtime.DevEvent;
+export type DevHook = Runtime.DevHook;
+export type ScopeInfo = Runtime.ScopeInfo;
