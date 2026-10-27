@@ -16,6 +16,7 @@ module Screamer.Element
   , foreignWithFallback_
   , each
   , portal
+  , named
   , catchError
   , suspense
   , withLeave
@@ -156,6 +157,15 @@ foreign import portalImpl :: String -> Element -> Scope -> Effect Node
 -- | nodes from the target.
 portal :: String -> Element -> Element
 portal selector el = Element (Owned (portalImpl selector el))
+
+foreign import namedImpl :: String -> Element -> Scope -> Effect Node
+
+-- | Instantiate the element in a child scope with a name, which development
+-- | tools (`screamer-devtools`) show in scope paths, snapshots and logs in
+-- | place of the scope's kind. It changes nothing else: the element sees
+-- | the same context and is disposed with its parent.
+named :: String -> Element -> Element
+named name el = Element (Owned (namedImpl name el))
 
 foreign import catchErrorImpl :: (Error -> Element) -> Element -> Scope -> Effect Node
 
