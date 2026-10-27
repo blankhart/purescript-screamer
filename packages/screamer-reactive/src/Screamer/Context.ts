@@ -19,6 +19,7 @@ interface Key<A> {
 export const provideImpl = (s: Scope) => <A>(k: Key<A>) => (value: A) => <B>(body: (s: Scope) => Eff<B>) => (): B => {
   if (s.disposed) throw new Error(`provide ${k.name} in a disposed scope`);
   const c = R.createScope(s);
+  R.tagScope(c, 'provide');
   const ctx: Runtime.Context = Object.create(R.contextOf(s));
   ctx[k.name] = value;
   c.ctx = ctx;

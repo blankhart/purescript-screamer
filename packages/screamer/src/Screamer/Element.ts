@@ -162,9 +162,13 @@ export const textImpl = (sig: Sig<string>) => (s: Scope) => (): N => {
   return node;
 };
 
-/** Instantiate `el` with backend `b` in a fresh child scope of `parent`, untracked. */
-function instantiateIn(b: Backend, parent: Scope, el: El): { scope: Scope; node: N } {
+/**
+ * Instantiate `el` with backend `b` in a fresh child scope of `parent`,
+ * untracked. `kind` and `key` name the scope for development tools.
+ */
+function instantiateIn(b: Backend, parent: Scope, el: El, kind: string, key?: unknown): { scope: Scope; node: N } {
   const scope = R.createScope(parent);
+  R.tagScope(scope, kind, '', key);
   const node = withB(b, () => R.untracked(() => R.runInScope(scope, () => el(scope)())));
   return { scope, node };
 }
@@ -215,8 +219,9 @@ export const noEnter: EnterHook = () => () => () => {};
 export const noMove: MoveHook = () => () => () => {};
 
 /** Run an `Owned Unit` in a fresh child scope of `parent`, untracked. */
-function runHook(parent: Scope, body: OwnedUnit): Scope {
+function runHook(parent: Scope, kind: string, body: OwnedUnit): Scope {
   const c = R.createScope(parent);
+  R.tagScope(c, kind);
   R.untracked(() => R.runInScope(c, () => body(c)()));
   return c;
 }
@@ -271,7 +276,7 @@ class Remover {
     // `done` may be called while the hook is still running; the scope is
     // then disposed once the hook returns.
     try {
-      l.scope = runHook(this.s, hook(n)(() => this.finish(n)));
+      l.scope = runHook(this.s, 'leave', hook(n)(() => this.finish(n)));
     } finally {
       l.running = false;
       if (!this.leaving.has(n) && l.scope !== null) l.scope.dispose();
@@ -347,7 +352,7 @@ class Enterer {
     const hook = this.hook!;
     for (let i = 0; i < nodes.length; i++) {
       if (scope.disposed) return;
-      runHook(scope, hook(nodes[i]));
+      runHook(scope, 'enter', hook(nodes[i]));
     }
   }
 }
@@ -381,7 +386,7 @@ export const dynImpl = (hooks: Hooks) => (sig: Sig<El>) => (s: Scope) => (): N =
       if (child !== null) child.dispose();
       child = null;
       removeBetween(b, start, end, remover);
-      const made = instantiateIn(b, s, el);
+      const made = instantiateIn(b, s, el, 'dyn');
       child = made.scope;
       const entering = enterer.runs(initial) ? topLevel(b, made.node) : null;
       initial = false;
@@ -533,7 +538,7 @@ export const eachImpl =
     const makeRow = (key: K, item: A, into: N, before: N | null): Row<A> => {
       if (remover.delayed) remover.finishKey(key, compare);
       const cell = R.cell(item);
-      const { scope, node } = instantiateIn(b, s, render(cell));
+      const { scope, node } = instantiateIn(b, s, render(cell), 'each', key);
       let first: N;
       let last: N;
       if (b.nodeType(node) === FRAGMENT) {
@@ -683,7 +688,10 @@ export const eachImpl =
         if (was === undefined) break;
         const now = rectOf(nodes[i]);
         if (was.left === now.left && was.top === now.top && was.width === now.width && was.height === now.height) continue;
-        if (scope === null) scope = R.createScope(row.scope);
+        if (scope === null) {
+          scope = R.createScope(row.scope);
+          R.tagScope(scope, 'move');
+        }
         const c = scope;
         const hook = mover!({ node: nodes[i], before: was, after: now });
         R.untracked(() => R.runInScope(c, () => hook(c)()));
@@ -721,13 +729,22 @@ export const eachImpl =
   };
 
 // ---------------------------------------------------------------------------
+// Names
+
+export const namedImpl = (name: string) => (el: El) => (s: Scope) => (): N => {
+  const scope = R.createScope(s);
+  R.tagScope(scope, 'named', name);
+  return R.untracked(() => R.runInScope(scope, () => el(scope)()));
+};
+
+// ---------------------------------------------------------------------------
 // Portals, error boundaries and suspense
 
 export const portalImpl = (selector: string) => (el: El) => (s: Scope) => (): N => {
   const b = B;
   const target = b.select(selector);
   if (target === null) throw new Error(`portal: no element matches "${selector}"`);
-  const { scope, node } = instantiateIn(b, s, el);
+  const { scope, node } = instantiateIn(b, s, el, 'portal');
   scope.cleanups.push(attachRange(b, target, node));
   return b.createComment('');
 };
@@ -738,6 +755,7 @@ export const catchErrorImpl = (handler: (e: Error) => El) => (el: El) => (s: Sco
   const b = B;
   const { start, end, f } = anchors(b);
   const scope = R.createScope(s);
+  R.tagScope(scope, 'catchError');
   let failed = false;
   // Replace the child with the handler's element. Errors from the handler's
   // element are not caught here: its scope is a sibling of the child's.
@@ -746,7 +764,7 @@ export const catchErrorImpl = (handler: (e: Error) => El) => (el: El) => (s: Sco
     scope.onError = null;
     scope.dispose();
     removeBetween(b, start, end);
-    const made = instantiateIn(b, s, handler(toError(e)));
+    const made = instantiateIn(b, s, handler(toError(e)), 'fallback');
     b.insertBefore(b.parentNode(end)!, made.node, end);
   };
   scope.onError = recover;
@@ -774,6 +792,7 @@ export const suspenseImpl =
     const b = B;
     const { start, end, f } = anchors(b);
     const scope = R.createScope(s);
+    R.tagScope(scope, 'suspense');
     const settled = settledIn(scope)();
     R.lookupContext(s, boundary.name, boundary.default)({ start, end, settled })();
     // The content builds detached, so its pending work starts at once.
@@ -782,9 +801,10 @@ export const suspenseImpl =
       b.insertBefore(f, node, end);
       return f;
     }
-    const shown = instantiateIn(b, s, fallback);
+    const shown = instantiateIn(b, s, fallback, 'fallback');
     b.insertBefore(f, shown.node, end);
     const watch = R.createScope(s);
+    R.tagScope(watch, 'watch');
     R.effectIn(watch, () => {
       if (!settled.read()) return;
       R.untracked(() => {

@@ -75,6 +75,30 @@
           ]
         }
       },
+      "screamer-devtools": {
+        "path": "packages/screamer-devtools",
+        "core": {
+          "dependencies": [
+            "effect",
+            "prelude",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "effect",
+            "exceptions",
+            "maybe",
+            "refs",
+            "screamer",
+            "screamer-test",
+            "spec",
+            "strings"
+          ]
+        }
+      },
       "screamer-examples": {
         "path": "examples",
         "core": {
