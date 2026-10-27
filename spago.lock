@@ -97,6 +97,7 @@
             "screamer",
             "screamer-combinators",
             "screamer-forms",
+            "screamer-motion",
             "screamer-reactive",
             "screamer-resource",
             "screamer-router",
@@ -139,6 +140,41 @@
         },
         "test": {
           "dependencies": []
+        }
+      },
+      "screamer-motion": {
+        "path": "packages/screamer-motion",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "datetime",
+            "effect",
+            "foldable-traversable",
+            "maybe",
+            "newtype",
+            "ordered-collections",
+            "prelude",
+            "refs",
+            "screamer",
+            "screamer-combinators",
+            "screamer-reactive",
+            "screamer-web",
+            "typelevel-prelude",
+            "unsafe-coerce",
+            "web-dom"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "datetime",
+            "effect",
+            "refs",
+            "screamer-test",
+            "spec",
+            "web-dom"
+          ]
         }
       },
       "screamer-reactive": {

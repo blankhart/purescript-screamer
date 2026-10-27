@@ -19,6 +19,7 @@ package:
     - screamer
     - screamer-combinators
     - screamer-forms
+    - screamer-motion
     - screamer-reactive
     - screamer-resource
     - screamer-router

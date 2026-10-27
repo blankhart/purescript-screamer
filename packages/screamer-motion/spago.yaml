@@ -1,0 +1,33 @@
+package:
+  name: screamer-motion
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - arrays
+    - datetime
+    - effect
+    - foldable-traversable
+    - maybe
+    - newtype
+    - ordered-collections
+    - prelude
+    - refs
+    - screamer
+    - screamer-combinators
+    - screamer-reactive
+    - screamer-web
+    - typelevel-prelude
+    - unsafe-coerce
+    - web-dom
+  test:
+    main: Test.Motion.Main
+    dependencies:
+      - aff
+      - arrays
+      - datetime
+      - effect
+      - refs
+      - screamer-test
+      - spec
+      - web-dom

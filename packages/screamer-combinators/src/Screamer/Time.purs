@@ -19,6 +19,7 @@ module Screamer.Time
   , interval
   , after
   , frames
+  , frameLoop
   , debounce
   , debounceSignal
   , throttle
@@ -125,6 +126,24 @@ frames = do
       out.fireT1 ts
   liftEffect $ loop unit
   pure out.event
+
+-- | A frame loop that runs only while it has work. `start` requests a
+-- | frame, if none is requested yet; on each frame the step runs with the
+-- | frame's timestamp, and the loop requests another while it returns true.
+-- | `stop` cancels the requested frame. Each step runs inside `batch`. Use
+-- | it, rather than `frames`, for an animation that should stop costing
+-- | frames once it settles.
+frameLoop :: (Number -> Effect Boolean) -> Owned { start :: Effect Unit, stop :: Effect Unit }
+frameLoop step = do
+  t <- timers
+  timer <- slot
+  let
+    loop = timer.start $ t.frame \ts -> do
+      timerDone timer
+      again <- step ts
+      when again loop
+    start = timer.busy >>= \running -> unless running loop
+  pure { start, stop: timer.cancel }
 
 -- | The last occurrence of each burst, once the input has been quiet for
 -- | the interval. (RxJS `debounceTime`.)

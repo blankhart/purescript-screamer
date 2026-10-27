@@ -59,6 +59,8 @@ after    :: Milliseconds -> Owned (Event Unit)       -- one occurrence, once
 frames   :: Owned (Event Number)                     -- one occurrence per animation frame, with its timestamp
 ```
 
+`frames` requests a frame for its scope's whole life. For an animation that should stop costing frames once it settles, `frameLoop :: (Number -> Effect Boolean) -> Owned { start :: Effect Unit, stop :: Effect Unit }` runs its step on each frame only while the step returns true; `start` begins it again. screamer-motion's `tween` and `spring` are built on it.
+
 Each combinator needs a timer, so each returns `Owned` and cancels its timers when its scope is disposed; an occurrence still pending then is dropped. Timers start at instantiation: each combinator subscribes to its input when its scope runs and observes it for the scope's whole life, whether or not anything observes the output. `timeout` and `sampleEvery` count their first interval from instantiation.
 
 | RxJS | Screamer |
