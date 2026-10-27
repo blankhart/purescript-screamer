@@ -13,6 +13,7 @@ import Screamer.Runtime (readStats)
 import Screamer.Event as Event
 import Screamer.Signal (readT0, subscribe)
 import Screamer.Source (signalSource)
+import Screamer.Test (withoutStrict)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -106,7 +107,8 @@ spec = describe "Screamer.Owned" do
         n.modifyT1 (_ * 10)
         -- Not yet: the writes are deferred to the next timestep.
         readT0 n.signal >>= \v -> Ref.modify_ (_ <> [ v ]) seen
-    liftEffect $ a.putT1 1
+    -- Two subscribers modifying one source warn (SCR002) on purpose.
+    liftEffect $ withoutStrict $ a.putT1 1
     liftEffect (readT0 n.signal) >>= shouldEqual 20
     liftEffect (Ref.read seen) >>= shouldEqual [ 1 ]
     liftEffect r.dispose
@@ -120,7 +122,8 @@ spec = describe "Screamer.Owned" do
     liftEffect (readT0 count) >>= shouldEqual 2
     liftEffect r.value.dispose
     liftEffect $ clicks.putT1 3
-    liftEffect (readT0 count) >>= shouldEqual 2
+    -- A read of the paused fold, which warns (SCR001) on purpose.
+    liftEffect (withoutStrict (readT0 count)) >>= shouldEqual 2
     liftEffect r.dispose
 
   it "leaves nothing live after disposal" do

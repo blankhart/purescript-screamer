@@ -313,7 +313,11 @@ instantiate :: Element -> Owned Node
 instantiate (Element (Owned build)) = Owned \s -> do
   let Owned backend = ask rendererKey
   b <- backend s
-  withBackend b (build s)
+  node <- withBackend b (build s)
+  recordNodes b s node
+  pure node
+
+foreign import recordNodes :: Backend -> Scope -> Node -> Effect Unit
 
 foreign import findMountPoint :: Backend -> String -> Effect Node
 

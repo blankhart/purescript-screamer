@@ -5,8 +5,11 @@ package:
     license: MIT
   dependencies:
     - effect
+    - either
+    - maybe
     - prelude
     - screamer-reactive
+    - web-dom
   test:
     main: Test.Devtools.Main
     dependencies:
@@ -20,3 +23,4 @@ package:
       - screamer-test
       - spec
       - strings
+      - web-dom

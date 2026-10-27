@@ -57,11 +57,12 @@ export const LOOP_LIMIT = 100;
 export type DevEvent =
   | { type: 'scopeCreated'; scope: Scope }
   | { type: 'scopeDisposed'; scope: Scope }
+  | { type: 'sourceCreated'; source: Cell<any> | EventSourceNode<any> }
   | { type: 'effectRun'; effect: EffectNode; scope: Scope }
   | { type: 'roundStart' }
   | { type: 'roundEnd' }
-  | { type: 'write'; source: Cell<any>; scope: Scope | null }
-  | { type: 'fire'; source: EventSourceNode<any>; scope: Scope | null }
+  | { type: 'write'; source: Cell<any>; value: unknown; scope: Scope | null }
+  | { type: 'fire'; source: EventSourceNode<any>; value: unknown; scope: Scope | null }
   | { type: 'warning'; code: string; message: string; scope: Scope | null }
   | { type: 'error'; error: unknown; scope: Scope | null };
 
@@ -93,9 +94,9 @@ function devError(code: string, message: string): Error {
  * Report a development warning: to the hook, then as a thrown error under
  * strict mode or else to the console.
  */
-function warn(code: string, message: string): void {
+function warn(code: string, message: string, scope: Scope | null = writerScope()): void {
   const text = `screamer ${code}: ${message}`;
-  if (devHook !== null) devHook({ type: 'warning', code, message: text, scope: writerScope() });
+  if (devHook !== null) devHook({ type: 'warning', code, message: text, scope });
   if (strict) throw new Error(text);
   console.warn(text);
 }
@@ -110,6 +111,8 @@ export interface ScopeInfo {
   name: string;
   /** The row key of an `each` row, or undefined. */
   key: unknown;
+  /** The top-level nodes the scope's element built, or empty. */
+  nodes: unknown[];
 }
 
 let nextScopeId = 0;
@@ -119,7 +122,7 @@ const liveRoots: Set<Scope> = new Set();
 
 /** What development tools know about `s`. Empty outside development. */
 export function scopeInfo(s: Scope): ScopeInfo {
-  return scopeInfos.get(s) ?? { id: -1, kind: '', name: '', key: undefined };
+  return scopeInfos.get(s) ?? { id: -1, kind: '', name: '', key: undefined, nodes: [] };
 }
 
 /** Record what made `s`, for development tools. A no-op outside development. */
@@ -130,6 +133,122 @@ export function tagScope(s: Scope, kind: string, name: string = '', key?: unknow
   info.kind = kind;
   info.name = name;
   info.key = key;
+}
+
+/** The innermost scope that recorded each node as one of its top-level nodes. */
+const nodeOwners: WeakMap<object, Scope> = new WeakMap();
+
+/**
+ * Record the top-level nodes an element built in `s`. A node keeps the
+ * first live scope that records it, which is the innermost, since an
+ * element finishes building before the elements around it.
+ */
+export function setScopeNodes(s: Scope, nodes: unknown[]): void {
+  if (!DEV) return;
+  const info = scopeInfos.get(s);
+  if (info === undefined) return;
+  info.nodes = nodes;
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i] as object;
+    const o = nodeOwners.get(n);
+    if (o === undefined || o.disposed) nodeOwners.set(n, s);
+  }
+}
+
+/** The live scope that recorded `node` as a top-level node, or null. */
+export function ownerOfNode(node: unknown): Scope | null {
+  const o = nodeOwners.get(node as object);
+  return o === undefined || o.disposed ? null : o;
+}
+
+// Creation sites
+
+let trackOrigins = false;
+const origins: WeakMap<object, string> = new WeakMap();
+
+/** Record a stack trace where each scope, source, stateful node and effect is created. Costly. */
+export function setTrackOrigins(b: boolean): void {
+  if (DEV) trackOrigins = b;
+}
+
+function recordOrigin(x: object): void {
+  // Deep enough to get past Screamer's own frames to the program's.
+  const E = Error as { stackTraceLimit?: number };
+  const limit = E.stackTraceLimit;
+  E.stackTraceLimit = 40;
+  const stack = new Error().stack;
+  E.stackTraceLimit = limit;
+  if (stack !== undefined) origins.set(x, stack);
+}
+
+/** The stack trace recorded when `x` was created, or null. */
+export function originOf(x: object): string | null {
+  return origins.get(x) ?? null;
+}
+
+// Consistency checks
+
+let checking = false;
+const checks: Map<() => string | null, Scope> = new Map();
+
+/**
+ * Check, after each timestep, the bindings registered with `registerCheck`
+ * while this is on: each returns null when the DOM shows its signal's
+ * current value, and otherwise a message, reported as `SCR003`.
+ */
+export function setConsistencyCheck(b: boolean): void {
+  if (DEV) checking = b;
+}
+
+export function consistencyChecking(): boolean {
+  return checking;
+}
+
+/** Register a check for the lifetime of `s`, if checking is on. */
+export function registerCheck(s: Scope, check: () => string | null): void {
+  if (!DEV || !checking) return;
+  checks.set(check, s);
+  s.cleanups.push(() => { checks.delete(check); });
+}
+
+function runChecks(): void {
+  for (const [check, s] of Array.from(checks)) {
+    const problem = untracked(check);
+    if (problem !== null) warn('SCR003', problem, s);
+  }
+}
+
+// Graph introspection
+
+/** What kind of node `n` is, for development tools. */
+export function nodeKind(n: object): string {
+  if (n instanceof Cell) return 'signal source';
+  if (n instanceof EventSourceNode) return 'event source';
+  if (n instanceof Constant) return 'constant';
+  if (n instanceof Derived) return 'derived signal';
+  if (n instanceof Stateful) return 'stateful signal';
+  if (n instanceof EventDerived) return 'derived event';
+  if (n instanceof EventStateful) return 'stateful event';
+  if (n instanceof EffectNode) return 'effect';
+  return 'node';
+}
+
+/** The label of a stateful node (the operator that made it), or empty. */
+export function nodeLabel(n: object): string {
+  return n instanceof Stateful ? n.label : '';
+}
+
+/** The nodes `n` read when it last ran, and their versions then (for an effect or derived node). */
+export function nodeInputs(n: object): { inputs: Source[]; versions: number[] | null } {
+  if (n instanceof EffectNode) return { inputs: n.deps, versions: n.versions };
+  if (n instanceof Derived || n instanceof EventDerived) return { inputs: n.deps, versions: null };
+  if (n instanceof Stateful || n instanceof EventStateful) return { inputs: n.inputs, versions: null };
+  return { inputs: [], versions: null };
+}
+
+/** Whether an effect has been disposed. */
+export function effectDisposed(e: EffectNode): boolean {
+  return e.disposed;
 }
 
 /** The root scopes not yet disposed, in creation order. Empty outside development. */
@@ -334,7 +453,12 @@ export class Cell<T> implements Source<T> {
    * `commutingSignalSource`.
    */
   commutes = false;
-  constructor(public value: T, public eq: Eq<T> = Object.is) {}
+  constructor(public value: T, public eq: Eq<T> = Object.is) {
+    if (DEV) {
+      if (trackOrigins) recordOrigin(this);
+      if (devHook !== null) devHook({ type: 'sourceCreated', source: this });
+    }
+  }
 
   refresh(): void {}
 
@@ -353,7 +477,7 @@ export class Cell<T> implements Source<T> {
    */
   putT1(x: T): void {
     if (DEV && inDerived > 0) throw devError('SCR101', 'write inside a derivation');
-    if (DEV && devHook !== null) devHook({ type: 'write', source: this, scope: writerScope() });
+    if (DEV && devHook !== null) devHook({ type: 'write', source: this, value: x, scope: writerScope() });
     // Effects only run inside a batch or a flush, both of which count here.
     if (batchDepth > 0) {
       if (!this.deferred) {
@@ -617,6 +741,7 @@ export class Stateful<S> implements Source<S>, Target, Settle {
     this.settles = inputs.some(isEvent);
     this.changed = inputs.map(() => false);
     this.values = inputs.map(() => undefined);
+    if (DEV && trackOrigins) recordOrigin(this);
   }
 
   notify(): void {
@@ -900,7 +1025,8 @@ export class Scope {
     }
     if (DEV) {
       stats.liveScopes++;
-      scopeInfos.set(this, { id: nextScopeId++, kind: '', name: '', key: undefined });
+      scopeInfos.set(this, { id: nextScopeId++, kind: '', name: '', key: undefined, nodes: [] });
+      if (trackOrigins) recordOrigin(this);
       if (parent === null) liveRoots.add(this);
       if (devHook !== null) devHook({ type: 'scopeCreated', scope: this });
     }
@@ -1031,7 +1157,9 @@ export class EffectNode implements Target, Computation {
   queued = false;
   disposed = false;
 
-  constructor(private fn: () => void, public scope: Scope) {}
+  constructor(private fn: () => void, public scope: Scope) {
+    if (DEV && trackOrigins) recordOrigin(this);
+  }
 
   notify(): void {
     if (this.queued || this.disposed) return;
@@ -1185,6 +1313,7 @@ function flush(): void {
     flushing--;
   }
   releaseUnobserved();
+  if (DEV && checking && loopError === null && pendingErrors.length === 0) runChecks();
   if (loopError !== null) {
     pendingErrors = [];
     throw loopError;
@@ -1320,6 +1449,13 @@ export class EventSourceNode<T> implements EventLike<T> {
   /** Fires from several places in one round are expected; see `Cell.commutes`. */
   commutes = false;
 
+  constructor() {
+    if (DEV) {
+      if (trackOrigins) recordOrigin(this);
+      if (devHook !== null) devHook({ type: 'sourceCreated', source: this });
+    }
+  }
+
   refresh(): void {}
 
   /** Add an occurrence. It is delivered when the next round starts. */
@@ -1327,7 +1463,7 @@ export class EventSourceNode<T> implements EventLike<T> {
     if (DEV && inDerived > 0) throw devError('SCR102', 'fire inside a derivation');
     // Nothing observes the event, so the occurrence goes nowhere.
     if (this.targets.size === 0) return;
-    if (DEV && devHook !== null) devHook({ type: 'fire', source: this, scope: writerScope() });
+    if (DEV && devHook !== null) devHook({ type: 'fire', source: this, value: x, scope: writerScope() });
     if (this.pending.length === 0) {
       fired.push(this);
       if (DEV && batchDepth > 0) this.writer = currentWriter();

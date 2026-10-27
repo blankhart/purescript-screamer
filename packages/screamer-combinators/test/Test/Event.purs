@@ -24,7 +24,7 @@ import Screamer.Signal (readT0)
 import Screamer.Signal (dropRepeatsOn, withPrevious) as Signal
 import Screamer.Signal.Extra (combine, history, withLatest) as Signal
 import Screamer.Source (batch, eventSource, signalSource)
-import Screamer.Test (observe, observeE, observeOwned, observeOwnedE)
+import Screamer.Test (observe, observeE, observeOwned, observeOwnedE, withoutStrict)
 import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, randomSample', vectorOf)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
@@ -389,7 +389,8 @@ spec = describe "Screamer.Event" do
       liftEffect (readT0 r.value) >>= shouldEqual 3
       liftEffect r.dispose
       liftEffect $ src.fireT1 4
-      liftEffect (readT0 r.value) >>= shouldEqual 3
+      -- A read of the paused fold, which warns (SCR001) on purpose.
+      liftEffect (withoutStrict (readT0 r.value)) >>= shouldEqual 3
 
   describe "ownership" do
     it "holds no links while unobserved and releases them on dispose" do
