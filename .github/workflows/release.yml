@@ -20,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -35,6 +36,14 @@ jobs:
             .spago
           key: spago-${{ hashFiles('spago.lock') }}
 
+      - name: Read pinned private build dependencies
+        env:
+          TOKEN: ${{ secrets.PSX_DEPS_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/blankhart/".insteadOf "https://github.com/blankhart/"
+          fi
+
       - name: Install
         run: npm ci
 
@@ -44,7 +53,9 @@ jobs:
       - name: Release
         env:
           VERSION: ${{ inputs.version }}
+          RELEASE_TOKEN: ${{ github.token }}
         run: |
+          git config url."https://x-access-token:${RELEASE_TOKEN}@github.com/blankhart/purescript-screamer.git".insteadOf "https://github.com/blankhart/purescript-screamer.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
           node scripts/release.mjs "$VERSION" --push

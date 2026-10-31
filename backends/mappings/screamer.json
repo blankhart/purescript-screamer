@@ -1,0 +1,184 @@
+{
+  "module": "Screamer.Psx",
+  "directory": "packages/screamer-psx/src",
+  "core": "Screamer.Psx.Core",
+  "coreExports": [
+    "class Children",
+    "class Content",
+    "class ToKey",
+    "Attr",
+    "Key",
+    "Markup",
+    "Node",
+    "attribute",
+    "children",
+    "element",
+    "keyed",
+    "none",
+    "root",
+    "text",
+    "toKey"
+  ],
+  "doc": [
+    "-- | The PSX backend for Screamer, at `a = Effect Unit`. Lowered `.psx` code",
+    "-- | calls it through the alias `B`.",
+    "-- |",
+    "-- | The core is hand-written in `Screamer.Psx.Core`. Every element below is",
+    "-- | Screamer's `element_` (or `svgElement_`), every attribute takes a",
+    "-- | constant or a `Signal` of its type, as Screamer's own attributes do, and",
+    "-- | every handler is an effect: `onclick={count.modifyT1 (_ + 1)}`. `oninput`",
+    "-- | is given the target's value and the keyboard events their event."
+  ],
+  "imports": [
+    "Prelude (Unit, show, (<<<))",
+    "Prelude as Prelude",
+    "Effect (Effect)",
+    "Screamer.Element as S",
+    "Screamer.Attribute as S",
+    "Screamer.Psx.Core (class Content, Attr, Node, elementOf, onValueInput)",
+    "Web.UIEvent.KeyboardEvent (KeyboardEvent)"
+  ],
+  "templates": {
+    "element": {
+      "type": "forall c a. Content c a => Array (Attr a) -> c -> Node a",
+      "code": "elementOf (S.element_ {name})"
+    },
+    "svgElement": {
+      "type": "forall c a. Content c a => Array (Attr a) -> c -> Node a",
+      "code": "elementOf (S.svgElement_ {name})"
+    },
+    "boolean": {
+      "type": "forall v a. S.AttrValue v Boolean => v -> Attr a",
+      "code": "S.booleanAttribute {name} <<< S.toSignal"
+    },
+    "string": {
+      "type": "forall v a. S.AttrValue v String => v -> Attr a",
+      "code": "S.attribute {name} <<< S.toSignal"
+    },
+    "integer": {
+      "type": "forall v a. S.AttrValue v Int => v -> Attr a",
+      "code": "S.attribute {name} <<< Prelude.map show <<< S.toSignal"
+    },
+    "number": {
+      "type": "forall v a. S.AttrValue v Number => v -> Attr a",
+      "code": "S.attribute {name} <<< Prelude.map show <<< S.toSignal"
+    },
+    "event": {
+      "type": "Effect Unit -> Attr (Effect Unit)",
+      "code": "\\effect -> S.on_ {name} \\_ -> effect"
+    }
+  },
+  "groups": [
+    {
+      "names": [
+        "checked",
+        "selected",
+        "value"
+      ],
+      "code": "S.property {name} <<< S.toSignal"
+    }
+  ],
+  "names": {
+    "onInput": {
+      "type": "(String -> Effect Unit) -> Attr (Effect Unit)",
+      "code": "onValueInput",
+      "sample": "\\_ -> msg"
+    },
+    "onKeyDown": {
+      "type": "(KeyboardEvent -> Effect Unit) -> Attr (Effect Unit)",
+      "code": "S.unsafeOn_ {name}",
+      "sample": "\\_ -> msg"
+    },
+    "onKeyPress": {
+      "type": "(KeyboardEvent -> Effect Unit) -> Attr (Effect Unit)",
+      "code": "S.unsafeOn_ {name}",
+      "sample": "\\_ -> msg"
+    },
+    "onKeyUp": {
+      "type": "(KeyboardEvent -> Effect Unit) -> Attr (Effect Unit)",
+      "code": "S.unsafeOn_ {name}",
+      "sample": "\\_ -> msg"
+    }
+  },
+  "conformance": {
+    "imports": [
+      "Prelude (Unit, pure, (<>))",
+      "Data.Maybe (Maybe(..))",
+      "Data.Tuple (Tuple)",
+      "Effect (Effect)",
+      "Screamer.Psx (class Children, class Content, class ToKey)",
+      "Screamer.Signal (Signal)"
+    ],
+    "core": [
+      [
+        "text",
+        "forall a. String -> B.Node a"
+      ],
+      [
+        "element",
+        "forall c a. Content c a => String -> Array (B.Attr a) -> c -> B.Node a"
+      ],
+      [
+        "none",
+        "forall a. B.Markup a"
+      ],
+      [
+        "keyed",
+        "forall k a. ToKey k => k -> B.Node a -> Tuple B.Key (B.Node a)"
+      ],
+      [
+        "attribute",
+        "forall a. String -> String -> B.Attr a"
+      ],
+      [
+        "children",
+        "forall c r. Children c r => c -> r"
+      ],
+      [
+        "root",
+        "forall a. B.Markup a -> B.Node a"
+      ]
+    ],
+    "extra": [
+      "-- | What a child hole takes: a string, a node, markup, a signal of a",
+      "-- | string or of markup, and arrays and `Maybe`s of those.",
+      "childHoles :: B.Node (Effect Unit) -> B.Markup (Effect Unit)",
+      "childHoles node =",
+      "  B.children \"text\"",
+      "    <> B.children node",
+      "    <> B.children [ node ]",
+      "    <> B.children [ [ node ] ]",
+      "    <> B.children (Just node)",
+      "    <> B.children (Nothing :: Maybe String)",
+      "    <> B.children (pure \"text\" :: Signal String)",
+      "    <> B.children (pure node :: Signal (B.Node (Effect Unit)))",
+      "    <> B.children (pure [ node ] :: Signal (B.Markup (Effect Unit)))",
+      "",
+      "-- | What a child hole takes to make keyed children: keyed literals and",
+      "-- | arrays of them, keyed by strings or by integers.",
+      "keyedChildHoles :: B.Node (Effect Unit) -> Array (Tuple B.Key (B.Node (Effect Unit)))",
+      "keyedChildHoles node =",
+      "  B.children (B.keyed \"a\" node)",
+      "    <> B.children [ B.keyed 1 node ]",
+      "    <> B.children [ [ B.keyed 2 node ] ]",
+      "    <> B.children (Just (B.keyed 3.0 node))",
+      "",
+      "-- | An element takes keyed children as it takes plain ones.",
+      "keyedContent :: B.Node (Effect Unit) -> Array (B.Node (Effect Unit))",
+      "keyedContent node =",
+      "  [ B.ul [] [ B.keyed \"a\" node, B.keyed \"b\" node ]",
+      "  , B.element \"x-list\" [] (B.children [ B.keyed 1 node ])",
+      "  , B.g [] [ B.keyed \"c\" node ]",
+      "  ]",
+      "",
+      "-- | Attributes take a signal of their type as well as a constant.",
+      "signalAttributes :: Array (B.Node (Effect Unit))",
+      "signalAttributes =",
+      "  [ B.div [ B.class_ (pure \"on\" :: Signal String), B.hidden (pure true :: Signal Boolean), B.tabindex (pure 0 :: Signal Int) ] B.none",
+      "  , B.input [ B.value (pure \"\" :: Signal String), B.checked (pure false :: Signal Boolean) ] B.none",
+      "  ]"
+    ],
+    "nodes": "Array (B.Node (Effect Unit))",
+    "handlers": "Effect Unit -> Array (B.Node (Effect Unit))"
+  }
+}

@@ -1,0 +1,13 @@
+package:
+  name: psx-suite-svg-screamer-psx
+  dependencies:
+    - arrays
+    - control
+    - effect
+    - maybe
+    - prelude
+    - screamer-psx
+    - psx-suite-shared
+    - screamer
+    - screamer-reactive
+    - strings

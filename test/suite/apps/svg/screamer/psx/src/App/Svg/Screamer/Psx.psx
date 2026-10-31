@@ -1,0 +1,88 @@
+-- | The svg scenario on Screamer, in PSX. The bars are fixed, so each is
+-- | built once with its attributes bound to the values; the marker is a
+-- | signal of markup.
+module App.Svg.Screamer.Psx (main) where
+
+import Prelude
+
+import Control.Apply (lift2)
+import Data.Array as Array
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
+import Data.String as String
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Screamer.Signal (Signal, readT0)
+import Screamer.Source (signalSource)
+import Suite.Shared.Dom (removeApp)
+import Screamer.Element (Element, component, mount)
+import Screamer.Psx (Markup, root)
+
+type Fixture = { values :: Array Int, max :: Int }
+
+-- | What the view shows and what its handlers do.
+type Props =
+  { values :: Signal (Array Int)
+  , selected :: Signal (Maybe Int)
+  , count :: Int
+  , select :: Int -> Effect Unit
+  , grow :: Effect Unit
+  }
+
+-- | A bar's left edge and top, in the chart's coordinates.
+left :: Int -> Int
+left i = 10 + 20 * i
+
+barTop :: Int -> Int
+barTop v = 55 - 4 * v
+
+-- | The line through the tops of the bars.
+trend :: Array Int -> String
+trend values = String.joinWith " " (Array.mapWithIndex point values)
+  where
+  point i v = (if i == 0 then "M " else "L ") <> show (left i + 8) <> " " <> show (barTop v)
+
+value :: Int -> Array Int -> Int
+value i values = fromMaybe 0 (Array.index values i)
+
+caption :: Maybe Int -> Array Int -> String
+caption selected values = case selected of
+  Just i -> "Bar " <> show i <> ": " <> show (value i values)
+  Nothing -> "Click a bar"
+
+chart :: Fixture -> Element
+chart fixture = component do
+  values <- liftEffect $ signalSource fixture.values
+  selected <- liftEffect $ signalSource Nothing
+  let
+    grow = readT0 selected.signal >>= case _ of
+      Just i -> values.modifyT1 \vs -> fromMaybe vs (Array.modifyAt i (\v -> min fixture.max (v + 1)) vs)
+      Nothing -> pure unit
+  pure $ root $ view { values: values.signal, selected: selected.signal, count: Array.length fixture.values, select: selected.putT1 <<< Just, grow }
+
+view :: Props -> Markup (Effect Unit)
+view props =
+  <figure class="chart" data-testid="chart">
+    <svg viewBox="0 0 120 60" width="360" height="180">
+      <g class="bars">
+        {map bar (Array.range 0 (props.count - 1))}
+      </g>
+      <path class="trend" d={trend <$> props.values} fill="none" stroke="gray"/>
+      <line x1="5" y1="55" x2="115" y2="55" stroke="black"/>
+      {lift2 marker props.selected props.values}
+      <text x="5" y="8">Values</text>
+    </svg>
+    <figcaption data-testid="caption">{lift2 caption props.selected props.values}</figcaption>
+    <button data-testid="grow" onclick={props.grow} disabled={isNothing <$> props.selected}>Grow</button>
+  </figure>
+  where
+  bar i =
+    <rect data-testid={"bar-" <> show i} x={show (left i)} y={show <<< barTop <<< value i <$> props.values} width="16" height={show <<< (4 * _) <<< value i <$> props.values} fill={(\s -> if s == Just i then "orange" else "steelblue") <$> props.selected} onclick={props.select i}/>
+  marker selected values = case selected of
+    Just i -> <circle cx={show (left i + 8)} cy={show (barTop (value i values))} r="2" fill="orange"/>
+    Nothing -> <></>
+
+-- | Mounts in place of `#app`, starting from the scenario's fixture.
+main :: Fixture -> Effect Unit
+main fixture = do
+  removeApp
+  void $ mount "#root" (chart fixture)

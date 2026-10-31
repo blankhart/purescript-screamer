@@ -1,0 +1,8 @@
+package:
+  name: screamer-psx-tooling
+  dependencies:
+    - effect
+    - prelude
+    - psx-cli
+    - psx-suite
+    - psx-suite-shared

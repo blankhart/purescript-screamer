@@ -106,3 +106,20 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 * The rainbow spiral example is a port of [sinuous-rainbow-spiral](https://github.com/luwes/sinuous-rainbow-spiral).
 
 * `bench/` runs the [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) operations, measured as upstream measures them, against Screamer and upstream's VanillaJS, Solid and Halogen apps (`npm run bench:measure`; results in `bench/results/summary.md`). Absolute times depend on the machine, so compare frameworks within one run rather than against upstream's published tables. `bench/legacy/` holds earlier Screamer-only results from a cold-start harness that is not comparable.
+
+## PSX integration
+
+`screamer-psx` provides `Screamer.Psx` for `.psx` and `.psxt` sources.
+The adapter depends on the framework; PSX is pinned separately as build tooling.
+PSX examples live in `examples/psx`, and paired native/PSX comparison apps in
+`test/suite/apps`. Their canonical DOM contracts come from the pinned PSX checkout.
+
+```sh
+npm run build
+npm run psx:generate
+npm run build
+npm run psx:examples
+npm run psx:suite -- --runs 1
+```
+
+`CHROME_PATH` selects the browser for smoke tests and the suite.

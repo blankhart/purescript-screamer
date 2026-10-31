@@ -1,6 +1,278 @@
 {
   "workspace": {
     "packages": {
+      "psx-examples-screamer": {
+        "path": "examples/psx",
+        "core": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "control",
+            "datetime",
+            "effect",
+            "filterable",
+            "integers",
+            "maybe",
+            "prelude",
+            "random",
+            "refs",
+            "screamer",
+            "screamer-combinators",
+            "screamer-psx",
+            "screamer-reactive",
+            "screamer-resource",
+            "strings",
+            "web-events",
+            "web-uievents"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-counter-screamer-psx": {
+        "path": "test/suite/apps/counter/screamer/psx",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "prelude",
+            "psx-suite-shared",
+            "screamer",
+            "screamer-psx",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-counter-screamer-purs": {
+        "path": "test/suite/apps/counter/screamer/purs",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "prelude",
+            "psx-suite-shared",
+            "screamer",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-nested-screamer-psx": {
+        "path": "test/suite/apps/nested/screamer/psx",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "foldable-traversable",
+            "ordered-collections",
+            "prelude",
+            "psx-suite-shared",
+            "refs",
+            "screamer",
+            "screamer-psx",
+            "screamer-reactive",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-nested-screamer-purs": {
+        "path": "test/suite/apps/nested/screamer/purs",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "foldable-traversable",
+            "ordered-collections",
+            "prelude",
+            "psx-suite-shared",
+            "refs",
+            "screamer",
+            "screamer-reactive",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-svg-screamer-psx": {
+        "path": "test/suite/apps/svg/screamer/psx",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "control",
+            "effect",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "screamer",
+            "screamer-psx",
+            "screamer-reactive",
+            "strings"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-svg-screamer-purs": {
+        "path": "test/suite/apps/svg/screamer/purs",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "control",
+            "effect",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "screamer",
+            "screamer-reactive",
+            "strings"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-table-screamer-psx": {
+        "path": "test/suite/apps/table/screamer/psx",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "refs",
+            "screamer",
+            "screamer-psx",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-table-screamer-purs": {
+        "path": "test/suite/apps/table/screamer/purs",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "refs",
+            "screamer",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-todo-screamer-psx": {
+        "path": "test/suite/apps/todo/screamer/psx",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "foldable-traversable",
+            "prelude",
+            "psx-suite-shared",
+            "refs",
+            "screamer",
+            "screamer-psx",
+            "screamer-reactive"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-todo-screamer-purs": {
+        "path": "test/suite/apps/todo/screamer/purs",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "foldable-traversable",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "refs",
+            "screamer",
+            "screamer-reactive",
+            "web-events",
+            "web-html"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-typeahead-screamer-psx": {
+        "path": "test/suite/apps/typeahead/screamer/psx",
+        "core": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "control",
+            "datetime",
+            "effect",
+            "filterable",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "screamer",
+            "screamer-combinators",
+            "screamer-psx",
+            "screamer-reactive",
+            "screamer-resource",
+            "strings",
+            "web-uievents"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "psx-suite-typeahead-screamer-purs": {
+        "path": "test/suite/apps/typeahead/screamer/purs",
+        "core": {
+          "dependencies": [
+            "aff",
+            "arrays",
+            "control",
+            "datetime",
+            "effect",
+            "filterable",
+            "maybe",
+            "prelude",
+            "psx-suite-shared",
+            "screamer",
+            "screamer-combinators",
+            "screamer-reactive",
+            "screamer-resource",
+            "strings",
+            "web-events",
+            "web-html",
+            "web-uievents"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
       "screamer": {
         "path": "packages/screamer",
         "core": {
@@ -206,6 +478,42 @@
           ]
         }
       },
+      "screamer-psx": {
+        "path": "packages/screamer-psx",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "effect",
+            "maybe",
+            "prelude",
+            "screamer",
+            "screamer-reactive",
+            "tuples",
+            "web-events",
+            "web-uievents"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "console"
+          ]
+        }
+      },
+      "screamer-psx-tooling": {
+        "path": "tooling/psx",
+        "core": {
+          "dependencies": [
+            "effect",
+            "prelude",
+            "psx-cli",
+            "psx-suite",
+            "psx-suite-shared"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
       "screamer-reactive": {
         "path": "packages/screamer-reactive",
         "core": {
@@ -343,7 +651,7 @@
     },
     "package_set": {
       "address": {
-        "registry": "81.4.0"
+        "registry": "81.5.0"
       },
       "compiler": ">=0.15.15 <0.16.0",
       "content": {
@@ -533,12 +841,12 @@
         "halogen-css": "10.0.0",
         "halogen-declarative-canvas": "0.0.8",
         "halogen-echarts-simple": "0.0.4",
-        "halogen-formless": "4.0.3",
+        "halogen-formless": "4.1.0",
         "halogen-helix": "1.1.0",
-        "halogen-hooks": "0.6.3",
+        "halogen-hooks": "0.6.4",
         "halogen-hooks-extra": "0.9.0",
         "halogen-infinite-scroll": "1.1.0",
-        "halogen-store": "0.5.4",
+        "halogen-store": "0.5.5",
         "halogen-storybook": "2.0.0",
         "halogen-subscriptions": "2.0.0",
         "halogen-svg-elems": "8.0.0",
@@ -660,28 +968,29 @@
         "next-purs-rsc": "0.1.0",
         "nextjs": "0.1.1",
         "nextui": "0.2.0",
-        "node-buffer": "9.0.0",
+        "node-buffer": "9.0.1",
+        "node-buffer-blob": "1.0.1",
         "node-child-process": "11.1.0",
-        "node-event-emitter": "3.0.0",
+        "node-event-emitter": "3.0.1",
         "node-execa": "5.0.0",
-        "node-fs": "9.2.0",
+        "node-fs": "9.2.1",
         "node-glob-basic": "2.0.0",
-        "node-http": "9.1.0",
-        "node-http2": "1.1.1",
+        "node-http": "9.1.1",
+        "node-http2": "1.1.2",
         "node-human-signals": "1.0.0",
-        "node-net": "5.1.0",
-        "node-os": "5.1.0",
+        "node-net": "5.1.1",
+        "node-os": "5.1.1",
         "node-path": "5.0.1",
-        "node-process": "11.2.0",
-        "node-readline": "8.1.1",
-        "node-sqlite": "0.2.0",
+        "node-process": "11.2.1",
+        "node-readline": "8.1.2",
+        "node-sqlite": "0.2.1",
         "node-sqlite3": "8.0.0",
         "node-stream-pipes": "2.1.6",
-        "node-streams": "9.0.1",
-        "node-tls": "0.3.1",
-        "node-url": "7.0.1",
+        "node-streams": "9.0.2",
+        "node-tls": "0.3.2",
+        "node-url": "7.0.2",
         "node-workerbees": "0.3.1",
-        "node-zlib": "0.4.0",
+        "node-zlib": "0.4.1",
         "nonempty": "7.0.0",
         "now": "6.0.0",
         "npm-package-json": "2.0.0",
@@ -725,7 +1034,7 @@
         "point-free": "1.0.0",
         "pointed-list": "0.5.1",
         "polymorphic-vectors": "4.0.0",
-        "posix-types": "6.0.0",
+        "posix-types": "6.0.1",
         "postgresql": "2.0.21",
         "precise": "6.0.0",
         "precise-datetime": "7.0.0",
@@ -741,6 +1050,8 @@
         "psa-utils": "8.0.0",
         "psci-support": "6.0.0",
         "punycode": "1.0.0",
+        "puppy-runtime": "0.2.0",
+        "puregrain": "0.1.0",
         "pursfmt": "0.17.0",
         "qualified-do": "2.2.0",
         "quantities": "12.2.0",
@@ -811,7 +1122,7 @@
         "simple-ulid": "3.0.0",
         "sized-matrices": "1.0.0",
         "sized-vectors": "5.0.2",
-        "slug": "3.2.0",
+        "slug": "3.2.1",
         "small-ffi": "4.0.1",
         "soundfonts": "4.1.0",
         "sparse-matrices": "2.0.1",
@@ -902,31 +1213,31 @@
         "vitest": "2.0.1",
         "wasm-base": "0.2.0",
         "web-chain": "1.0.1",
-        "web-clipboard": "6.0.0",
-        "web-cssom": "2.0.0",
-        "web-cssom-view": "0.1.0",
+        "web-clipboard": "6.0.1",
+        "web-cssom": "2.0.1",
+        "web-cssom-view": "0.2.1",
         "web-dom": "6.0.0",
         "web-dom-parser": "8.0.0",
-        "web-dom-xpath": "3.0.0",
-        "web-encoding": "3.0.0",
+        "web-dom-xpath": "3.0.1",
+        "web-encoding": "3.0.1",
         "web-events": "4.0.0",
         "web-fetch": "4.0.1",
         "web-file": "4.0.0",
-        "web-geometry": "0.1.0",
+        "web-geometry": "0.1.1",
         "web-html": "4.1.1",
-        "web-pointerevents": "2.0.0",
+        "web-pointerevents": "2.0.1",
         "web-proletarian": "1.0.0",
         "web-promise": "3.2.0",
         "web-resize-observer": "2.1.0",
         "web-router": "1.0.0",
-        "web-socket": "4.0.0",
+        "web-socket": "4.0.1",
         "web-storage": "5.0.0",
         "web-streams": "4.0.0",
-        "web-touchevents": "4.0.0",
+        "web-touchevents": "4.0.1",
         "web-uievents": "5.0.0",
         "web-url": "2.0.0",
-        "web-workers": "2.0.0",
-        "web-xhr": "5.0.1",
+        "web-workers": "2.0.1",
+        "web-xhr": "5.0.2",
         "webb-aff-list": "0.0.2",
         "webb-array": "0.0.2",
         "webb-channel": "0.0.3",
@@ -947,7 +1258,7 @@
         "webb-thread": "0.0.2",
         "webb-writer": "0.0.3",
         "webextension-polyfill": "0.1.0",
-        "webgpu": "0.0.1",
+        "webgpu": "0.0.2",
         "which": "2.0.0",
         "whine-core": "0.0.34",
         "xterm": "1.0.0",
@@ -1001,6 +1312,41 @@
       }
     },
     "extra_packages": {
+      "psx-cli": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "packages/psx-cli"
+      },
+      "psx-cst": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "packages/psx-cst"
+      },
+      "psx-fmt": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "packages/psx-fmt"
+      },
+      "psx-html-data": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "packages/psx-html-data"
+      },
+      "psx-lower": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "packages/psx-lower"
+      },
+      "psx-suite": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "test/suite"
+      },
+      "psx-suite-shared": {
+        "git": "https://github.com/blankhart/psx.git",
+        "ref": "4b04b493d27967350422133005851d905f52282f",
+        "subdir": "test/suite/shared"
+      },
       "windrose-router": {
         "git": "https://github.com/blankhart/purescript-windrose-router.git",
         "ref": "6199237cf42d35b8ca3d89ceaba40efb83966ac3"
@@ -1038,6 +1384,30 @@
         "lists",
         "prelude"
       ]
+    },
+    "argonaut-core": {
+      "type": "registry",
+      "version": "7.0.0",
+      "integrity": "sha256-gYZihtBIKthVuXXoiPphMookSf8M5aHyFYkcIWqlxTM=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "either",
+        "foreign-object",
+        "functions",
+        "gen",
+        "maybe",
+        "nonempty",
+        "prelude",
+        "strings",
+        "tailrec"
+      ]
+    },
+    "arraybuffer-types": {
+      "type": "registry",
+      "version": "3.0.2",
+      "integrity": "sha256-p05cJnSkyeoB7VHzMyc2Eb1RwUaB7Nl0sQSqEGNEUD8=",
+      "dependencies": []
     },
     "arrays": {
       "type": "registry",
@@ -1175,6 +1545,25 @@
         "type-equality"
       ]
     },
+    "dodo-printer": {
+      "type": "registry",
+      "version": "2.2.3",
+      "integrity": "sha256-z6LZV9tXQPBZvHqzUYyCYGB7zHq6u7TOgV6Pr0wiobs=",
+      "dependencies": [
+        "ansi",
+        "either",
+        "foldable-traversable",
+        "integers",
+        "lists",
+        "maybe",
+        "newtype",
+        "partial",
+        "prelude",
+        "safe-coerce",
+        "strings",
+        "tuples"
+      ]
+    },
     "effect": {
       "type": "registry",
       "version": "4.0.0",
@@ -1280,6 +1669,26 @@
         "prelude",
         "strings",
         "transformers",
+        "unsafe-coerce"
+      ]
+    },
+    "foreign-object": {
+      "type": "registry",
+      "version": "4.1.0",
+      "integrity": "sha256-x/Q7r80z/vmHRKvPwhYmHP/DnJciPtsyGfRTMzayKIU=",
+      "dependencies": [
+        "arrays",
+        "foldable-traversable",
+        "functions",
+        "gen",
+        "lists",
+        "maybe",
+        "prelude",
+        "st",
+        "tailrec",
+        "tuples",
+        "typelevel-prelude",
+        "unfoldable",
         "unsafe-coerce"
       ]
     },
@@ -1432,6 +1841,39 @@
         "prelude"
       ]
     },
+    "language-cst-parser": {
+      "type": "registry",
+      "version": "0.14.1",
+      "integrity": "sha256-tnue0oM2/EmyNJmLoJDnmUDfinKLJHi2fcSGt7d6ewU=",
+      "dependencies": [
+        "arrays",
+        "const",
+        "control",
+        "either",
+        "enums",
+        "foldable-traversable",
+        "free",
+        "functions",
+        "functors",
+        "identity",
+        "integers",
+        "lazy",
+        "lists",
+        "maybe",
+        "newtype",
+        "numbers",
+        "ordered-collections",
+        "partial",
+        "prelude",
+        "st",
+        "strings",
+        "transformers",
+        "tuples",
+        "typelevel-prelude",
+        "unfoldable",
+        "unsafe-coerce"
+      ]
+    },
     "lazy": {
       "type": "registry",
       "version": "6.0.0",
@@ -1520,6 +1962,107 @@
       "dependencies": [
         "prelude",
         "safe-coerce"
+      ]
+    },
+    "node-buffer": {
+      "type": "registry",
+      "version": "9.0.1",
+      "integrity": "sha256-IobmhKderXXf8C4tUnmIXNSBhfIGuFZ8vbV9i8BPBaI=",
+      "dependencies": [
+        "arraybuffer-types",
+        "effect",
+        "functions",
+        "maybe",
+        "nullable",
+        "partial",
+        "prelude",
+        "st",
+        "unsafe-coerce"
+      ]
+    },
+    "node-event-emitter": {
+      "type": "registry",
+      "version": "3.0.1",
+      "integrity": "sha256-F3VUV8CnDOxKNqaWj3Q+ODfhtHRJ3HMy6p8R+sKs2M0=",
+      "dependencies": [
+        "effect",
+        "either",
+        "functions",
+        "maybe",
+        "nullable",
+        "prelude",
+        "unsafe-coerce"
+      ]
+    },
+    "node-fs": {
+      "type": "registry",
+      "version": "9.2.1",
+      "integrity": "sha256-IqK8L/fvP/FIyOwWcz1TVjokTGiQ64deObxqSsl329M=",
+      "dependencies": [
+        "aff",
+        "datetime",
+        "effect",
+        "either",
+        "enums",
+        "exceptions",
+        "functions",
+        "integers",
+        "js-date",
+        "maybe",
+        "node-buffer",
+        "node-path",
+        "node-streams",
+        "nullable",
+        "partial",
+        "prelude",
+        "strings"
+      ]
+    },
+    "node-path": {
+      "type": "registry",
+      "version": "5.0.1",
+      "integrity": "sha256-j7n/SmpVz0FOMJl4XZop3ofJ+MeIPkMNqUEUKHEL6Us=",
+      "dependencies": [
+        "effect"
+      ]
+    },
+    "node-process": {
+      "type": "registry",
+      "version": "11.2.1",
+      "integrity": "sha256-6fbi4MzlDoOx+0Tq9fHBgzaPDn2Y92twBxUHLGl4Nr0=",
+      "dependencies": [
+        "effect",
+        "exceptions",
+        "foreign",
+        "foreign-object",
+        "maybe",
+        "node-event-emitter",
+        "node-streams",
+        "nullable",
+        "posix-types",
+        "prelude",
+        "strings"
+      ]
+    },
+    "node-streams": {
+      "type": "registry",
+      "version": "9.0.2",
+      "integrity": "sha256-gC0QsuvFI9A3HfoeG3swH9AU2C3mhSEEf0TiMT6kiAI=",
+      "dependencies": [
+        "aff",
+        "arrays",
+        "effect",
+        "either",
+        "exceptions",
+        "maybe",
+        "node-buffer",
+        "node-event-emitter",
+        "nullable",
+        "prelude",
+        "refs",
+        "st",
+        "tailrec",
+        "unsafe-coerce"
       ]
     },
     "nonempty": {
@@ -1640,6 +2183,16 @@
         "tuples"
       ]
     },
+    "posix-types": {
+      "type": "registry",
+      "version": "6.0.1",
+      "integrity": "sha256-b9FgoKaAQlj7HQ8PqNm4GiEO8mnFqd1sZBPd0tvDTQg=",
+      "dependencies": [
+        "maybe",
+        "newtype",
+        "prelude"
+      ]
+    },
     "prelude": {
       "type": "registry",
       "version": "6.0.2",
@@ -1659,6 +2212,166 @@
         "newtype",
         "prelude",
         "tuples"
+      ]
+    },
+    "psx-cli": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "packages/psx-cli",
+      "dependencies": [
+        "argonaut-core",
+        "arrays",
+        "console",
+        "effect",
+        "either",
+        "foldable-traversable",
+        "foreign-object",
+        "functions",
+        "integers",
+        "language-cst-parser",
+        "maybe",
+        "node-buffer",
+        "node-fs",
+        "node-path",
+        "node-process",
+        "prelude",
+        "psx-cst",
+        "psx-fmt",
+        "psx-html-data",
+        "psx-lower",
+        "strings",
+        "tuples"
+      ]
+    },
+    "psx-cst": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "packages/psx-cst",
+      "dependencies": [
+        "arrays",
+        "effect",
+        "either",
+        "foldable-traversable",
+        "functions",
+        "language-cst-parser",
+        "lists",
+        "maybe",
+        "prelude",
+        "psx-html-data",
+        "refs",
+        "strings",
+        "tuples"
+      ]
+    },
+    "psx-fmt": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "packages/psx-fmt",
+      "dependencies": [
+        "arrays",
+        "dodo-printer",
+        "either",
+        "foldable-traversable",
+        "language-cst-parser",
+        "maybe",
+        "prelude",
+        "psx-cst",
+        "psx-lower",
+        "strings",
+        "tidy",
+        "tuples"
+      ]
+    },
+    "psx-html-data": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "packages/psx-html-data",
+      "dependencies": [
+        "arrays",
+        "foreign-object",
+        "maybe",
+        "prelude",
+        "strings"
+      ]
+    },
+    "psx-lower": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "packages/psx-lower",
+      "dependencies": [
+        "arrays",
+        "either",
+        "enums",
+        "foldable-traversable",
+        "foreign-object",
+        "integers",
+        "language-cst-parser",
+        "lists",
+        "maybe",
+        "newtype",
+        "prelude",
+        "psx-cst",
+        "psx-html-data",
+        "strings",
+        "transformers",
+        "tuples"
+      ]
+    },
+    "psx-suite": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "test/suite",
+      "dependencies": [
+        "aff",
+        "argonaut-core",
+        "arrays",
+        "console",
+        "datetime",
+        "effect",
+        "either",
+        "foldable-traversable",
+        "foreign",
+        "foreign-object",
+        "integers",
+        "lists",
+        "maybe",
+        "node-buffer",
+        "node-fs",
+        "node-path",
+        "node-process",
+        "numbers",
+        "ordered-collections",
+        "prelude",
+        "refs",
+        "strings",
+        "tuples"
+      ]
+    },
+    "psx-suite-shared": {
+      "type": "git",
+      "url": "https://github.com/blankhart/psx.git",
+      "rev": "4b04b493d27967350422133005851d905f52282f",
+      "subdir": "test/suite/shared",
+      "dependencies": [
+        "aff",
+        "arrays",
+        "datetime",
+        "effect",
+        "foldable-traversable",
+        "integers",
+        "maybe",
+        "numbers",
+        "prelude",
+        "strings",
+        "tuples",
+        "web-dom",
+        "web-html"
       ]
     },
     "quickcheck": {
@@ -1815,6 +2528,27 @@
         "refs"
       ]
     },
+    "tidy": {
+      "type": "registry",
+      "version": "0.11.1",
+      "integrity": "sha256-YVBajrHqEC0A5OpY5QwXgDzkqbdVs+Ym7qIM/A64MGA=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "dodo-printer",
+        "either",
+        "foldable-traversable",
+        "language-cst-parser",
+        "lists",
+        "maybe",
+        "newtype",
+        "ordered-collections",
+        "partial",
+        "prelude",
+        "strings",
+        "tuples"
+      ]
+    },
     "transformers": {
       "type": "registry",
       "version": "6.1.0",
@@ -1898,8 +2632,8 @@
     },
     "web-clipboard": {
       "type": "registry",
-      "version": "6.0.0",
-      "integrity": "sha256-3CV0txwKddLoj8qBrRjUWbiX0M8+rnOpi1iApr5PEb0=",
+      "version": "6.0.1",
+      "integrity": "sha256-FqPfz5Z0gwL2Co8UoDEc54oNlR+EJx/UHbHZH0w4eGw=",
       "dependencies": [
         "effect",
         "functions",
@@ -1990,8 +2724,8 @@
     },
     "web-pointerevents": {
       "type": "registry",
-      "version": "2.0.0",
-      "integrity": "sha256-mQbm1V36u3It2WdYMAXtzLBJl3uRAhN4BjeZTw3LWN8=",
+      "version": "2.0.1",
+      "integrity": "sha256-qlVldrIHa3/VOixQSLZC6hVbSz9U3WYsmOgFv1PgsGU=",
       "dependencies": [
         "effect",
         "maybe",
@@ -2018,8 +2752,8 @@
     },
     "web-touchevents": {
       "type": "registry",
-      "version": "4.0.0",
-      "integrity": "sha256-H02c53BJlHDlAgogj/x8bM7PagJjhMMrMPYy9I7Rf0s=",
+      "version": "4.0.1",
+      "integrity": "sha256-iVnt17C7bQjy2F6Vi5zFdupcxuqeI7pT0Kiy7krPHJk=",
       "dependencies": [
         "functions",
         "maybe",

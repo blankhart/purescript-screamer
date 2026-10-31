@@ -16,6 +16,8 @@ This is one Spago workspace containing packages released together at one version
 - `packages/screamer-motion`: transitions, animation, and animated values.
 - `packages/screamer-devtools`: runtime inspection, recording, diagnostics, and work budgets.
 - `packages/screamer-test`: observation helpers, DOM helpers, and fake clocks.
+- `packages/screamer-psx`: PSX adapter, generated API, and conformance tests. PSX is build tooling under `tooling/psx`.
+- `examples/psx`: PSX examples; `test/suite/apps` contains paired native/PSX scenarios. Run `npm run psx:generate`, `npm run psx:examples`, and `npm run psx:suite` after PSX integration changes.
 - `examples/src`: runnable examples and integration demonstrations.
 - `codegen`: DOM metadata, generators, and templates.
 - `compile-fail`: fixtures checking the public API's type constraints.
