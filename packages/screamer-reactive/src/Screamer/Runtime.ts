@@ -689,7 +689,7 @@ export function derived<T>(fn: () => T): Derived<T> {
 //   `read` returns that state. When observed again it resynchronizes with its
 //   inputs without stepping, then continues.
 // - Simultaneity. When both inputs of `merge` change in one batch, the left
-//   wins (like Reflex's `leftmost`).
+//   wins.
 //
 // Guarantee: two evaluations of the same stateful expression produce the
 // same values whenever they are observed over the same interval. Where a

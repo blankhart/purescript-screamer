@@ -115,7 +115,7 @@ type RetryPolicy = { retries :: Int, backoff :: Backoff }
 -- | failure is rethrown. The waits use the scope's `Screamer.Host` timers,
 -- | and killing the request (a new input under `Switch`, or disposing the
 -- | scope) cancels a pending retry. Pass the result to `resourceWith` or
--- | `request`. (RxJS `retry` with a delay.)
+-- | `request`.
 retry :: forall a b. RetryPolicy -> (a -> Aff b) -> Owned (a -> Aff b)
 retry policy req = host <#> \h a ->
   let
@@ -140,16 +140,15 @@ sleep h (Milliseconds ms) = makeAff \k -> do
   cancel <- h.setTimeout ms (k (Right unit))
   pure (effectCanceler cancel)
 
--- | How requests that overlap are run. The names are RxJS's flattening
--- | operators.
+-- | Choose how overlapping requests run:
 -- |
--- | - `Switch` (`switchMap`): a new input kills the running request, whose
+-- | - `Switch`: a new input kills the running request, whose
 -- |   result is never shown.
--- | - `Merge` (`mergeMap`): every request runs; each result is shown when it
+-- | - `Merge`: every request runs; each result is shown when it
 -- |   arrives.
--- | - `Concat` (`concatMap`): inputs queue while a request runs, without
+-- | - `Concat`: inputs queue while a request runs, without
 -- |   bound, and run in order.
--- | - `Exhaust` (`exhaustMap`): inputs that arrive while a request runs are
+-- | - `Exhaust`: inputs that arrive while a request runs are
 -- |   ignored.
 data Strategy = Switch | Merge | Concat | Exhaust
 

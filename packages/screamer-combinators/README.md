@@ -15,23 +15,28 @@ Depends on: screamer-reactive, and datetime for `Time.clock`.  The tables below 
 
 All stateful, so each returns `Owned`: it starts from its seed when the action runs and counts every occurrence from then on, for the life of its scope, whether or not anything observes it.
 
-| RxJS | Screamer | Notes |
-|---|---|---|
-| `take`, `skip`, `takeWhile`, `skipWhile`, `first` | the same names on `Event`, such as `Event.take :: Int -> Event a -> Owned (Event a)` | |
-| `count`, `reduce` | `Event.count :: Event a -> Owned (Signal Int)`, `Event.fold` | |
+| Operator | Behavior |
+| --- | --- |
+| `Event.take n` | Keep the first n occurrences. |
+| `Event.skip n` | Drop the first n occurrences. |
+| `Event.takeWhile predicate` | Keep occurrences until the first predicate failure; discard that occurrence and all later ones. |
+| `Event.skipWhile predicate` | Drop occurrences until the first predicate failure; keep that occurrence and all later ones. |
+| `Event.first` | Keep only the first occurrence. |
+| `Event.count` | A signal counting occurrences, starting at zero. |
+| `Event.fold` | A signal accumulating occurrences from a seed with a supplied function; available in `Screamer.Event`. |
 
 ## Combining several streams
 
 On signals, one step per batch; on events, every occurrence is kept in fire order unless the combinator says otherwise.
 
-| RxJS | Screamer | Simultaneity |
-|---|---|---|
-| `combineLatest` | `Signal.combine :: Array (Signal a) -> Signal (Array a)` | one value per batch; one node instead of a chain of `apply`s |
-| `withLatestFrom` | `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Owned (Signal (Tuple a b))` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; stateful |
-| (Reflex `leftmost`) | `Event.leftmost :: Array (Event a) -> Event a` | only the leftmost input that fired in the round |
-| `mergeWith` keeping both | `Event.mergeWith :: (a -> b -> c) -> (a -> c) -> (b -> c) -> Event a -> Event b -> Event c` | occurrences with the same fire stamp (both derived from one fire) are combined; nothing is lost |
-| `zip` | `Event.zip`, `Event.zipWith` (in `Owned`) | pairs the nth occurrence of each, counting from when the action runs; unpaired occurrences queue without bound; stateful |
-| `race` | `Event.race :: Array (Event a) -> Owned (Event a)` | follows the first argument to fire after the action runs (the leftmost, on a tie); stateful |
+| Operator | Behavior |
+| --- | --- |
+| `Signal.combine :: Array (Signal a) -> Signal (Array a)` | one value per batch; one node instead of a chain of `apply`s |
+| `Event.attachWith`; `Signal.withLatest :: Signal b -> Signal a -> Owned (Signal (Tuple a b))` | `withLatest` changes only when its second argument (the driver) does, unlike `apply`; stateful |
+| `Event.leftmost :: Array (Event a) -> Event a` | only the leftmost input that fired in the round |
+| `Event.mergeWith :: (a -> b -> c) -> (a -> c) -> (b -> c) -> Event a -> Event b -> Event c` | occurrences with the same fire stamp (both derived from one fire) are combined; nothing is lost |
+| `Event.zip`, `Event.zipWith` (in `Owned`) | pairs the nth occurrence of each, counting from when the action runs; unpaired occurrences queue without bound; stateful |
+| `Event.race :: Array (Event a) -> Owned (Event a)` | follows the first argument to fire after the action runs (the leftmost, on a tie); stateful |
 
 ## Flattening
 
@@ -39,12 +44,12 @@ On signals, one step per batch; on events, every occurrence is kept in fire orde
 
 Inner work that needs an owner (timers, sockets, requests) runs in a child scope per inner value, like `dyn` for values other than elements. `Screamer.Flatten`:
 
-| RxJS | Screamer |
-|---|---|
-| `switchMap` | `switchOwned :: Signal a -> (a -> Owned b) -> Owned (Signal b)`: each new value disposes the running child first |
-| `mergeMap` | `mergeOwned :: Event a -> (a -> Effect Unit -> Owned (Event b)) -> Owned (Event b)`: every child runs at once |
-| `concatMap` | `concatOwned` (same type): occurrences queue while a child runs, without bound, and start in order |
-| `exhaustMap` | `exhaustOwned` (same type): occurrences are ignored while a child runs |
+| Operator | Behavior |
+| --- | --- |
+| `switchOwned :: Signal a -> (a -> Owned b) -> Owned (Signal b)` | Each new value disposes the running child first. |
+| `mergeOwned :: Event a -> (a -> Effect Unit -> Owned (Event b)) -> Owned (Event b)` | Every child runs at once. |
+| `concatOwned` (same type as `mergeOwned`) | Occurrences queue while a child runs, without bound, and start in order. |
+| `exhaustOwned` (same type as `mergeOwned`) | Occurrences are ignored while a child runs. |
 
 A child of the event forms is *running* until it calls the `Effect Unit` it is given (`done`), which disposes it, or until the parent scope is disposed. The output merges the events the running children return, in fire order; an inner event delivers what it fires after its child's setup returns.
 
@@ -63,16 +68,16 @@ frames   :: Owned (Event Number)                     -- one occurrence per anima
 
 Each combinator needs a timer, so each returns `Owned` and cancels its timers when its scope is disposed; an occurrence still pending then is dropped. Timers start at instantiation: each combinator subscribes to its input when its scope runs and observes it for the scope's whole life, whether or not anything observes the output. `timeout` and `sampleEvery` count their first interval from instantiation.
 
-| RxJS | Screamer |
-|---|---|
-| `debounceTime` | `debounce :: Milliseconds -> Event a -> Owned (Event a)`; `debounceSignal :: Milliseconds -> Signal a -> Owned (Signal a)` holds the last settled value, starting at the current one |
-| `throttleTime` | `throttle :: { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)`; a trailing occurrence opens a new interval, as in RxJS |
-| `auditTime` | `audit :: Milliseconds -> Event a -> Owned (Event a)` |
-| `sampleTime` | `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)`; holds the signal so it is kept computed between samples |
-| `delay` | `delay :: Milliseconds -> Event a -> Owned (Event a)`; keeps order |
-| `timeout` | `timeout :: Milliseconds -> Event a -> Owned (Event (Either Unit a))`; a `Left unit` for each silence of the interval, from instantiation and after each occurrence, instead of an error |
-| `interval`, `timer` | `interval`, `after`; `clock` for the time itself |
-| animation-frame scheduling | `frames`; `onFrame :: Event a -> Owned (Event a)`: the latest occurrence on the next frame |
+| Operator | Behavior |
+| --- | --- |
+| `debounce :: Milliseconds -> Event a -> Owned (Event a)` | Emit the latest occurrence after the input has been quiet for the interval. |
+| `debounceSignal :: Milliseconds -> Signal a -> Owned (Signal a)` | Hold the current value until a new value has remained unchanged for the interval. |
+| `throttle :: { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)` | With `leading`, emit the first occurrence and open an interval. With `trailing`, emit the latest occurrence collected during the interval at its end, then open another interval. |
+| `audit :: Milliseconds -> Event a -> Owned (Event a)` | An occurrence opens an interval; at its end, emit the latest occurrence seen. |
+| `sampleEvery :: Milliseconds -> Signal a -> Owned (Event a)` | Emit the signal's value every interval, starting one interval after instantiation. Hold the signal so it stays computed between samples. |
+| `delay :: Milliseconds -> Event a -> Owned (Event a)` | Emit every occurrence after the interval, preserving order. |
+| `timeout :: Milliseconds -> Event a -> Owned (Event (Either Unit a))` | Emit every input as `Right`. Emit `Left unit` after an interval of silence, counting from instantiation or the latest input. After `Left`, wait for another input before arming the timer again. |
+| `onFrame :: Event a -> Owned (Event a)` | Emit the latest occurrence on the next animation frame, combining multiple occurrences before that frame into one. |
 
 Each timer callback runs in one `batch`, so what it fires arrives in one round. An occurrence passed on without a timer (a leading `throttle` edge, a `timeout`'s `Right`) is fired from a subscription, so it arrives one round after the input's.
 
@@ -80,15 +85,16 @@ Each timer callback runs in one `batch`, so what it fires arrives in one round. 
 
 Every buffer is stateful, so each returns `Owned` and collects from when the action runs, for the life of its scope.
 
-| RxJS | Screamer |
-|---|---|
-| `bufferCount(n, step)` | `Event.bufferCount :: Int -> Int -> Event a -> Owned (Event (Array a))` |
-| `buffer(notifier)` | `Event.bufferOn :: Event b -> Event a -> Owned (Event (Array a))` |
-| `bufferToggle`, `bufferWhen` | `Event.bufferWhile :: Signal Boolean -> Event a -> Owned (Event (Array a))` |
-| `bufferTime` | `Time.bufferFor :: Milliseconds -> Event a -> Owned (Event (Array a))` |
-| `window*` | left out: a window is an event of events, which has no owner for the inner events (see #21); buffer, or use `switchEvent` |
-| (no RxJS name) | `Signal.history :: Int -> Signal a -> Owned (Signal (Array a))`: the last n values, oldest first, for sparklines and undo |
+| Operator | Behavior |
+| --- | --- |
+| `Event.bufferCount :: Int -> Int -> Event a -> Owned (Event (Array a))` | Collect buffers of n occurrences, starting a new buffer every `step` occurrences. Emit only full buffers: `bufferCount 3 3` chunks; `bufferCount 3 1` slides. |
+| `Event.bufferOn :: Event b -> Event a -> Owned (Event (Array a))` | Emit collected occurrences whenever the notifier fires, then clear the buffer. |
+| `Event.bufferWhile :: Signal Boolean -> Event a -> Owned (Event (Array a))` | Collect while the signal is true; emit the collection when it turns false. |
+| `Time.bufferFor :: Milliseconds -> Event a -> Owned (Event (Array a))` | Emit the occurrences collected during each interval, skipping empty intervals. |
+| `Signal.history :: Int -> Signal a -> Owned (Signal (Array a))` | Keep the last n values, oldest first, starting with the current value; useful for sparklines and undo. |
 
-- `bufferOn` fires on every notifier occurrence, even with nothing collected, as RxJS does. An occurrence fired in the same round as the notifier and before it goes into that buffer.
+Buffers produce arrays rather than inner events with independent lifetimes. Use owned flattening when inner work needs its own scope, or `switchEvent` to follow an existing event selected by a signal.
+
+- `bufferOn` fires on every notifier occurrence, even with nothing collected. An occurrence fired in the same round as the notifier and before it goes into that buffer.
 - `bufferWhile` reads its signal at the end of each round, like `gate`: it collects the occurrences of rounds that end with the signal true, and fires the collection (possibly empty) in the round that ends with it false.
-- `bufferFor` fires every interval from instantiation, but skips an interval with nothing collected, unlike RxJS, so an idle buffer does not wake its observers. What it holds when its scope is disposed is dropped.
+- `bufferFor` fires every interval from instantiation, but skips an interval with nothing collected, so an idle buffer does not wake its observers. What it holds when its scope is disposed is dropped.
