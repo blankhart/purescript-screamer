@@ -1,0 +1,75 @@
+-- | The nested scenario on Screamer, in PSX: each counter is a component
+-- | with its own state, in an `each` keyed by id.
+module App.Nested.Screamer.Psx (main) where
+
+import Prelude
+
+import Data.Array as Array
+import Data.Foldable (foldl, sum)
+import Data.Map as Map
+import Data.Tuple (Tuple(..))
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Effect.Ref as Ref
+import Screamer.Signal (Signal, readT0)
+import Screamer.Source (batch, signalSource)
+import Suite.Shared.Dom (removeApp)
+import Screamer.Element (Element, component, each, mount)
+import Screamer.Psx (Markup, root)
+import App.Nested.Screamer.Psx.Counter as Counter
+
+-- | What the view shows and what its handlers do.
+type Props =
+  { children :: Signal (Array Counter.Input)
+  , total :: Signal Int
+  , add :: Effect Unit
+  , remove :: Int -> Effect Unit
+  , report :: Int -> Int -> Effect Unit
+  }
+
+type Fixture = { counters :: Array Counter.Input }
+
+-- | The parent keeps the children it shows and the counts they report.
+nested :: Fixture -> Element
+nested fixture = component do
+  children <- liftEffect $ signalSource fixture.counters
+  counts <- liftEffect $ signalSource (Map.fromFoldable (map (\c -> Tuple c.id c.start) fixture.counters))
+  next <- liftEffect $ Ref.new (1 + foldl (\n c -> max n c.id) 0 fixture.counters)
+  let
+    add = do
+      id <- Ref.modify (_ + 1) next <#> (_ - 1)
+      batch do
+        children.modifyT1 (_ <> [ { id, label: "Counter " <> show id, start: 0 } ])
+        counts.modifyT1 (Map.insert id 0)
+    remove id = batch do
+      children.modifyT1 (Array.filter \c -> c.id /= id)
+      counts.modifyT1 (Map.delete id)
+    report id n = counts.modifyT1 (Map.insert id n)
+  pure $ root $ view { children: children.signal, total: sum <$> counts.signal, add, remove, report }
+
+view :: Props -> Markup (Effect Unit)
+view props =
+  <section class="nested" data-testid="nested">
+    <p data-testid="total">Total: {show <$> props.total}</p>
+    <ul class="counters">
+      {each _.id props.children (child props)}
+    </ul>
+    <button data-testid="add" onclick={props.add}>Add a counter</button>
+  </section>
+
+-- | A row reads its child's input once.
+child :: Props -> Signal Counter.Input -> Element
+child props row = component do
+  c <- liftEffect (readT0 row)
+  pure $ root
+    ( <li class="child">
+        {Counter.counter c (props.report c.id)}
+        <button data-testid={"remove-" <> show c.id} onclick={props.remove c.id}>Remove</button>
+      </li>
+    )
+
+-- | Mounts in place of `#app`, starting from the scenario's fixture.
+main :: Fixture -> Effect Unit
+main fixture = do
+  removeApp
+  void $ mount "#root" (nested fixture)

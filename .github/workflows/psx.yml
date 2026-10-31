@@ -1,0 +1,31 @@
+name: PSX integration
+on: [push, pull_request]
+jobs:
+  psx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Read pinned private build dependencies
+        env:
+          TOKEN: ${{ secrets.PSX_DEPS_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/blankhart/".insteadOf "https://github.com/blankhart/"
+          fi
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm run psx:generate
+      - run: git diff --exit-code
+      - run: npm run psx:examples
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run psx:suite
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

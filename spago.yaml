@@ -1,7 +1,35 @@
 workspace:
   packageSet:
-    registry: 81.4.0
+    registry: 81.5.0
   extraPackages:
     windrose-router:
       git: https://github.com/blankhart/purescript-windrose-router.git
       ref: 6199237cf42d35b8ca3d89ceaba40efb83966ac3
+    psx-cst:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: packages/psx-cst
+    psx-html-data:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: packages/psx-html-data
+    psx-lower:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: packages/psx-lower
+    psx-fmt:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: packages/psx-fmt
+    psx-cli:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: packages/psx-cli
+    psx-suite:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: test/suite
+    psx-suite-shared:
+      git: https://github.com/blankhart/psx.git
+      ref: 4b04b493d27967350422133005851d905f52282f
+      subdir: test/suite/shared

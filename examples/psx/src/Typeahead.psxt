@@ -1,0 +1,162 @@
+<script type="text/purescript">
+-- | A search box over a slow, flaky fake server. The query is debounced,
+-- | deduplicated and filtered to three or more characters; each query is
+-- | sent with `resourceWith Switch` and `retry`, so a slow answer to an old
+-- | query is never shown; `keepLast` keeps the previous results on screen
+-- | while the next ones load; and the selection is an `Event.fold` over key
+-- | presses and new results. Screamer's own Typeahead example, with its view
+-- | in PSX: the setup stays in the script, and the view's signals go in holes.
+module Screamer.Psx.Examples.Typeahead where
+
+import Prelude
+
+import Control.Alt ((<|>))
+import Data.Array as Array
+import Data.Filterable (filter)
+import Data.Int (toNumber)
+import Data.Maybe (fromMaybe)
+import Data.String as String
+import Data.Time.Duration (Milliseconds(..))
+import Effect (Effect)
+import Effect.Aff (Aff, delay, error, message, throwError)
+import Effect.Class (liftEffect)
+import Effect.Random (randomInt)
+import Effect.Ref as Ref
+import Screamer.Psx.Examples.Harness as Harness
+import Screamer.Element (Element, component, each)
+import Screamer.Event as Event
+import Screamer.Psx (Markup, root)
+import Screamer.Resource (Backoff(..), Remote(..), Strategy(..), isLoading, keepLast, resourceWith, retry)
+import Screamer.Signal (Signal, readT0)
+import Screamer.Source (eventSource, signalSource)
+import Screamer.Time as Time
+import Web.Event.Event (preventDefault)
+import Web.UIEvent.KeyboardEvent (KeyboardEvent, key, toEvent)
+
+main :: Effect Unit
+main = Harness.run "main" typeahead
+
+fruits :: Array String
+fruits =
+  [ "apple", "apricot", "avocado", "banana", "bilberry", "blackberry", "blackcurrant", "blueberry"
+  , "boysenberry", "cherry", "cloudberry", "coconut", "cranberry", "currant", "damson", "date"
+  , "dragonfruit", "durian", "elderberry", "feijoa", "fig", "gooseberry", "grape", "grapefruit"
+  , "guava", "huckleberry", "jackfruit", "kiwi", "kumquat", "lemon", "lime", "lingonberry", "loquat"
+  , "lychee", "mango", "mangosteen", "melon", "mulberry", "nectarine", "orange", "papaya"
+  , "passionfruit", "peach", "pear", "persimmon", "pineapple", "plum", "pomegranate", "quince"
+  , "raspberry", "redcurrant", "salak", "satsuma", "strawberry", "tamarind", "tangerine", "yuzu"
+  ]
+
+-- | A fake server: answers after 50 to 400 ms, and fails every third
+-- | request, which `retry` hides.
+type Server = String -> Aff (Array String)
+
+server :: Effect Server
+server = do
+  requests <- Ref.new 0
+  pure \query -> do
+    n <- liftEffect $ Ref.modify (_ + 1) requests
+    latency <- liftEffect $ randomInt 50 400
+    delay (Milliseconds (toNumber latency))
+    when (n `mod` 3 == 0) $ throwError (error "server busy")
+    pure $ Array.take 8 $ Array.filter (String.contains (String.Pattern query)) fruits
+
+data Key = Up | Down
+
+-- | The selected row, kept within the results.
+type Selection = { index :: Int, count :: Int }
+
+data Step = Move Key | Results Int
+
+select :: Step -> Selection -> Selection
+select step s = case step of
+  Move Down -> s { index = min (s.count - 1) (s.index + 1) }
+  Move Up -> s { index = max 0 (s.index - 1) }
+  Results count -> { index: 0, count }
+
+type Item = { index :: Int, name :: String }
+
+-- | What the view shows and what its handlers do.
+type Props =
+  { onQuery :: String -> Effect Unit
+  , onKey :: KeyboardEvent -> Effect Unit
+  , status :: Signal String
+  , rows :: Signal (Array Item)
+  , selection :: Signal Selection
+  , chosen :: Signal String
+  }
+
+typeahead :: Element
+typeahead = component do
+  search <- liftEffect server
+  typed <- liftEffect eventSource
+  keys <- liftEffect eventSource
+  draft <- liftEffect $ signalSource ""
+  chosen <- liftEffect $ signalSource ""
+  settled <- Time.debounce (Milliseconds 150.0) typed.event
+  distinct <- Event.dropRepeats settled
+  let
+    queries = filter (\q -> String.length q >= 3) distinct
+    policy = { retries: 3, backoff: Exponential { initial: Milliseconds 100.0, max: Milliseconds 1000.0 } }
+  querySignal <- Event.stepper "" queries
+  request <- retry policy search
+  raw <- resourceWith Switch querySignal \q ->
+    if q == "" then pure [] else request q
+  results <- keepLast raw
+  let
+    shown = results <#> case _ of
+      Loaded rs -> rs
+      _ -> []
+  -- Held: while the list is empty nothing else observes the selection, and
+  -- an unheld fold would pause and miss the next results' reset.
+  selection <- Event.fold select { index: 0, count: 0 }
+    (map Move keys.event <|> map (Results <<< Array.length) (Event.changes shown))
+  let
+    status = ado
+      q <- draft.signal
+      r <- raw
+      rs <- shown
+      in
+        if String.length q < 3 then "Type at least three letters"
+        else if isLoading r then "Searching…"
+        else case r of
+          Failed e -> "Search failed: " <> message e
+          _ -> count (Array.length rs)
+    choose = do
+      rs <- readT0 shown
+      s <- readT0 selection
+      for_ (Array.index rs s.index) chosen.putT1
+    onKey e = case key e of
+      "ArrowDown" -> preventDefault (toEvent e) *> keys.fireT1 Down
+      "ArrowUp" -> preventDefault (toEvent e) *> keys.fireT1 Up
+      "Enter" -> preventDefault (toEvent e) *> choose
+      _ -> pure unit
+    onQuery q = do
+      draft.putT1 q
+      typed.fireT1 q
+    rows = shown <#> Array.mapWithIndex \index name -> { index, name }
+  pure $ root $ view
+    { onQuery, onKey, status, rows, selection, chosen: chosen.signal }
+  where
+  count n = show n <> if n == 1 then " result" else " results"
+  for_ m f = fromMaybe (pure unit) (f <$> m)
+
+selected :: Item -> Selection -> String
+selected r s = if r.index == s.index then "selected" else ""
+
+chosenText :: String -> String
+chosenText c = if c == "" then "" else "Chosen: " <> c
+
+foreign import view :: Props -> Markup (Effect Unit)
+</script>
+
+<template head="view props">
+  <div>
+    <input id="search" type="text" placeholder="Search fruit" autocomplete="off" oninput={props.onQuery} onkeydown={props.onKey}>
+    <p id="status">{props.status}</p>
+    <ul id="results">
+      {each _.name props.rows \row -> root (<li class={selected <$> row <*> props.selection}>{_.name <$> row}</li>)}
+    </ul>
+    <p id="chosen">{chosenText <$> props.chosen}</p>
+  </div>
+</template>
