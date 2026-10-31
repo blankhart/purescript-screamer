@@ -169,27 +169,24 @@ owned make = liftEffect make >>= hold
 -- their seed when the `Owned` action runs.
 
 -- | Thread a state through the occurrences, emitting one value for each,
--- | like `fold` but with an output per occurrence. Stateful. (RxJS `scan`
--- | with a separate output.)
+-- | like `fold` but with an output per occurrence. Stateful.
 mapAccum :: forall a s b. (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Owned (Event b)
 mapAccum f seed e = owned (mapAccumImpl f seed e)
 
 foreign import mapAccumImpl :: forall a s b. (a -> s -> { state :: s, value :: b }) -> s -> Event a -> Effect (Event b)
 
 -- | Each occurrence with the one before it, from the second occurrence
--- | after the `Owned` action runs. Stateful. (RxJS `pairwise`.)
+-- | after the `Owned` action runs. Stateful.
 withPrevious :: forall a. Event a -> Owned (Event { previous :: a, current :: a })
 withPrevious e = owned (withPreviousImpl e)
 
 foreign import withPreviousImpl :: forall a. Event a -> Effect (Event { previous :: a, current :: a })
 
 -- | The latest occurrence, starting at the seed. An alias of `stepper`.
--- | (RxJS `startWith`.)
 startWith :: forall a. a -> Event a -> Owned (Signal a)
 startWith = stepper
 
--- | Drop an occurrence equal to the one before it. Stateful. (RxJS
--- | `distinctUntilChanged`.)
+-- | Drop an occurrence equal to the one before it. Stateful.
 dropRepeats :: forall a. Eq a => Event a -> Owned (Event a)
 dropRepeats = dropRepeatsBy eq
 
@@ -198,7 +195,7 @@ dropRepeatsBy :: forall a. (a -> a -> Boolean) -> Event a -> Owned (Event a)
 dropRepeatsBy eq e = owned (dropRepeatsByImpl eq e)
 
 -- | Drop an occurrence whose key equals the previous occurrence's key.
--- | Stateful. (RxJS `distinctUntilKeyChanged`.)
+-- | Stateful.
 dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Event a -> Owned (Event a)
 dropRepeatsOn key = dropRepeatsBy \x y -> key x == key y
 
@@ -211,7 +208,7 @@ foreign import gate :: forall a. Signal Boolean -> Event a -> Event a
 -- Combining several streams (#20).
 
 -- | Every argument's occurrences, in fire order, as one node. It agrees
--- | with folding the array with `<|>`. (RxJS `merge`.)
+-- | with folding the array with `<|>`.
 foreign import oneOf :: forall a. Array (Event a) -> Event a
 
 -- Flattening (#21). Flattening that owns inner work (timers, requests) is
@@ -219,7 +216,7 @@ foreign import oneOf :: forall a. Array (Event a) -> Event a
 
 -- | The occurrences of whichever event the signal currently holds. After a
 -- | switch, the new event is followed from then on; nothing it fired before
--- | is delivered. (RxJS `switchMap` over events, `switchAll`.)
+-- | is delivered.
 foreign import switchEvent :: forall a. Signal (Event a) -> Event a
 
 -- | The occurrences of every event in the signal's array, in fire order.

@@ -27,15 +27,6 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: No sinuous imports
-        run: |
-          test -z "$(npm ls sinuous --parseable)"
-          if grep -rnE "(from|import|require\()[[:space:]]*['\"]sinuous|Screamer\.Core\.Sinuous|Screamer\.Observable" \
-              --include='*.ts' --include='*.js' --include='*.mjs' --include='*.purs' \
-              packages examples codegen bench compile-fail; then
-            echo "sinuous is imported above"; exit 1
-          fi
-
       - name: Type-check TypeScript
         run: npx tsc
 

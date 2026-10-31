@@ -36,7 +36,7 @@
 -- |   scope's whole life, whether or not anything reads it, until the scope
 -- |   is disposed.
 -- | - Simultaneity. When both arguments of `merge` update in one batch, the
--- |   left wins (like Reflex's `leftmost`).
+-- |   left wins.
 -- |
 -- | Since state starts when it is created, and not when someone subscribes,
 -- | a stateful signal shows the same values to every subscriber, and a pure
@@ -114,10 +114,9 @@ instance Monoid a => Monoid (Signal a) where
 foreign import sampleOn :: forall a b. Signal a -> Signal b -> Signal b
 
 -- | Update only when the argument updates to a value not equal to the one
--- | shown. Stateful, since it remembers that value (Reflex's
--- | `holdUniqDyn`). Use it before `dyn`, `resource`, `Event.changes` and
--- | anything else that reacts to updates rather than values, when the
--- | argument can update without changing:
+-- | shown. Stateful, since it remembers that value. Use it before `dyn`,
+-- | `resource`, `Event.changes` and anything else that reacts to updates
+-- | rather than values, when the argument can update without changing:
 -- |
 -- | ```purescript
 -- | page <- dropRepeats (_.page <$> state)
@@ -135,14 +134,13 @@ dropRepeatsBy eq s = owned (newDropRepeatsBy eq s)
 foreign import newDropRepeatsBy :: forall a. (a -> a -> Boolean) -> Signal a -> Effect (Signal a)
 
 -- | Propagate a change only when the key of the new value differs from the
--- | key of the one shown. Stateful, like `dropRepeatsBy`. (RxJS
--- | `distinctUntilKeyChanged`.)
+-- | key of the one shown. Stateful, like `dropRepeatsBy`.
 dropRepeatsOn :: forall a k. Eq k => (a -> k) -> Signal a -> Owned (Signal a)
 dropRepeatsOn key = dropRepeatsBy \x y -> key x == key y
 
 -- | The previous value and the current one. It starts as the seed and the
 -- | current value, and on each update pairs the value before it with the new
--- | one. Stateful. (RxJS `pairwise`.)
+-- | one. Stateful.
 withPrevious :: forall a. a -> Signal a -> Owned (Signal (Tuple a a))
 withPrevious seed s = owned (withPreviousImpl Tuple seed s)
 
@@ -152,7 +150,6 @@ foreign import withPreviousImpl :: forall a. (a -> a -> Tuple a a) -> a -> Signa
 -- | signal's computation fails, and the signal's value again once it
 -- | succeeds. The failing node stays consistent: it recomputes when its
 -- | inputs change, and its next successful computation clears the error.
--- | (RxJS `catchError` for pure derivations.)
 catching :: forall a. (Error -> a) -> Signal a -> Signal a
 catching handler s = map (either handler identity) (attempt s)
 

@@ -3,13 +3,13 @@
 -- | setup creates (timers, sockets, subscriptions) and releases it when it
 -- | is disposed.
 -- |
--- | The four RxJS strategies:
+-- | Choose how overlapping child scopes run:
 -- |
--- | - `switchOwned` (`switchMap`): a new input disposes the running child.
--- | - `mergeOwned` (`mergeMap`): every child runs at once.
--- | - `concatOwned` (`concatMap`): inputs queue while a child runs, and
+-- | - `switchOwned`: a new input disposes the running child.
+-- | - `mergeOwned`: every child runs at once.
+-- | - `concatOwned`: inputs queue while a child runs, and
 -- |   start in order.
--- | - `exhaustOwned` (`exhaustMap`): inputs are ignored while a child runs.
+-- | - `exhaustOwned`: inputs are ignored while a child runs.
 -- |
 -- | For the event forms a child is running until it calls the `done` action
 -- | it is given, which disposes it, or until the parent scope is disposed.

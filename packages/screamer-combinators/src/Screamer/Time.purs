@@ -146,7 +146,7 @@ frameLoop step = do
   pure { start, stop: timer.cancel }
 
 -- | The last occurrence of each burst, once the input has been quiet for
--- | the interval. (RxJS `debounceTime`.)
+-- | the interval.
 debounce :: forall a. Milliseconds -> Event a -> Owned (Event a)
 debounce (Milliseconds ms) input = do
   t <- timers
@@ -168,7 +168,7 @@ debounceSignal ms input = do
 -- | At most one occurrence per interval. With `leading`, the first
 -- | occurrence of a burst passes and opens the interval; with `trailing`,
 -- | the last occurrence during the interval is fired when it ends, and opens
--- | a new one. (RxJS `throttleTime`.)
+-- | a new one.
 throttle :: forall a. { leading :: Boolean, trailing :: Boolean } -> Milliseconds -> Event a -> Owned (Event a)
 throttle { leading, trailing } (Milliseconds ms) input = do
   t <- timers
@@ -192,7 +192,7 @@ throttle { leading, trailing } (Milliseconds ms) input = do
   pure out.event
 
 -- | After an occurrence, wait for the interval, then fire the latest
--- | occurrence seen meanwhile. (RxJS `auditTime`.)
+-- | occurrence seen meanwhile.
 audit :: forall a. Milliseconds -> Event a -> Owned (Event a)
 audit (Milliseconds ms) input = do
   t <- timers
@@ -208,8 +208,7 @@ audit (Milliseconds ms) input = do
   pure out.event
 
 -- | The signal's value at every interval, starting one interval from now.
--- | The signal is held, so it is kept computed between samples. (RxJS
--- | `sampleTime`, built like `clock`.)
+-- | The signal is held, so it is kept computed between samples.
 sampleEvery :: forall a. Milliseconds -> Signal a -> Owned (Event a)
 sampleEvery (Milliseconds ms) input = do
   t <- timers
@@ -219,7 +218,7 @@ sampleEvery (Milliseconds ms) input = do
   onCleanup cancel
   pure out.event
 
--- | Every occurrence, the interval later, in order. (RxJS `delay`.)
+-- | Every occurrence, the interval later, in order.
 delay :: forall a. Milliseconds -> Event a -> Owned (Event a)
 delay (Milliseconds ms) input = do
   t <- timers
@@ -241,7 +240,6 @@ delay (Milliseconds ms) input = do
 -- | Every occurrence as `Right`, and a `Left unit` whenever the interval
 -- | passes with no occurrence: from instantiation, and after each
 -- | occurrence. After a `Left`, the next one waits for another occurrence.
--- | (RxJS `timeout`, which errors instead.)
 timeout :: forall a. Milliseconds -> Event a -> Owned (Event (Either Unit a))
 timeout (Milliseconds ms) input = do
   t <- timers
@@ -275,9 +273,8 @@ timerDone :: Slot -> Effect Unit
 timerDone = _.cancel
 
 -- | The occurrences of each interval, fired at its end, starting one
--- | interval from now. An interval with no occurrences fires nothing,
--- | unlike RxJS. What is buffered when the scope is disposed is dropped.
--- | (RxJS `bufferTime`.)
+-- | interval from now. An interval with no occurrences fires nothing.
+-- | What is buffered when the scope is disposed is dropped.
 bufferFor :: forall a. Milliseconds -> Event a -> Owned (Event (Array a))
 bufferFor (Milliseconds ms) input = do
   t <- timers

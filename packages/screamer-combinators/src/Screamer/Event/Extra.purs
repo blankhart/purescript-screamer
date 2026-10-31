@@ -73,12 +73,12 @@ count = fold (\_ n -> n + 1) 0
 -- Combining several streams (#20).
 
 -- | In each round, the occurrences of the leftmost input that fired, and
--- | none of the others'. (Reflex `leftmost`.)
+-- | none of the others'.
 foreign import leftmost :: forall a. Array (Event a) -> Event a
 
 -- | Both events' occurrences in fire order, losing none. An occurrence of
 -- | each with the same fire stamp (both derived from one fire) are combined
--- | with the first function into one occurrence. (Reflex `alignWith`.)
+-- | with the first function into one occurrence.
 foreign import mergeWith
   :: forall a b c
    . (a -> b -> c)
@@ -90,7 +90,6 @@ foreign import mergeWith
 
 -- | Pair the nth occurrence of each, counting from when the `Owned` action
 -- | runs. Unpaired occurrences wait in a queue with no bound. Stateful.
--- | (RxJS `zip`.)
 zip :: forall a b. Event a -> Event b -> Owned (Event (Tuple a b))
 zip = zipWith Tuple
 
@@ -101,7 +100,7 @@ foreign import zipWithImpl :: forall a b c. (a -> b -> c) -> Event a -> Event b 
 
 -- | Follow the first argument that fires after the `Owned` action runs (the
 -- | leftmost, if several fire in one round) and ignore the rest from then
--- | on. Stateful. (RxJS `race`.)
+-- | on. Stateful.
 race :: forall a. Array (Event a) -> Owned (Event a)
 race es = owned (raceImpl es)
 
@@ -112,7 +111,7 @@ foreign import raceImpl :: forall a. Array (Event a) -> Effect (Event a)
 
 -- | Buffers of n occurrences, a new one starting every `step` occurrences:
 -- | `bufferCount 3 3` chunks, `bufferCount 3 1` slides. Each buffer is fired
--- | when it is full. (RxJS `bufferCount`.)
+-- | when it is full.
 bufferCount :: forall a. Int -> Int -> Event a -> Owned (Event (Array a))
 bufferCount n step e = owned (bufferCountImpl n step e)
 
@@ -120,7 +119,7 @@ foreign import bufferCountImpl :: forall a. Int -> Int -> Event a -> Effect (Eve
 
 -- | The occurrences since the notifier last fired, each time it fires, even
 -- | when there were none. An occurrence fired in the same round as the
--- | notifier but before it goes in that buffer. (RxJS `buffer`.)
+-- | notifier but before it goes in that buffer.
 bufferOn :: forall a b. Event b -> Event a -> Owned (Event (Array a))
 bufferOn notifier e = owned (bufferOnImpl notifier e)
 
@@ -128,8 +127,7 @@ foreign import bufferOnImpl :: forall a b. Event b -> Event a -> Effect (Event (
 
 -- | Collect occurrences while the signal is true, and fire the collection
 -- | when it turns false. The signal is read at the end of each round, so
--- | a round that ends with it false is not collected. (RxJS
--- | `bufferToggle`, `bufferWhen`.)
+-- | a round that ends with it false is not collected.
 bufferWhile :: forall a. Signal Boolean -> Event a -> Owned (Event (Array a))
 bufferWhile cond e = owned (bufferWhileImpl cond e)
 
