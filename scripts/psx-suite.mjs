@@ -1,0 +1,10 @@
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+const lock = JSON.parse(readFileSync('spago.lock', 'utf8'));
+const ref = lock.packages['psx-suite'].rev;
+const root = process.env.PSX_SUITE_CONTRACT_ROOT || resolve('.spago/p/psx-suite', ref);
+if (!existsSync(root + '/test/suite/scenarios')) throw new Error('Missing PSX suite contracts: run spago install');
+process.env.PSX_SUITE_CONTRACT_ROOT = root;
+process.env.PSX_SUITE_CLI = 'scripts/psx.mjs';
+const { main } = await import('../output/Suite.Main/index.js');
+main();

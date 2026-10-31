@@ -17,3 +17,8 @@
 # tsc compiles each FFI .ts to the .js beside it. Only the release branch
 # commits that .js (scripts/release.mjs).
 packages/*/src/**/*.js
+
+/test/suite/dist/
+/output-es/
+/examples/psx/dist/
+/examples/psx/examples/dist/

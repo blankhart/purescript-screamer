@@ -1,0 +1,19 @@
+package:
+  name: psx-suite-typeahead-screamer-psx
+  dependencies:
+    - aff
+    - arrays
+    - control
+    - datetime
+    - effect
+    - filterable
+    - maybe
+    - prelude
+    - screamer-psx
+    - psx-suite-shared
+    - screamer
+    - screamer-reactive
+    - screamer-combinators
+    - screamer-resource
+    - strings
+    - web-uievents

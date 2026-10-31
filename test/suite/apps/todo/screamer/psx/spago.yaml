@@ -1,0 +1,12 @@
+package:
+  name: psx-suite-todo-screamer-psx
+  dependencies:
+    - arrays
+    - effect
+    - foldable-traversable
+    - prelude
+    - screamer-psx
+    - psx-suite-shared
+    - refs
+    - screamer
+    - screamer-reactive

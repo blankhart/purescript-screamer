@@ -24,7 +24,11 @@
     "test:compile-fail": "node compile-fail/run.mjs",
     "test:smoke": "node examples/smoke.mjs",
     "inspect": "node examples/inspect.mjs",
-    "set-version": "node scripts/set-version.mjs"
+    "set-version": "node scripts/set-version.mjs",
+    "psx": "node scripts/psx.mjs",
+    "psx:generate": "node scripts/psx.mjs gen-backend && node scripts/psx.mjs build examples/psx/src && node scripts/psx.mjs build test/suite/apps",
+    "psx:examples": "npm run build && node examples/psx/scripts/build-examples.mjs && node examples/psx/scripts/smoke-test.mjs",
+    "psx:suite": "npm run build && node scripts/psx-suite.mjs"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
@@ -39,12 +43,13 @@
     "jsdom": "^26.1.0",
     "playwright": "^1.64.1",
     "purescript": "^0.15.16",
-    "purs-backend-es": "^1.4.3",
+    "purs-backend-es": "1.4.3",
     "purs-tidy": "^0.11.1",
     "solid-js": "1.9.3",
     "spago": "^1.0.4",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "playwright-core": "^1.64.1"
   },
   "dependencies": {
     "@playwright/test": "^1.64.1"

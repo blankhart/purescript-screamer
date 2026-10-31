@@ -1,0 +1,19 @@
+package:
+  name: screamer-psx
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - arrays
+    - effect
+    - maybe
+    - prelude
+    - screamer
+    - screamer-reactive
+    - tuples
+    - web-events
+    - web-uievents
+  test:
+    main: Test.Screamer.Psx
+    dependencies:
+      - console
