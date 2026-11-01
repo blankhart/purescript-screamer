@@ -18,7 +18,5 @@
 # commits that .js (scripts/release.mjs).
 packages/*/src/**/*.js
 
-/test/suite/dist/
-/output-es/
-/examples/psx/dist/
-/examples/psx/examples/dist/
+# psx-suite.mjs links the root node_modules here for the suite.
+/psx/node_modules

@@ -26,14 +26,6 @@ jobs:
             .spago
           key: spago-${{ hashFiles('spago.lock') }}
 
-      - name: Read pinned private build dependencies
-        env:
-          TOKEN: ${{ secrets.PSX_DEPS_TOKEN }}
-        run: |
-          if [ -n "$TOKEN" ]; then
-            git config --global url."https://x-access-token:${TOKEN}@github.com/blankhart/".insteadOf "https://github.com/blankhart/"
-          fi
-
       - name: Install
         run: npm ci
 

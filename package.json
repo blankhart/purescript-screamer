@@ -25,10 +25,11 @@
     "test:smoke": "node examples/smoke.mjs",
     "inspect": "node examples/inspect.mjs",
     "set-version": "node scripts/set-version.mjs",
-    "psx": "node scripts/psx.mjs",
-    "psx:generate": "node scripts/psx.mjs gen-backend && node scripts/psx.mjs build examples/psx/src && node scripts/psx.mjs build test/suite/apps",
-    "psx:examples": "npm run build && node examples/psx/scripts/build-examples.mjs && node examples/psx/scripts/smoke-test.mjs",
-    "psx:suite": "npm run build && node scripts/psx-suite.mjs"
+    "psx": "cd psx && node scripts/psx.mjs",
+    "psx:build": "tsc && cd psx && spago build",
+    "psx:generate": "cd psx && node scripts/psx.mjs gen-backend && node scripts/psx.mjs build examples/src && node scripts/psx.mjs build test/suite/apps",
+    "psx:examples": "npm run psx:build && cd psx && node examples/scripts/build-examples.mjs && node examples/scripts/smoke-test.mjs",
+    "psx:suite": "npm run psx:build && cd psx && node scripts/psx-suite.mjs"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",

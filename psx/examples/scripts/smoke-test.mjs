@@ -1,5 +1,5 @@
 // Screamer's own browser smoke tests for its HelloWorld and Typeahead
-// examples, run against the PSX versions in examples/psx/src: each
+// examples, run against the PSX versions in examples/src: each
 // example renders, responds to the same interactions, and unmounts leaving
 // no live effects or scopes.
 //
@@ -8,7 +8,7 @@
 // the bundles come from build-examples.mjs, and Chrome from CHROME_PATH
 // through playwright-core.
 //
-//   node examples/psx/scripts/smoke-test.mjs   (after build-examples.mjs)
+//   node examples/scripts/smoke-test.mjs   (after build-examples.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +69,7 @@ for (const [name, interact] of Object.entries(examples)) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   try {
-    if (!fs.existsSync(bundle)) throw new Error(`missing ${bundle}; run examples/psx/scripts/build-examples.mjs`);
+    if (!fs.existsSync(bundle)) throw new Error(`missing ${bundle}; run examples/scripts/build-examples.mjs`);
     // Served from a fake origin, so the History API works.
     await page.route(`${origin}/**`, (route) => {
       const url = new URL(route.request().url());

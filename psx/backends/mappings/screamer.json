@@ -1,6 +1,6 @@
 {
   "module": "Screamer.Psx",
-  "directory": "packages/screamer-psx/src",
+  "directory": "../packages/screamer-psx/src",
   "core": "Screamer.Psx.Core",
   "coreExports": [
     "class Children",
