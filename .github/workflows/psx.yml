@@ -11,16 +11,24 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Read pinned private build dependencies
+      - name: Cache PureScript packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/spago-nodejs
+            psx/.spago
+          key: spago-psx-${{ hashFiles('psx/spago.lock') }}
+      # PSX is private. Only this workflow fetches it: psx/ is a workspace of
+      # its own, so Screamer's core CI needs no token.
+      - name: Read the pinned private PSX tooling
         env:
           TOKEN: ${{ secrets.PSX_DEPS_TOKEN }}
         run: |
           if [ -n "$TOKEN" ]; then
             git config --global url."https://x-access-token:${TOKEN}@github.com/blankhart/".insteadOf "https://github.com/blankhart/"
           fi
-
       - run: npm ci
-      - run: npm run build
+      - run: npm run psx:build
       - run: npm run psx:generate
       - run: git diff --exit-code
       - run: npm run psx:examples

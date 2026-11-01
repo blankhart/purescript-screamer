@@ -110,14 +110,18 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 ## PSX integration
 
 `screamer-psx` provides `Screamer.Psx` for `.psx` and `.psxt` sources.
-The adapter depends on the framework; PSX is pinned separately as build tooling.
-PSX examples live in `examples/psx`, and paired native/PSX comparison apps in
-`test/suite/apps`. Their canonical DOM contracts come from the pinned PSX checkout.
+The adapter depends only on Screamer and builds with the rest of the workspace.
+Everything that needs PSX itself lives in `psx/`, a Spago workspace of its own
+that takes Screamer's packages by path and pins PSX as build tooling: the
+backend mapping (`psx/backends/mappings`), the PSX examples (`psx/examples`),
+the paired native/PSX comparison apps (`psx/test/suite/apps`) and the tooling
+package. Their canonical DOM contracts come from the pinned PSX checkout. The
+root workspace never fetches PSX, so only the PSX workflow needs
+`PSX_DEPS_TOKEN`.
 
 ```sh
-npm run build
+npm run psx:build
 npm run psx:generate
-npm run build
 npm run psx:examples
 npm run psx:suite -- --runs 1
 ```

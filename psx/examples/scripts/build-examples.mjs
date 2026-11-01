@@ -1,17 +1,17 @@
-// Bundles every example in examples/psx/src into
-// examples/psx/dist/<Name>.js, where smoke-test.mjs looks for them. Run
-// `psx build examples/psx/src` and `spago build` first; this only
+// Bundles every example in examples/src into
+// examples/dist/<Name>.js, where smoke-test.mjs looks for them. Run
+// `psx build examples/src` and `spago build` first; this only
 // bundles what the compiler left in output/.
 //
-//   node examples/psx/scripts/build-examples.mjs          build
-//   node examples/psx/scripts/build-examples.mjs clean    remove examples/psx/dist
+//   node examples/scripts/build-examples.mjs          build
+//   node examples/scripts/build-examples.mjs clean    remove examples/dist
 
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const workspace = fileURLToPath(new URL('../../..', import.meta.url));
+const workspace = fileURLToPath(new URL('../..', import.meta.url));
 const src = root + 'src/';
 const dist = root + 'dist/';
 
@@ -46,4 +46,4 @@ for (const name of names) {
   });
 }
 
-console.log(`Built ${names.length} examples into examples/psx/dist`);
+console.log(`Built ${names.length} examples into examples/dist`);

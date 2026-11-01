@@ -1,0 +1,48 @@
+# The PSX integration: Screamer's PSX examples, the paired native/PSX
+# comparison apps and the PSX build tooling. It is a workspace of its own so
+# that the root workspace, and Screamer's core CI, never fetch the private
+# PSX repository. Screamer's packages come from this checkout by path; PSX
+# is pinned as build tooling. Run commands from this directory (the root's
+# npm run psx:* scripts do).
+workspace:
+  packageSet:
+    registry: 81.5.0
+  extraPackages:
+    screamer:
+      path: ../packages/screamer
+    screamer-reactive:
+      path: ../packages/screamer-reactive
+    screamer-combinators:
+      path: ../packages/screamer-combinators
+    screamer-resource:
+      path: ../packages/screamer-resource
+    screamer-psx:
+      path: ../packages/screamer-psx
+    psx-cst:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: packages/psx-cst
+    psx-html-data:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: packages/psx-html-data
+    psx-lower:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: packages/psx-lower
+    psx-fmt:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: packages/psx-fmt
+    psx-cli:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: packages/psx-cli
+    psx-suite:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: test/suite
+    psx-suite-shared:
+      git: https://github.com/blankhart/psx.git
+      ref: 0a60356a0f376071fa4e96f645a82fd19099ce6c
+      subdir: test/suite/shared
