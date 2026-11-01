@@ -1,7 +1,7 @@
 -- | The hand-written core of the PSX backend for Screamer: the signature's
 -- | names that are not one per element, attribute or event. `Screamer.Psx`
 -- | re-exports it beside the per-name functions `psx gen-backend` writes
--- | from `backends/mappings/screamer.json`.
+-- | from `psx/backends/mappings/screamer.json`.
 -- |
 -- | Screamer binds signals to nodes and never re-renders, so its nodes have
 -- | no message type: `Node` and `Attr` ignore their parameter, and the
