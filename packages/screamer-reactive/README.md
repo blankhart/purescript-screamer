@@ -1,0 +1,19 @@
+# screamer-reactive
+
+The reactive core: signals, events, sources and scopes, with no DOM. It builds with no `web-*` package, so it runs wherever JavaScript does.
+
+| Module | What it has |
+|---|---|
+| `Screamer.Signal` | `Signal`, its instances, `sampleOn`, `dropRepeats*`, `withPrevious`, `merge`, `latestWhere`, `gate`, `catching`, `attempt`, `readT0`, `subscribe`, `hold` |
+| `Screamer.Event` | `Event`, its instances, `changes`, `stepper`, `fold`, `tag`, `attach*`, `mapAccum`, `withPrevious`, `startWith`, `dropRepeats*`, `gate`, `oneOf`, `switchEvent`, `subscribe`, `hold` |
+| `Screamer.Source` | `signalSource`, `eventSource`, `batch`, and `focus` and `prop` for a source over part of another's value |
+| `Screamer.Owned` | `Owned`, `onCleanup`, `child`, `runOwned`, `onError` |
+| `Screamer.Context` | `ContextKey`, `provide`, `ask`, `uniqueId`, and `key` for foreign code |
+| `Screamer.Host` | the clock, timers and frames as a context value |
+| `Screamer.Pending` | `pending`, `settled`: work in flight per scope |
+| `Screamer.Runtime` | `readStats`, for leak checks |
+| `Screamer.Runtime.Unsafe` | no PureScript API: its foreign module is the JavaScript API add-ons build nodes with |
+
+Depends on: prelude, effect, control, either, maybe, tuples, exceptions, filterable, record, typelevel-prelude, unsafe-coerce.
+
+`test/core/` has the TypeScript tests of the runtime (`npm run test:core`).

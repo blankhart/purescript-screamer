@@ -1,0 +1,37 @@
+package:
+  name: screamer-examples
+  dependencies:
+    - aff
+    - arrays
+    - console
+    - datetime
+    - effect
+    - either
+    - filterable
+    - foldable-traversable
+    - integers
+    - maybe
+    - numbers
+    - partial
+    - prelude
+    - random
+    - refs
+    - screamer
+    - screamer-combinators
+    - screamer-devtools
+    - screamer-forms
+    - screamer-motion
+    - screamer-reactive
+    - screamer-resource
+    - screamer-router
+    - screamer-web
+    - st
+    - strings
+    - unfoldable
+    - unsafe-coerce
+    - web-dom
+    - web-events
+    - web-html
+    - web-pointerevents
+    - web-uievents
+    - windrose-router

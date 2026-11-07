@@ -1,0 +1,37 @@
+-- | The child: a Screamer component with its own count, which tells its
+-- | parent each new count.
+module App.Nested.Screamer.Psx.Counter
+  ( Input
+  , counter
+  ) where
+
+import Prelude
+
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Screamer.Element (Element, component)
+import Screamer.Psx (Markup, root)
+import Screamer.Signal (Signal, readT0)
+import Screamer.Source (signalSource)
+
+type Input = { id :: Int, label :: String, start :: Int }
+
+-- | Its own count, in a source the instance creates; `report` tells the
+-- | parent each new count.
+counter :: Input -> (Int -> Effect Unit) -> Element
+counter input report = component do
+  count <- liftEffect (signalSource input.start)
+  let
+    by d = do
+      n <- (_ + d) <$> readT0 count.signal
+      count.putT1 n
+      report n
+  pure $ root (view input count.signal by)
+
+view :: Input -> Signal Int -> (Int -> Effect Unit) -> Markup (Effect Unit)
+view input count by =
+  <div class="counter" data-testid={"counter-" <> show input.id}>
+    <span class="count">{input.label}: {show <$> count}</span>
+    <button data-testid={"decrement-" <> show input.id} onclick={by (-1)}>-</button>
+    <button data-testid={"increment-" <> show input.id} onclick={by 1}>+</button>
+  </div>

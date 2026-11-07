@@ -1,0 +1,14 @@
+package:
+  name: psx-suite-nested-screamer-psx
+  dependencies:
+    - arrays
+    - effect
+    - foldable-traversable
+    - ordered-collections
+    - prelude
+    - screamer-psx
+    - psx-suite-shared
+    - refs
+    - screamer
+    - screamer-reactive
+    - tuples

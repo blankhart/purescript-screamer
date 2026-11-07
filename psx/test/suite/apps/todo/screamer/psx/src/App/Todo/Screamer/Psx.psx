@@ -1,0 +1,105 @@
+-- | The todo scenario on Screamer, in PSX. The list is Screamer's own
+-- | `each`, keyed by id, in a hole; each row reads its id once and binds
+-- | the rest to the row's signal.
+module App.Todo.Screamer.Psx (main) where
+
+import Prelude
+
+import Data.Array as Array
+import Data.Foldable (foldl)
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Effect.Ref as Ref
+import Screamer.Element (Element, component, each, mount)
+import Screamer.Psx (Markup, root)
+import Screamer.Signal (Signal, readT0)
+import Screamer.Source (batch, signalSource)
+import Suite.Shared.Dom (removeApp)
+
+type Todo = { id :: Int, text :: String, done :: Boolean }
+
+type Fixture = { todos :: Array Todo }
+
+data Filter = All | Active | Completed
+
+derive instance Eq Filter
+
+shown :: Filter -> Todo -> Boolean
+shown filter todo = case filter of
+  All -> true
+  Active -> not todo.done
+  Completed -> todo.done
+
+-- | What the view shows and what its handlers do.
+type Props =
+  { todos :: Signal (Array Todo)
+  , draft :: Signal String
+  , filter :: Signal Filter
+  , setDraft :: String -> Effect Unit
+  , add :: Effect Unit
+  , toggle :: Int -> Effect Unit
+  , remove :: Int -> Effect Unit
+  , show :: Filter -> Effect Unit
+  }
+
+todoApp :: Fixture -> Element
+todoApp fixture = component do
+  todos <- liftEffect $ signalSource fixture.todos
+  draft <- liftEffect $ signalSource ""
+  filter <- liftEffect $ signalSource All
+  next <- liftEffect $ Ref.new (1 + foldl (\n todo -> max n todo.id) 0 fixture.todos)
+  let
+    add = do
+      id <- Ref.modify (_ + 1) next
+      text <- readT0 draft.signal
+      batch do
+        todos.modifyT1 (_ <> [ { id: id - 1, text, done: false } ])
+        draft.putT1 ""
+    toggle id = todos.modifyT1 $ map \todo -> if todo.id == id then todo { done = not todo.done } else todo
+    remove id = todos.modifyT1 $ Array.filter \todo -> todo.id /= id
+  pure $ root $ view
+    { todos: todos.signal
+    , draft: draft.signal
+    , filter: filter.signal
+    , setDraft: draft.putT1
+    , add
+    , toggle
+    , remove
+    , show: filter.putT1
+    }
+
+view :: Props -> Markup (Effect Unit)
+view props =
+  <section class="todo" data-testid="todo">
+    <h1>Todos</h1>
+    <div class="new">
+      <input type="text" data-testid="draft" value={props.draft} oninput={props.setDraft}>
+      <button data-testid="add" onclick={props.add} disabled={(_ == "") <$> props.draft}>Add</button>
+    </div>
+    <ul class="items">
+      {each _.id (Array.filter <$> (shown <$> props.filter) <*> props.todos) (item props)}
+    </ul>
+    <p data-testid="left">{show <<< Array.length <<< Array.filter (not <<< _.done) <$> props.todos} left</p>
+    <div class="filters">
+      <button data-testid="all" onclick={props.show All} disabled={(_ == All) <$> props.filter}>All</button>
+      <button data-testid="active" onclick={props.show Active} disabled={(_ == Active) <$> props.filter}>Active</button>
+      <button data-testid="completed" onclick={props.show Completed} disabled={(_ == Completed) <$> props.filter}>Completed</button>
+    </div>
+  </section>
+
+item :: Props -> Signal Todo -> Element
+item props todo = component do
+  { id } <- liftEffect (readT0 todo)
+  pure $ root
+    ( <li class={(\t -> if t.done then "item done" else "item") <$> todo}>
+        <input type="checkbox" data-testid={"toggle-" <> show id} checked={_.done <$> todo} onchange={props.toggle id}>
+        <span>{_.text <$> todo}</span>
+        <button data-testid={"remove-" <> show id} onclick={props.remove id}>Remove</button>
+      </li>
+    )
+
+-- | Mounts in place of `#app`, starting from the scenario's fixture.
+main :: Fixture -> Effect Unit
+main fixture = do
+  removeApp
+  void $ mount "#root" (todoApp fixture)

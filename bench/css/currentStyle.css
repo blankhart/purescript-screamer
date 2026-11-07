@@ -1,0 +1,4 @@
+/* The stylesheet every js-framework-benchmark app loads: Bootstrap 3.3.6 and
+   the benchmark's own main.css (copied from krausest/js-framework-benchmark). */
+@import url("../../node_modules/bootstrap/dist/css/bootstrap.min.css");
+@import url("main.css");

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [release]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache PureScript packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/spago-nodejs
+            .spago
+          key: spago-${{ hashFiles('spago.lock') }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check TypeScript
+        run: npx tsc
+
+      - name: Compiled .js is not committed
+        run: |
+          tracked=$(git ls-files 'packages/*/src/**/*.js')
+          if [ -n "$tracked" ]; then
+            echo "Only the release branch commits compiled .js; git rm --cached these:"
+            echo "$tracked"; exit 1
+          fi
+          orphans=$(find packages/*/src -name '*.js' | while read -r f; do [ -f "${f%.js}.ts" ] || echo "$f"; done)
+          if [ -n "$orphans" ]; then
+            echo "These .js files have no .ts source:"; echo "$orphans"; exit 1
+          fi
+
+      - name: Build PureScript
+        run: npx spago build
+
+      - name: screamer-reactive builds with no web-* dependency, and versions match
+        run: |
+          npx spago build -p screamer-reactive
+          node scripts/check-packages.mjs
+
+      - name: Bundle examples
+        run: npm run build:examples
+
+      - name: Test
+        run: npm test
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test examples in Chromium
+        run: npm run test:smoke
+
+      - name: Bundle the benchmark
+        run: npm run bench
+
+      - name: Generated DOM modules are up to date
+        run: |
+          npm run codegen:dom
+          git diff --exit-code -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts'
+          test -z "$(git status --porcelain -- 'packages/screamer/src/**/*.g.purs' 'packages/screamer/src/**/*.g.ts')"

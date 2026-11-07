@@ -1,0 +1,7 @@
+workspace:
+  packageSet:
+    registry: 81.5.0
+  extraPackages:
+    windrose-router:
+      git: https://github.com/blankhart/purescript-windrose-router.git
+      ref: 6199237cf42d35b8ca3d89ceaba40efb83966ac3

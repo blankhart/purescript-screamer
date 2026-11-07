@@ -1,0 +1,36 @@
+package:
+  name: screamer
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - effect
+    - exceptions
+    - prelude
+    - record
+    - screamer-reactive
+    - unsafe-coerce
+    - web-clipboard
+    - web-dom
+    - web-events
+    - web-html
+    - web-pointerevents
+    - web-touchevents
+    - web-uievents
+  test:
+    main: Test.Screamer.Main
+    dependencies:
+      - aff
+      - arrays
+      - effect
+      - either
+      - exceptions
+      - foldable-traversable
+      - maybe
+      - quickcheck
+      - refs
+      - screamer-resource
+      - screamer-test
+      - spec
+      - web-events
+      - web-uievents

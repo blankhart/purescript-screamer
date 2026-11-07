@@ -1,0 +1,60 @@
+-- | The counter scenario on Screamer, in PSX: `App.Counter` from the design
+-- | doc, with its scoped `<style>`. Screamer builds the view once, so what
+-- | changes is a signal in a hole or an attribute.
+module App.Counter.Screamer.Psx (main) where
+
+import Prelude
+
+import Data.Array ((..))
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Screamer.Element (component, mount)
+import Screamer.Psx (Markup, root)
+import Screamer.Signal (Signal)
+import Screamer.Source (signalSource)
+import Suite.Shared.Dom (removeApp)
+
+type Props = { label :: String, max :: Int }
+
+data Msg = Increment | Decrement | Reset
+
+update :: Int -> Msg -> Int
+update n = case _ of
+  Increment -> n + 1
+  Decrement -> n - 1
+  Reset -> 0
+
+view :: Props -> Signal Int -> (Msg -> Effect Unit) -> Markup (Effect Unit)
+view props n send =
+  <section class="counter" data-testid="counter">
+    <h2 data-testid="label">{props.label}: {show <$> n}</h2>
+    <button data-testid="decrement" onclick={send Decrement} disabled={(_ <= 0) <$> n}>-</button>
+    <button data-testid="increment" onclick={send Increment} disabled={(_ >= props.max) <$> n}>+</button>
+    {
+      n <#> \count ->
+        if count == 0 then
+          <></>
+        else
+          <button data-testid="reset" onclick={send Reset}>Reset</button>
+    }
+    <ol class="pips">
+      {
+        map
+          (\i -> <li key={i} class={(\count -> if i <= count then "pip filled" else "pip") <$> n}></li>)
+          (1 .. props.max)
+      }
+    </ol>
+    <style>
+      .counter { display: grid; gap: 0.75rem; }
+      .pip { width: 1rem; height: 0.25rem; background: silver; }
+      .pip.filled { background: seagreen; }
+    </style>
+  </section>
+
+-- | Mounts in place of `#app`, with the scenario's fixture as the props.
+main :: Props -> Effect Unit
+main props = do
+  removeApp
+  void $ mount "#root" $ component do
+    n <- liftEffect (signalSource 0)
+    pure $ root (view props n.signal \msg -> n.modifyT1 (\count -> update count msg))

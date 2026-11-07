@@ -1,0 +1,16 @@
+The vanillajs, solid and halogen apps here, and bench/css/main.css, are copied
+from krausest/js-framework-benchmark (Apache License 2.0,
+https://github.com/krausest/js-framework-benchmark) at commit
+3ab4ceaf5591771228f83fb5161b9fda7e15934d:
+
+  frameworks/keyed/vanillajs/{index.html,src/Main.js}
+  frameworks/keyed/solid/{index.html,src/main.jsx}
+  frameworks/non-keyed/halogen/{index.html,src/Main.purs,src/Main.js}
+  frameworks/non-keyed/halogen/output-es/bundle.js  ->  halogen/bundle.js
+  css/main.css
+
+The pages' stylesheet and script paths were changed to fit this directory.
+halogen/bundle.js is upstream's committed build (upstream's build-prod is a
+no-op), so it is the same code their published Halogen results measure;
+Main.purs and Main.js are kept beside it as its source. Upstream lists Halogen
+only as a non-keyed implementation.

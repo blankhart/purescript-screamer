@@ -1,0 +1,53 @@
+name: Release
+
+# Publishes the chosen commit to the release branch, with the compiled .js,
+# and tags it v<version>. Run it from the Actions tab on master.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (must match every packages/*/spago.yaml)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache PureScript packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/spago-nodejs
+            .spago
+          key: spago-${{ hashFiles('spago.lock') }}
+
+      - name: Install
+        run: npm ci
+
+      - name: Check packages
+        run: node scripts/check-packages.mjs
+
+      - name: Release
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE_TOKEN: ${{ github.token }}
+        run: |
+          git config url."https://x-access-token:${RELEASE_TOKEN}@github.com/blankhart/purescript-screamer.git".insteadOf "https://github.com/blankhart/purescript-screamer.git"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          node scripts/release.mjs "$VERSION" --push

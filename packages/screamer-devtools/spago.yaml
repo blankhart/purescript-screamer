@@ -1,0 +1,26 @@
+package:
+  name: screamer-devtools
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - effect
+    - either
+    - maybe
+    - prelude
+    - screamer-reactive
+    - web-dom
+  test:
+    main: Test.Devtools.Main
+    dependencies:
+      - aff
+      - arrays
+      - effect
+      - exceptions
+      - maybe
+      - refs
+      - screamer
+      - screamer-test
+      - spec
+      - strings
+      - web-dom

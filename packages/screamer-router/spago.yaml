@@ -1,0 +1,23 @@
+package:
+  name: screamer-router
+  publish:
+    version: 0.1.0
+    license: MIT
+  dependencies:
+    - effect
+    - either
+    - maybe
+    - prelude
+    - screamer
+    - screamer-reactive
+    - strings
+    - web-events
+    - web-uievents
+    - windrose-router
+  test:
+    main: Test.Router.Main
+    dependencies:
+      - effect
+      - refs
+      - screamer-test
+      - spec

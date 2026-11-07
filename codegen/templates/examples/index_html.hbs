@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+
+<body>
+  <ul>
+    <% FileList["*.purs"].ext("").each do |name| %>
+    <li>
+      <a href="<%= name %>.html"><%= name %></a>
+    </li>
+    <% end %>
+  </ul>
+</body>
+
+</html>
