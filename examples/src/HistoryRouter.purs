@@ -14,8 +14,9 @@ import Screamer.Html.Attributes as A
 import Screamer.Router (interceptLinks, link, location)
 import Screamer.Router.Windrose (matchPath)
 import Screamer.Signal (dropRepeats)
-import Windrose.Router (type (:<|>), type (:>), P, Q, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)
+import Windrose.Router (type (:<|>), type (:>), P, Q, Route, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)
 
+type Api :: Route
 type Api = P "history-router" :>
   ( V "home"
       :<|> (P "login" :> Q (return :: String) :> V "login")
@@ -26,6 +27,7 @@ data Page = Home | Login String | NotFound String
 derive instance Eq Page
 
 links :: { home :: String, login :: { return :: String } -> String }
+-- Windrose encodes query values in links and decodes them before calling Login.
 links = allLinks (mkRoutable (RouteProxy :: _ Api))
 
 routes :: String -> Either RoutingError Page
