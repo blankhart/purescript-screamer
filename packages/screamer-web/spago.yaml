@@ -4,9 +4,12 @@ package:
     version: 0.1.0
     license: MIT
   dependencies:
+    - datetime
     - effect
+    - either
     - foldable-traversable
     - maybe
+    - numbers
     - prelude
     - refs
     - screamer
