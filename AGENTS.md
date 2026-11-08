@@ -16,6 +16,8 @@ This is one Spago workspace containing packages released together at one version
 - `packages/screamer-motion`: transitions, animation, and animated values.
 - `packages/screamer-devtools`: runtime inspection, recording, diagnostics, and work budgets.
 - `packages/screamer-test`: observation helpers, DOM helpers, and fake clocks.
+  Its Node-only `Screamer.Test.Setup` module provides the downstream DOM/CSS
+  preload through the stable compiled output path (Node 22.15+ and jsdom).
 - `packages/screamer-psx`: PSX adapter, generated API, and conformance tests. It does not depend on PSX.
 - `psx`: a separate Spago workspace for everything that needs PSX (pinned as build tooling, Screamer packages by path): the backend mapping, PSX examples, paired native/PSX scenarios in `psx/test/suite/apps`, and the tooling package. The root workspace must never depend on it. Run `npm run psx:build`, `npm run psx:generate`, `npm run psx:examples`, and `npm run psx:suite` after PSX integration changes.
 - `examples/src`: runnable examples and integration demonstrations.
