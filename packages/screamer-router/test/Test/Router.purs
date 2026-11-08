@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Either (Either(..))
 import Screamer.Router.Windrose (matchHash, matchPath)
-import Windrose.Router (type (:>), P, Q, RouteProxy(..), V, mkRoutable, route)
+import Windrose.Router (type (:>), C, P, Q, RouteProxy(..), V, allLinks, mkRoutable, route)
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Element (text)
@@ -17,6 +17,8 @@ import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
 type QueryRoute = P "login" :> Q (return :: String) :> V "login"
+
+type CaptureRoute = P "items" :> C "id" String :> V "item"
 
 spec :: Spec Unit
 spec = describe "Screamer.Router" do
@@ -80,9 +82,32 @@ spec = describe "Screamer.Router" do
 
   it "matches History queries with Windrose Q and leaves hashes out" do
     let
-      matcher = route (mkRoutable (RouteProxy :: _ QueryRoute)) _.return
+      matcher = route (mkRoutable (RouteProxy :: _ QueryRoute)) { login: _.return }
       loc = { pathname: "/login", search: "?return=%2Fitems%2F7", hash: "#ignored" }
-    matchPath matcher loc `shouldEqual` Right "%2Fitems%2F7"
+    matchPath matcher loc `shouldEqual` Right "/items/7"
     matchPath matcher (loc { search = "" }) `shouldEqual` Left "/login"
     matchPath matcher (loc { pathname = "/missing" }) `shouldEqual` Left "/missing?return=%2Fitems%2F7"
-    matchHash matcher (loc { hash = "#/login?return=%2Fhome" }) `shouldEqual` Right "%2Fhome"
+    matchHash matcher (loc { hash = "#/login?return=%2Fhome" }) `shouldEqual` Right "/home"
+
+  it "round-trips a single-endpoint query link with reserved characters" do
+    let
+      api = mkRoutable (RouteProxy :: _ QueryRoute)
+      links = allLinks api
+      matcher = route api { login: _.return }
+      target = "/items/7?sort=a+b&next=#details"
+      url = links.login { return: target }
+    url `shouldEqual` "/login?return=%2Fitems%2F7%3Fsort%3Da%2Bb%26next%3D%23details"
+    matchHash matcher { pathname: "/", search: "", hash: "#" <> url } `shouldEqual` Right target
+
+  it "decodes captured separators once in History and hash routes" do
+    let
+      api = mkRoutable (RouteProxy :: _ CaptureRoute)
+      links = allLinks api
+      matcher = route api { item: identity }
+      target = "a/b?c#d%2F+"
+      url = links.item target
+    url `shouldEqual` "/items/a%2Fb%3Fc%23d%252F%2B"
+    matchPath matcher { pathname: url, search: "", hash: "#ignored" } `shouldEqual` Right target
+    matchHash matcher { pathname: "/", search: "", hash: "#" <> url } `shouldEqual` Right target
+    matchPath matcher { pathname: "/missing/a%2Fb", search: "?q=%23", hash: "" }
+      `shouldEqual` Left "/missing/a%2Fb?q=%23"

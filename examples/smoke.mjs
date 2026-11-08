@@ -11,6 +11,7 @@ const examples = {
     await expectText(page, '#page h1', 'Home');
     await page.evaluate(() => { window.historyExampleMarker = true; });
     await page.click('#login');
+    if (new URL(page.url()).search !== '?return=%2Fhistory-router%2F') throw new Error(`query is ${page.url()}`);
     await expectText(page, '#return', '/history-router/');
     if (!await page.evaluate(() => window.historyExampleMarker)) throw new Error('link reloaded the page');
     await page.reload();
