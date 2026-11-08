@@ -14,6 +14,7 @@ module Screamer.Router.Windrose
   ) where
 
 import Data.Either (Either(..))
+import Data.Semigroup ((<>))
 import Data.Maybe (fromMaybe)
 import Data.String (Pattern(..), stripPrefix)
 import Screamer.Router (Location)
@@ -25,9 +26,10 @@ import Windrose.Router (RoutingError)
 matchHash :: forall a. (String -> Either RoutingError a) -> Location -> Either String a
 matchHash router { hash } = match router (fromMaybe hash (stripPrefix (Pattern "#") hash))
 
--- | Route the location's path. `Left` is the path no route matches.
+-- | Route the location's path and query string (including Windrose `Q`
+-- | routes). The hash is excluded. `Left` contains the unmatched path and query.
 matchPath :: forall a. (String -> Either RoutingError a) -> Location -> Either String a
-matchPath router { pathname } = match router pathname
+matchPath router { pathname, search } = match router (pathname <> search)
 
 match :: forall a. (String -> Either RoutingError a) -> String -> Either String a
 match router path = case router path of

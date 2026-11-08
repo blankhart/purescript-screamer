@@ -7,6 +7,7 @@ import Screamer.Test (runSpec)
 import Test.Context as Context
 import Test.Dom as Dom
 import Test.Hooks as Hooks
+import Test.Focus as Focus
 import Test.Primitives as Primitives
 import Test.Renderer as Renderer
 import Test.TypedDom as TypedDom
@@ -19,3 +20,4 @@ main = runSpec do
   Primitives.spec
   Hooks.spec
   TypedDom.spec
+  Focus.spec

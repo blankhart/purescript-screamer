@@ -6,6 +6,26 @@
 import { launch, openExample, origin } from './page.mjs';
 
 const examples = {
+  async HistoryRouter(page) {
+    await page.goto(`${origin}/history-router/`);
+    await expectText(page, '#page h1', 'Home');
+    await page.evaluate(() => { window.historyExampleMarker = true; });
+    await page.click('#login');
+    await expectText(page, '#return', '/history-router/');
+    if (!await page.evaluate(() => window.historyExampleMarker)) throw new Error('link reloaded the page');
+    await page.reload();
+    await expectText(page, '#return', '/history-router/');
+    await page.goBack();
+    await expectText(page, '#page h1', 'Home');
+    await page.goForward();
+    await expectText(page, '#page h1', 'Sign in');
+    await page.click('#broken');
+    await expectText(page, '#page h1', 'Not found');
+    await page.evaluate(() => { window.historyExampleMarker = true; });
+    await page.click('#plain-home');
+    await expectText(page, '#page h1', 'Home');
+    if (!await page.evaluate(() => window.historyExampleMarker)) throw new Error('plain anchor reloaded the page');
+  },
   async HelloWorld(page) {
     await expectText(page, '#count', '0');
     await page.click('#increment');
@@ -56,6 +76,14 @@ const examples = {
     await page.fill('#draft', 'hello');
     await page.click('button');
     await page.waitForFunction(() => Array.from(document.querySelectorAll('#lines li')).map((l) => l.className + ':' + l.textContent).join() === 'mine:hello,theirs:hello');
+    await page.evaluate(() => { window.oldSocket = window.lastSocket; window.lastSocket.drop(); });
+    await expectText(page, '#status', 'Retrying connection (attempt 1)');
+    if (!await page.locator('button').isDisabled()) throw new Error('send enabled while disconnected');
+    await expectText(page, '#status', 'Connected to wss://echo.websocket.org');
+    if (!await page.evaluate(() => window.lastSocket !== window.oldSocket)) throw new Error('socket was not replaced');
+    await page.fill('#draft', 'again');
+    await page.click('button');
+    await page.waitForFunction(() => document.querySelectorAll('#lines li').length === 4);
     const closed = await page.evaluate(() => { window.screamerExample.unmount(); return window.lastSocket.closed; });
     if (!closed) throw new Error('socket still open after unmount');
   },
@@ -194,7 +222,11 @@ const examples = {
 };
 
 async function expectText(page, selector, text) {
-  await page.waitForFunction(([s, t]) => document.querySelector(s)?.textContent === t, [selector, text]);
+  try {
+    await page.waitForFunction(([s, t]) => document.querySelector(s)?.textContent === t, [selector, text]);
+  } catch (error) {
+    throw new Error(`${selector}: expected ${JSON.stringify(text)} at ${page.url()}: ${error.message}`);
+  }
 }
 
 async function expectClass(page, selector, cls) {
@@ -208,6 +240,7 @@ for (const [name, interact] of Object.entries(examples)) {
   try {
     const opened = await openExample(browser, name);
     page = opened.page;
+    page.setDefaultTimeout(10000);
     const errors = opened.errors;
     await page.goto(`${origin}/`);
     await page.waitForFunction(() => window.screamerExample !== undefined, null, { timeout: 5000 });

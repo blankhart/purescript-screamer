@@ -21,8 +21,13 @@ function mockWebSocket() {
       super();
       this.url = url;
       this.closed = false;
+      this.readyState = 0;
       window.lastSocket = this;
-      setTimeout(() => this.dispatchEvent(new Event('open')), 0);
+      setTimeout(() => {
+        if (this.closed) return;
+        this.readyState = 1;
+        this.dispatchEvent(new Event('open'));
+      }, 0);
     }
     send(text) {
       setTimeout(() => {
@@ -32,7 +37,13 @@ function mockWebSocket() {
     }
     close() {
       this.closed = true;
-      setTimeout(() => this.dispatchEvent(new Event('close')), 0);
+      this.readyState = 3;
+      setTimeout(() => this.dispatchEvent(new CloseEvent('close', { code: 1000, wasClean: true })), 0);
+    }
+    drop() {
+      this.closed = true;
+      this.readyState = 3;
+      this.dispatchEvent(new CloseEvent('close', { code: 1006, reason: 'network lost', wasClean: false }));
     }
   };
 }

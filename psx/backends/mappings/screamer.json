@@ -27,7 +27,10 @@
     "-- | Screamer's `element_` (or `svgElement_`), every attribute takes a",
     "-- | constant or a `Signal` of its type, as Screamer's own attributes do, and",
     "-- | every handler is an effect: `onclick={count.modifyT1 (_ + 1)}`. `oninput`",
-    "-- | is given the target's value and the keyboard events their event."
+    "-- | is given the target's value and the keyboard events their event.",
+    "-- | `onsubmit` prevents the default submission before running its effect.",
+    "-- | `onclick` preserves the default action, including anchor navigation.",
+    "-- | Use a trait hole with a raw handler to choose a different policy."
   ],
   "imports": [
     "Prelude (Unit, show, (<<<))",
@@ -36,7 +39,8 @@
     "Screamer.Element as S",
     "Screamer.Attribute as S",
     "Screamer.Psx.Core (class Content, Attr, Node, elementOf, onValueInput)",
-    "Web.UIEvent.KeyboardEvent (KeyboardEvent)"
+    "Web.UIEvent.KeyboardEvent (KeyboardEvent)",
+    "Web.Event.Event (preventDefault)"
   ],
   "templates": {
     "element": {
@@ -98,6 +102,9 @@
       "type": "(KeyboardEvent -> Effect Unit) -> Attr (Effect Unit)",
       "code": "S.unsafeOn_ {name}",
       "sample": "\\_ -> msg"
+    },
+    "onSubmit": {
+      "code": "\\effect -> S.on_ {name} \\e -> preventDefault e Prelude.*> effect"
     }
   },
   "conformance": {

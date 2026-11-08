@@ -101,6 +101,11 @@ function warn(code: string, message: string, scope: Scope | null = writerScope()
   console.warn(text);
 }
 
+/** Add-on diagnostics use the same hook and strict-mode behavior as the core. */
+export function warnDevelopment(code: string, message: string, scope: Scope | null): void {
+  if (DEV) warn(code, message, scope);
+}
+
 /** What development tools know about a scope besides its structure. */
 export interface ScopeInfo {
   /** Creation order, from 0. */

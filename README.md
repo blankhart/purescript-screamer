@@ -34,12 +34,12 @@ package:
 | [`screamer`](packages/screamer) | `Screamer`, `Screamer.Element`, `.Attribute`, `.Html`, `.Html.Attributes`, `.Html.Handlers`, `.Svg` | elements |
 | [`screamer-combinators`](packages/screamer-combinators) | `Screamer.Event.Extra`, `.Signal.Extra`, `.Time`, `.Flatten` | more operators, timers and owned flattening |
 | [`screamer-resource`](packages/screamer-resource) | `Screamer.Resource` | requests as signals |
-| [`screamer-web`](packages/screamer-web) | `Screamer.Web.WebSocket` | browser subscriptions |
+| [`screamer-web`](packages/screamer-web) | `Screamer.Web.WebSocket`, `.Web.Page`, `.Web.Storage`, `.Web.MediaQuery`, `.Web.Observers` | sockets, online/visibility signals, storage, media queries and DOM observers |
 | [`screamer-router`](packages/screamer-router) | `Screamer.Router`, `.Router.Windrose` | the location as a signal |
 | [`screamer-forms`](packages/screamer-forms) | `Screamer.Form` | formlets |
 | [`screamer-motion`](packages/screamer-motion) | `Screamer.Motion`, `.Motion.Transition`, `.Motion.Animate`, `.Motion.Value`, `.Motion.ViewTransition`, `.Motion.ReducedMotion` | enter, leave and move animations, crossfades, tweens and springs |
 | [`screamer-devtools`](packages/screamer-devtools) | `Screamer.Devtools` | headless inspection: scope tree snapshots, timestep log, leak checks, work budgets and strict mode |
-| [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock` | test helpers |
+| [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock`, `.Test.Setup` | test helpers and Node DOM/CSS bootstrap |
 
 `npm run build` builds them all, and `npm test` runs every package's tests.
 
@@ -69,6 +69,34 @@ workspace:
 
 The examples are in `examples/src`. Run `npm run build:examples` to compile them, optimize the compiled code with [purs-backend-optimizer](https://github.com/aristanetworks/purescript-backend-optimizer) (into `output-es`), and bundle each one with esbuild into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
 
+## Building for production
+
+Development checks are enabled by default. When bundling an application for
+production, define the JavaScript identifier `__DEV__` as the boolean `false`.
+For esbuild:
+
+```javascript
+await esbuild.build({
+  entryPoints: ['app.js'], // imports the compiled PureScript main and calls it
+  bundle: true,
+  platform: 'browser',
+  outfile: 'dist/app.js',
+  minify: true,
+  define: { __DEV__: 'false' },
+});
+```
+
+The define value is JavaScript source text: `'false'` becomes a boolean in the
+bundle. Setting `NODE_ENV=production` alone does not turn Screamer checks off.
+This disables development consistency checks, warnings, graph counters,
+creation-site tracking and devtools hooks, and lets the bundler remove their
+unused code. Devtools inspection is unavailable in that build. Signal/event
+propagation and resource ownership still operate normally.
+
+Keep `__DEV__` enabled for tests (or leave it undefined), so strict warnings,
+leak assertions and other diagnostics remain effective. The regular example
+builds keep it on; `npm run bench` uses the production define for measurements.
+
 ## How ownership works
 
 **Signals are pure values.** `Signal a` is a value that changes over time. `map`, `apply`, `bind`, `sampleOn` and `sampleManyWith` build new signals without touching the reactive graph. A derived signal connects to its sources only while something observes it, and it is garbage-collected like any other value when nothing refers to it. When a signal updates is part of its meaning: a signal source updates when it is written a different value, and a derived signal updates whenever an argument does, whatever it computes, so `f <$> s` updates exactly when `s` does. To stop updates that repeat a value, as before `dyn` or `resource`, use `dropRepeats`, which is stateful and so made in `Owned`.
@@ -95,9 +123,11 @@ The examples are in `examples/src`. Run `npm run build:examples` to compile them
 
 **Embedding JS widgets.** A widget that owns its DOM subtree (an editor, a map, a chart) goes in `foreign_ setup tag attrs`, which creates the host element and runs `setup host :: Owned Unit` once per instance. Create the widget there and destroy it in `onCleanup`. Sync both ways with guards: push a signal in with `subscribe`, skipping values equal to what the widget already shows so the user's edits do not loop back; report the widget's own changes out through a callback wrapped in `batch`, ignoring changes the wrapper made itself. Screamer never touches the host's children. `foreignWithFallback_` adds children shown where the widget cannot run, such as on a server renderer, whose backend is not interactive. See `examples/src/CodeMirror.purs`.
 
+See [the `dyn` and inputs guide](packages/screamer/README.md#dyn-and-inputs) for keeping editable controls focused while the model changes.
+
 **Motion.** Only `dyn` and `each` know when a node is added, moved or removed, so the core has one seam for each: `withEnter`, `withMove` and `withLeave` provide hooks to every `dyn` and `each` inside an element. A leave hook keeps the node in place until it calls `done`, and runs in a scope of its own, so its timers and animations end with the leave. `Screamer.Motion` (in screamer-motion) builds on them: CSS-class transitions (`transition`, with `fade` and `slide` presets), the Web Animations API (`animate`, `leaveWith`), FLIP reorders (`flipMoves`), shared-element `crossfade`s between lists, animated values that stop requesting frames once they settle (`tween`, `spring`), and `viewTransition`. Durations are always stated, never read from computed styles, and everything honours `prefers-reduced-motion` by default. See `examples/src/Motion.purs`.
 
-**Development tools.** In development builds the runtime reports scopes, effect runs, rounds, writes, warnings and errors to one optional hook, and every warning has a stable code (`SCR001` for a read of a paused stateful signal, `SCR002` for unordered writes in one timestep, `SCR003` for a failed consistency check, `SCR1xx` for the errors). `Screamer.Devtools` (in screamer-devtools) turns that into data a test, a script or an agent can read: `snapshotText` and `snapshotJson` print the live scope tree and the nodes each scope built, with deterministic paths such as `root/provide/named:App/each[key=3]` (`named` in `Screamer.Element` names a subtree); `scopeOf` and `nodesOf` map between the page and those paths; `startLog` records one JSON Lines row per round, and its `why` and `whyNot` explain why an effect ran or did not; `assertNoLeaks` fails with each leaked scope's path and, with `setTrackOrigins`, where it was created; `expectRounds` and `expectEffectRuns` assert work budgets; `startRecording` and `replay` turn a sequence of inputs into a test; and `setConsistencyCheck` checks the DOM against its signals after every timestep. `Screamer.Test.runSpec` runs tests in strict mode, where warnings are errors. The examples expose the same data as `window.__SCREAMER_DEVTOOLS__`, and `npm run inspect -- <Example> [script.mjs]` prints it for one example in headless Chromium. A visual overlay is planned in #85.
+**Development tools.** In development builds the runtime reports scopes, effect runs, rounds, writes, warnings and errors to one optional hook, and every warning has a stable code (`SCR001` for a read of a paused stateful signal, `SCR002` for unordered writes in one timestep, `SCR003` for a failed consistency check, `SCR004` for a `dyn` rebuild that removes focus, `SCR1xx` for the errors). `Screamer.Devtools` (in screamer-devtools) turns that into data a test, a script or an agent can read: `snapshotText` and `snapshotJson` print the live scope tree and the nodes each scope built, with deterministic paths such as `root/provide/named:App/each[key=3]` (`named` in `Screamer.Element` names a subtree); `scopeOf` and `nodesOf` map between the page and those paths; `startLog` records one JSON Lines row per round, and its `why` and `whyNot` explain why an effect ran or did not; `assertNoLeaks` fails with each leaked scope's path and, with `setTrackOrigins`, where it was created; `expectRounds` and `expectEffectRuns` assert work budgets; `startRecording` and `replay` turn a sequence of inputs into a test; and `setConsistencyCheck` checks the DOM against its signals after every timestep. `Screamer.Test.runSpec` runs tests in strict mode, where warnings are errors. The examples expose the same data as `window.__SCREAMER_DEVTOOLS__`, and `npm run inspect -- <Example> [script.mjs]` prints it for one example in headless Chromium. A visual overlay is planned in #85.
 
 ## Examples
 

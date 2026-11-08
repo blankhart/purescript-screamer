@@ -223,7 +223,10 @@
         },
         "test": {
           "dependencies": [
-            "console"
+            "console",
+            "exceptions",
+            "refs",
+            "screamer-test"
           ]
         }
       },
@@ -341,9 +344,12 @@
         "path": "packages/screamer-web",
         "core": {
           "dependencies": [
+            "datetime",
             "effect",
+            "either",
             "foldable-traversable",
             "maybe",
+            "numbers",
             "prelude",
             "refs",
             "screamer",

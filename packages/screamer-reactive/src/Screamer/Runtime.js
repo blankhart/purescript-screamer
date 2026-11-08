@@ -70,6 +70,11 @@ function warn(code, message, scope = writerScope()) {
         throw new Error(text);
     console.warn(text);
 }
+/** Add-on diagnostics use the same hook and strict-mode behavior as the core. */
+export function warnDevelopment(code, message, scope) {
+    if (DEV)
+        warn(code, message, scope);
+}
 let nextScopeId = 0;
 const scopeInfos = new WeakMap();
 /** Root scopes not yet disposed, in creation order (`DEV` only). */

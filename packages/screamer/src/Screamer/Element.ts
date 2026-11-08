@@ -397,9 +397,25 @@ export const dynImpl = (hooks: Hooks) => (sig: Sig<El>) => (s: Scope) => (): N =
   const enterer = Enterer.of(b, s, hooks.enter);
   let child: Scope | null = null;
   let initial = true;
+  let warnedFocus = false;
   R.effectIn(s, () => {
     const el = sig.read();
     R.untracked(() => {
+      if (R.development && b.interactive && child !== null && (!warnedFocus || R.isStrict())) {
+        // Use the anchor's document, so alternate documents work and inert
+        // backends never need DOM globals. Warn on rebuilds, not unmounts.
+        const active = start.ownerDocument?.activeElement;
+        if (active) {
+          for (let node = b.nextSibling(start); node !== null && node !== end; node = b.nextSibling(node)) {
+            if (node === active || node.contains?.(active)) {
+              warnedFocus = true;
+              const name = active.tagName.toLowerCase() + (active.id ? `#${active.id}` : '');
+              R.warnDevelopment('SCR004', `dyn is rebuilding focused <${name}>; keep inputs outside dyn and bind their values to signals`, s);
+              break;
+            }
+          }
+        }
+      }
       if (child !== null) child.dispose();
       child = null;
       removeBetween(b, start, end, remover);

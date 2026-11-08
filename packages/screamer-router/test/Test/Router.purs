@@ -2,17 +2,36 @@ module Test.Router (spec) where
 
 import Prelude
 
+import Data.Either (Either(..))
+import Screamer.Router.Windrose (matchHash, matchPath)
+import Windrose.Router (type (:>), P, Q, RouteProxy(..), V, mkRoutable, route)
 import Effect.Class (liftEffect)
 import Effect.Ref as Ref
 import Screamer.Element (text)
 import Screamer.Element as E
 import Screamer.Router as Router
+import Screamer.Owned (runOwned)
+import Test.Links as Links
 import Screamer.Test.Dom (click, innerHTML, resetBody)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
+type QueryRoute = P "login" :> Q (return :: String) :> V "login"
+
 spec :: Spec Unit
 spec = describe "Screamer.Router" do
+  it "intercepts eligible plain anchors through the provided router and removes its listener" do
+    liftEffect resetBody
+    sunk <- liftEffect $ Ref.new []
+    let env = Router.staticRouter "/" (\url -> Ref.modify_ (_ <> [ url ]) sunk)
+    scope <- liftEffect $ runOwned $ Router.withRouter env $ Router.interceptLinks { exclude: [ "/auth/", "/api/" ] }
+    liftEffect Links.exercise >>= shouldEqual
+      [ true, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, false ]
+    liftEffect (Ref.read sunk) >>= shouldEqual [ "/next?x=1#top", "/self" ]
+    liftEffect scope.dispose
+    _ <- liftEffect Links.exercise
+    liftEffect (Ref.read sunk) >>= shouldEqual [ "/next?x=1#top", "/self" ]
+
   it "follows navigate, redirect, links and popstate" do
     liftEffect resetBody
     liftEffect $ Router.browserRouter.replace "/start"
@@ -58,3 +77,12 @@ spec = describe "Screamer.Router" do
   it "parses relative URLs" do
     loc <- liftEffect (Router.staticRouter "/a/b?c=1" (\_ -> pure unit)).current
     loc `shouldEqual` { pathname: "/a/b", search: "?c=1", hash: "" }
+
+  it "matches History queries with Windrose Q and leaves hashes out" do
+    let
+      matcher = route (mkRoutable (RouteProxy :: _ QueryRoute)) _.return
+      loc = { pathname: "/login", search: "?return=%2Fitems%2F7", hash: "#ignored" }
+    matchPath matcher loc `shouldEqual` Right "%2Fitems%2F7"
+    matchPath matcher (loc { search = "" }) `shouldEqual` Left "/login"
+    matchPath matcher (loc { pathname = "/missing" }) `shouldEqual` Left "/missing?return=%2Fitems%2F7"
+    matchHash matcher (loc { hash = "#/login?return=%2Fhome" }) `shouldEqual` Right "%2Fhome"
