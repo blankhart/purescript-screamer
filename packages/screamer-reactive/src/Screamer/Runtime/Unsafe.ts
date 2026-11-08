@@ -83,6 +83,8 @@ export const untracked = R.untracked;
 // Development tools
 export const setDevHook = R.setDevHook;
 export const setStrict = R.setStrict;
+/** Report an add-on warning through the devtools hook and strict mode. */
+export const warnDevelopment = R.warnDevelopment;
 export const isStrict = R.isStrict;
 export const scopeInfo = R.scopeInfo;
 export const tagScope = R.tagScope;
