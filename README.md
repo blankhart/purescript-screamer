@@ -34,12 +34,12 @@ package:
 | [`screamer`](packages/screamer) | `Screamer`, `Screamer.Element`, `.Attribute`, `.Html`, `.Html.Attributes`, `.Html.Handlers`, `.Svg` | elements |
 | [`screamer-combinators`](packages/screamer-combinators) | `Screamer.Event.Extra`, `.Signal.Extra`, `.Time`, `.Flatten` | more operators, timers and owned flattening |
 | [`screamer-resource`](packages/screamer-resource) | `Screamer.Resource` | requests as signals |
-| [`screamer-web`](packages/screamer-web) | `Screamer.Web.WebSocket` | browser subscriptions |
+| [`screamer-web`](packages/screamer-web) | `Screamer.Web.WebSocket`, `.Web.Page`, `.Web.Storage`, `.Web.MediaQuery`, `.Web.Observers` | sockets, online/visibility signals, storage, media queries and DOM observers |
 | [`screamer-router`](packages/screamer-router) | `Screamer.Router`, `.Router.Windrose` | the location as a signal |
 | [`screamer-forms`](packages/screamer-forms) | `Screamer.Form` | formlets |
 | [`screamer-motion`](packages/screamer-motion) | `Screamer.Motion`, `.Motion.Transition`, `.Motion.Animate`, `.Motion.Value`, `.Motion.ViewTransition`, `.Motion.ReducedMotion` | enter, leave and move animations, crossfades, tweens and springs |
 | [`screamer-devtools`](packages/screamer-devtools) | `Screamer.Devtools` | headless inspection: scope tree snapshots, timestep log, leak checks, work budgets and strict mode |
-| [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock` | test helpers |
+| [`screamer-test`](packages/screamer-test) | `Screamer.Test`, `.Test.Dom`, `.Test.Clock`, `.Test.Setup` | test helpers and Node DOM/CSS bootstrap |
 
 `npm run build` builds them all, and `npm test` runs every package's tests.
 
@@ -68,6 +68,34 @@ workspace:
 `npm run release -- 0.2.0` does the same locally, and pushes only with `--push`.
 
 The examples are in `examples/src`. Run `npm run build:examples` to compile them, optimize the compiled code with [purs-backend-optimizer](https://github.com/aristanetworks/purescript-backend-optimizer) (into `output-es`), and bundle each one with esbuild into `examples/output`, which also gets an `index.html` showing a gallery of them and the stylesheet from `examples/static`. `npm run serve` serves that page at http://localhost:8080/ (`npm run serve:rainbow` opens the rainbow spiral directly), and `npm run test:smoke` checks the examples in headless Chromium.
+
+## Building for production
+
+Development checks are enabled by default. When bundling an application for
+production, define the JavaScript identifier `__DEV__` as the boolean `false`.
+For esbuild:
+
+```javascript
+await esbuild.build({
+  entryPoints: ['app.js'], // imports the compiled PureScript main and calls it
+  bundle: true,
+  platform: 'browser',
+  outfile: 'dist/app.js',
+  minify: true,
+  define: { __DEV__: 'false' },
+});
+```
+
+The define value is JavaScript source text: `'false'` becomes a boolean in the
+bundle. Setting `NODE_ENV=production` alone does not turn Screamer checks off.
+This disables development consistency checks, warnings, graph counters,
+creation-site tracking and devtools hooks, and lets the bundler remove their
+unused code. Devtools inspection is unavailable in that build. Signal/event
+propagation and resource ownership still operate normally.
+
+Keep `__DEV__` enabled for tests (or leave it undefined), so strict warnings,
+leak assertions and other diagnostics remain effective. The regular example
+builds keep it on; `npm run bench` uses the production define for measurements.
 
 ## How ownership works
 
