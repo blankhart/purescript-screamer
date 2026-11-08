@@ -17,11 +17,12 @@ import Screamer.Html.Attributes as A
 import Screamer.Signal (Signal, dropRepeats)
 import Screamer.Router (Location, link, location)
 import Screamer.Router.Windrose (matchHash)
-import Windrose.Router (type (:<|>), type (:>), C, P, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)
+import Windrose.Router (type (:<|>), type (:>), C, P, Route, RouteProxy(..), RoutingError, V, allLinks, mkRoutable, route)
 
 main :: Effect Unit
 main = Harness.run "main" app
 
+type Api :: Route
 type Api =
   V "home"
     :<|> (P "about" :> V "about")

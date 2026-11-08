@@ -5,9 +5,14 @@
 -- | parse.
 -- |
 -- | ```purescript
--- | router = route (mkRoutable (RouteProxy :: _ Api)) { home: Home, ... }
+-- | type Api = V "home"
+-- | router = route (mkRoutable (RouteProxy :: _ Api)) { home: Home }
 -- | page = either NotFound identity <<< matchHash router <$> loc
 -- | ```
+-- |
+-- | Windrose 0.2.0 uses handler and link records even for a single endpoint.
+-- | Pass encoded locations directly: Windrose decodes captures and query
+-- | values after splitting the URL. Failed matches retain the encoded input.
 module Screamer.Router.Windrose
   ( matchHash
   , matchPath
