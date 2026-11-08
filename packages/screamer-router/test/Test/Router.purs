@@ -10,6 +10,8 @@ import Effect.Ref as Ref
 import Screamer.Element (text)
 import Screamer.Element as E
 import Screamer.Router as Router
+import Screamer.Owned (runOwned)
+import Test.Links as Links
 import Screamer.Test.Dom (click, innerHTML, resetBody)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -18,6 +20,18 @@ type QueryRoute = P "login" :> Q (return :: String) :> V "login"
 
 spec :: Spec Unit
 spec = describe "Screamer.Router" do
+  it "intercepts eligible plain anchors through the provided router and removes its listener" do
+    liftEffect resetBody
+    sunk <- liftEffect $ Ref.new []
+    let env = Router.staticRouter "/" (\url -> Ref.modify_ (_ <> [ url ]) sunk)
+    scope <- liftEffect $ runOwned $ Router.withRouter env $ Router.interceptLinks { exclude: [ "/auth/", "/api/" ] }
+    liftEffect Links.exercise >>= shouldEqual
+      [ true, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, false ]
+    liftEffect (Ref.read sunk) >>= shouldEqual [ "/next?x=1#top", "/self" ]
+    liftEffect scope.dispose
+    _ <- liftEffect Links.exercise
+    liftEffect (Ref.read sunk) >>= shouldEqual [ "/next?x=1#top", "/self" ]
+
   it "follows navigate, redirect, links and popstate" do
     liftEffect resetBody
     liftEffect $ Router.browserRouter.replace "/start"

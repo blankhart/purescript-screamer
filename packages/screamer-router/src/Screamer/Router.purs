@@ -17,6 +17,7 @@ module Screamer.Router
   , navigate
   , redirect
   , link
+  , interceptLinks
   ) where
 
 import Prelude
@@ -30,8 +31,9 @@ import Screamer.Html (a_)
 import Screamer.Html.Attributes (href_)
 import Screamer.Html.Handlers (onClick_)
 import Screamer.Owned (Owned, onCleanup)
+import Screamer.Renderer (interactive)
 import Screamer.Signal (Signal)
-import Screamer.Source (signalSource)
+import Screamer.Source (batch, signalSource)
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, altKey, button, ctrlKey, metaKey, shiftKey, toEvent)
 import Type.Proxy (Proxy(..))
@@ -120,6 +122,20 @@ navigate url = router >>= \env -> liftEffect (env.push url)
 -- | Replace the current history entry through the current env.
 redirect :: String -> Owned Unit
 redirect url = router >>= \env -> liftEffect (env.replace url)
+
+-- | Opt in once per application scope to routing ordinary same-origin
+-- | anchors through the current env. Modified/non-primary/prevented clicks,
+-- | downloads, non-self targets, hash-only links and excluded pathname
+-- | prefixes retain browser behavior. Removed on cleanup; inert on a server.
+interceptLinks :: { exclude :: Array String } -> Owned Unit
+interceptLinks options = do
+  live <- interactive
+  when live do
+    env <- router
+    stop <- liftEffect $ interceptLinksImpl options.exclude (batch <<< env.push)
+    onCleanup stop
+
+foreign import interceptLinksImpl :: Array String -> (String -> Effect Unit) -> Effect (Effect Unit)
 
 -- | An anchor that navigates through the current env without reloading
 -- | the page. Clicks with a modifier key or a button other than the main

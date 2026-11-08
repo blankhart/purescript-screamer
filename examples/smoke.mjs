@@ -21,6 +21,10 @@ const examples = {
     await expectText(page, '#page h1', 'Sign in');
     await page.click('#broken');
     await expectText(page, '#page h1', 'Not found');
+    await page.evaluate(() => { window.historyExampleMarker = true; });
+    await page.click('#plain-home');
+    await expectText(page, '#page h1', 'Home');
+    if (!await page.evaluate(() => window.historyExampleMarker)) throw new Error('plain anchor reloaded the page');
   },
   async HelloWorld(page) {
     await expectText(page, '#count', '0');
@@ -210,7 +214,11 @@ const examples = {
 };
 
 async function expectText(page, selector, text) {
-  await page.waitForFunction(([s, t]) => document.querySelector(s)?.textContent === t, [selector, text]);
+  try {
+    await page.waitForFunction(([s, t]) => document.querySelector(s)?.textContent === t, [selector, text]);
+  } catch (error) {
+    throw new Error(`${selector}: expected ${JSON.stringify(text)} at ${page.url()}: ${error.message}`);
+  }
 }
 
 async function expectClass(page, selector, cls) {
@@ -224,6 +232,7 @@ for (const [name, interact] of Object.entries(examples)) {
   try {
     const opened = await openExample(browser, name);
     page = opened.page;
+    page.setDefaultTimeout(10000);
     const errors = opened.errors;
     await page.goto(`${origin}/`);
     await page.waitForFunction(() => window.screamerExample !== undefined, null, { timeout: 5000 });
