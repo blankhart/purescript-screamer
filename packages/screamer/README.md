@@ -16,6 +16,48 @@ Depends on: screamer-reactive, and the `web-*` packages.
 
 ## Framework primitives
 
+### `dyn` and inputs
+
+`dyn (model.signal <#> body)` destroys and rebuilds the whole body on every
+model update. If that body contains an input whose handler writes the model,
+typing replaces the focused element after the first character. The new input
+loses focus, selection, and any value that was not saved in the model.
+
+Keep editable elements outside that `dyn` and bind their properties directly:
+
+```purescript
+component do
+  model <- liftEffect $ signalSource { title: "", previewKind: "summary" }
+  preview <- Signal.dropRepeatsBy
+    (\a b -> a.previewKind == b.previewKind) model.signal
+  pure $ E.div_ []
+    [ E.input_
+        [ A.value_ (_.title <$> model.signal)
+        , H.onInput_ \event ->
+            for_ (Input.fromEventTarget =<< target event) \input -> do
+              title <- Input.value input
+              model.modifyT1 (_ { title = title })
+        ] []
+    , dyn (preview <#> \m -> renderPreview m.previewKind)
+    ]
+```
+
+Here `E`, `A`, `H`, and `Signal` are qualified imports of `Screamer.Html`,
+`Screamer.Html.Attributes`, `Screamer.Html.Handlers`, and `Screamer.Signal`.
+`Input` is `Web.HTML.HTMLInputElement`, `target` comes from `Web.Event.Event`,
+and `for_` from `Data.Foldable`. `renderPreview :: String -> Element` supplies
+the application-specific view. Use `dyn` only where structure changes, and
+deduplicate using exactly the data that subtree renders. For lists with stable
+row identities use `each`. Ordinary text and attribute changes need only
+signal bindings.
+
+Development builds emit `SCR004` once per `dyn` instance if a rebuild would
+remove the focused element, naming its tag and ID. It also reaches devtools;
+strict tests throw on it. Unmounting does not warn. Production builds skip
+the focus check.
+
+### Lifetimes and hooks
+
 - `portal selector el` renders `el` into another element (a modal root), owned by the current scope: it sees the current context and is removed with its parent.
 - `catchError handler el` is an error boundary: if `el` throws while it is built, or one of its effects throws later, its scope is disposed and `handler err` is shown in its place. Errors from the handler's element go to the enclosing boundary.
 - `suspense fallback content` shows `fallback` until nothing is pending in `content` (`Screamer.Pending.settled`), for example until its `resource`s have loaded, then shows `content`. Later loading inside `content` does not bring the fallback back.
