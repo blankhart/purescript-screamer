@@ -6,6 +6,22 @@
 import { launch, openExample, origin } from './page.mjs';
 
 const examples = {
+  async HistoryRouter(page) {
+    await page.goto(`${origin}/history-router/`);
+    await expectText(page, '#page h1', 'Home');
+    await page.evaluate(() => { window.historyExampleMarker = true; });
+    await page.click('#login');
+    await expectText(page, '#return', '/history-router/');
+    if (!await page.evaluate(() => window.historyExampleMarker)) throw new Error('link reloaded the page');
+    await page.reload();
+    await expectText(page, '#return', '/history-router/');
+    await page.goBack();
+    await expectText(page, '#page h1', 'Home');
+    await page.goForward();
+    await expectText(page, '#page h1', 'Sign in');
+    await page.click('#broken');
+    await expectText(page, '#page h1', 'Not found');
+  },
   async HelloWorld(page) {
     await expectText(page, '#count', '0');
     await page.click('#increment');

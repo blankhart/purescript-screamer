@@ -46,6 +46,13 @@ for (const name of examples) {
 
 fs.cpSync(staticDir, outDir, { recursive: true });
 writeIndex(examples.filter((name) => fs.existsSync(path.join(outDir, `${name}.js`))));
+if (fs.existsSync(path.join(outDir, 'HistoryRouter.js'))) {
+  fs.mkdirSync(path.join(outDir, 'history-router'), { recursive: true });
+  fs.writeFileSync(path.join(outDir, 'history-router/index.html'), `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>History router</title>
+<link rel="stylesheet" href="/examples.css"></head><body><main></main>
+<script src="/HistoryRouter.js"></script></body></html>`);
+}
 
 async function bundle(name, outfile, define = {}) {
   console.log(`bundling ${name}`);
@@ -86,11 +93,11 @@ function escape(text) {
 // With no `?example=` it shows a gallery; with one, it shows that example.
 function writeIndex(names) {
   const info = Object.fromEntries(names.map((name) => [name, { title: title(name), description: description(name) }]));
-  const cards = names.map((name) => `        <li><a href="?example=${name}">
+  const cards = names.map((name) => `        <li><a href="${name === 'HistoryRouter' ? '/history-router/' : `?example=${name}`}">
           <h2>${info[name].title}</h2>
           <p>${info[name].description}</p>
         </a></li>`).join('\n');
-  const pills = names.map((name) => `        <a href="?example=${name}" data-name="${name}">${info[name].title}</a>`).join('\n');
+  const pills = names.map((name) => `        <a href="${name === 'HistoryRouter' ? '/history-router/' : `?example=${name}`}" data-name="${name}">${info[name].title}</a>`).join('\n');
   const html = `<!doctype html>
 <html lang="en">
 <head>

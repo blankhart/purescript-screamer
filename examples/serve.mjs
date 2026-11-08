@@ -23,6 +23,9 @@ function resolve(pathname) {
   if (file !== root && !file.startsWith(root + path.sep)) return null;
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) return path.join(file, 'index.html');
   if (fs.existsSync(file)) return file;
+  // The History example has its own shell so a deep-link reload does not
+  // return to the gallery. Assets above are still served as files.
+  if (pathname.startsWith('/history-router/')) return path.join(root, 'history-router/index.html');
   return path.join(root, 'index.html');
 }
 
