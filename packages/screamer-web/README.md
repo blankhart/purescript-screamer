@@ -12,4 +12,25 @@ Browser sources as owned signals: each starts its listener or observer when its 
 
 Depends on: screamer (for `Screamer.Renderer.interactive`), screamer-reactive.
 
+### Page transitions
+
+`Page.online` and `Page.visible` return signals. `Signal.subscribe` calls back
+immediately with the current value, then on updates. Subscribing to both with a
+retry callback can therefore retry twice during setup. Use `Event.changes` when
+the effect should run only on transitions:
+
+```purescript
+import Screamer.Event as Event
+import Screamer.Web.Page as Page
+
+-- Inside an Owned action; retry :: Effect Unit.
+online <- Page.online
+Event.subscribe (Event.changes online) \isOnline -> when isOnline retry
+```
+
+The same pattern applies to `Page.visible`. It skips each signal's initial
+value, but separate online and visibility transitions still produce separate
+callbacks. A shared retry action should ignore requests while already
+connecting or connected, and cancel any pending backoff before retrying.
+
 The tests run under jsdom (`test/Test/Sources.purs`, with stubs for `matchMedia` and the observers) and, for the non-interactive behaviour, in plain Node with no DOM (`test/Test/Web/Node.purs`, run by `scripts/test-purs.mjs`).
