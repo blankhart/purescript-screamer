@@ -4,8 +4,8 @@ Elements: DOM trees bound to signals, without a virtual DOM. This is the package
 
 | Module | What it has |
 |---|---|
-| `Screamer` | the prelude: `Element`, `text`, `dyn`, `each`, `component`, `suspense`, `mount`, the `Signal` and `Event` types, `signalSource`, `eventSource`, `batch`, `Owned`, `onCleanup`, `liftEffect` |
-| `Screamer.Element` | `Element`, `element_`, `svgElement_`, `fragment_`, `text`, `dyn`, `each`, `component`, `foreign_`, `foreignWithFallback_`, `portal`, `catchError`, `suspense`, `withLeave`, `withEnter`, `withMove`, `mount`, `instantiate`, `IsElement` |
+| `Screamer` | the prelude: `Element`, `text`, `dyn`, `dynKeyed`, `each`, `component`, `suspense`, `mount`, the `Signal` and `Event` types, `signalSource`, `eventSource`, `batch`, `Owned`, `onCleanup`, `liftEffect` |
+| `Screamer.Element` | `Element`, `element_`, `svgElement_`, `fragment_`, `text`, `dyn`, `dynKeyed`, `each`, `component`, `foreign_`, `foreignWithFallback_`, `portal`, `catchError`, `suspense`, `withLeave`, `withEnter`, `withMove`, `mount`, `instantiate`, `IsElement` |
 | `Screamer.Element.Unsafe` | `instantiateWith`: instantiate under a root that provides another renderer backend |
 | `Screamer.Renderer` | `Backend`, `browserBackend`, `createBrowserBackend`, `RendererKey`, `rendererKey`, `interactive`, `delegated`, `BoundaryKey`, `boundaryKey`: the node operations every element goes through |
 | `Screamer.Attribute` | `Attribute`, `property`, `attribute`, `booleanAttribute`, `styleProperty`, `attributes`, `on_`, `unsafeOn_`, `AttrValue` |
@@ -55,6 +55,28 @@ Development builds emit `SCR004` once per `dyn` instance if a rebuild would
 remove the focused element, naming its tag and ID. It also reaches devtools;
 strict tests throw on it. Unmounting does not warn. Production builds skip
 the focus check.
+
+### Retained identity with `dynKeyed`
+
+`dynKeyed key values render` builds one child and gives `render` a live
+`Signal` of its inputs. While the key stays the same, input updates reach that
+signal without calling the builder again: DOM nodes, focus, selection, local
+state, and owned resources survive. Unlike `dyn`, it replaces the child only
+when the key changes. The outgoing child's signal never receives the incoming
+key's payload, and the new child starts with the current input.
+
+The caller chooses identity. For routing, a key can include the page
+constructor and path captures while excluding query fields; distinct resource
+IDs may need distinct keys even for the same endpoint. Reset policy and
+interpretation of query changes belong to the application. Retaining a child
+does not automatically reset its local state or interpret its inputs.
+
+Returning A → B → A creates a fresh A; inactive pages are not cached. Parent
+disposal releases the active child. Construction is pure and multiple mounts
+are independent. `dynKeyed` is a singleton `each`, so it retains the same
+renderer and enter/move/leave hook contracts, including disposal of outgoing
+resources before delayed leave nodes are removed. Use `each` for multiple
+keyed children and `dyn` when every update should replace the subtree.
 
 ### Lifetimes and hooks
 

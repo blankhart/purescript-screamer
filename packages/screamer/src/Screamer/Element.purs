@@ -11,6 +11,7 @@ module Screamer.Element
   , fragment_
   , text
   , dyn
+  , dynKeyed
   , component
   , foreign_
   , foreignWithFallback_
@@ -102,6 +103,17 @@ text s = Element (Owned (textImpl s))
 -- | instantiates the new element in a fresh child scope.
 dyn :: Signal Element -> Element
 dyn s = Element (Owned (dynImpl hooks s))
+
+-- | Retain one child while its key is unchanged, updating its live input
+-- | signal without rebuilding its nodes or restarting its owned resources.
+-- | A changed key disposes the old child and builds a fresh one seeded with
+-- | the current input; the old signal never receives the new key's value.
+-- | Returning to an earlier key creates a new instance, not a cached child.
+-- | Like a singleton `each`, this inherits its renderer and enter/move/leave
+-- | hook behavior, including immediate scope disposal with delayed removal.
+-- | Construction is pure and each mount owns an independent child.
+dynKeyed :: forall k a. Ord k => (a -> k) -> Signal a -> (Signal a -> Element) -> Element
+dynKeyed key values render = each key ((\value -> [ value ]) <$> values) render
 
 -- | Run setup effects once per instance, in the element's scope.
 component :: Owned Element -> Element

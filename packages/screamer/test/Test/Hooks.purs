@@ -1,4 +1,4 @@
-module Test.Hooks (spec) where
+module Test.Hooks (spec, leaks, noLeak, recordEnter) where
 
 import Prelude
 

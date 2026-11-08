@@ -13,7 +13,7 @@ module Screamer
   ) where
 
 import Effect.Class (liftEffect)
-import Screamer.Element (Element, component, dyn, each, mount, suspense, text)
+import Screamer.Element (Element, component, dyn, dynKeyed, each, mount, suspense, text)
 import Screamer.Event (Event)
 import Screamer.Owned (Owned, onCleanup)
 import Screamer.Signal (Signal)
