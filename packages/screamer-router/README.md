@@ -9,7 +9,29 @@ The browser location as a signal.
 
 `location`, `navigate`, `redirect` and `link` read the router env from context (default `browserRouter`, the History API). Provide `staticRouter url sink` for a fixed location, as a server renderer or a test does: navigation then calls the sink. `navigate` and `redirect` are `Owned`; an event handler uses the `push` or `replace` of the env that `router` returns.
 
-Depends on: screamer, windrose-router. See `examples/src/Router.purs`.
+Depends on: screamer, windrose-router 0.2.0. Windrose is a library dependency
+of this package, not just an example dependency. See `examples/src/Router.purs`.
+
+### Windrose 0.2.0
+
+`matchHash` and `matchPath` accept the matcher returned by `route`. Build it
+once with a record of handlers, including when the API has only one endpoint:
+
+```purescript
+type Api = P "login" :> Q (return :: String) :> V "login"
+
+api = mkRoutable (RouteProxy :: _ Api)
+matcher = route api { login: _.return }
+links = allLinks api
+-- links.login { return: "/items/7" } == "/login?return=%2Fitems%2F7"
+```
+
+`allLinks` likewise returns a record for every API. Windrose encodes link
+captures and query values, then decodes them when routing. Pass browser
+locations directly to the adapters; decoding the whole URL first would turn
+escaped separators into route syntax. For the link above, the handler receives
+`"/items/7"`. On failure, the adapters return the original encoded route in
+`Left` so a not-found view can display it.
 
 ### History routing
 

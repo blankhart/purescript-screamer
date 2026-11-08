@@ -1033,7 +1033,7 @@
     "extra_packages": {
       "windrose-router": {
         "git": "https://github.com/blankhart/purescript-windrose-router.git",
-        "ref": "6199237cf42d35b8ca3d89ceaba40efb83966ac3"
+        "ref": "5f3d414b35b531dbacc9c7a1380071184ab91fa1"
       }
     }
   },
@@ -2078,7 +2078,7 @@
     "windrose-router": {
       "type": "git",
       "url": "https://github.com/blankhart/purescript-windrose-router.git",
-      "rev": "6199237cf42d35b8ca3d89ceaba40efb83966ac3",
+      "rev": "5f3d414b35b531dbacc9c7a1380071184ab91fa1",
       "dependencies": [
         "arrays",
         "control",
