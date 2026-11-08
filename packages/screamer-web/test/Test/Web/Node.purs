@@ -72,3 +72,9 @@ main = runSpec do
       sock <- WebSocket.connect "ws://example.test/"
       pure (sock.send "hello" *> (show <$> readT0 sock.state))
     st `shouldEqual` "Connecting"
+
+  it "WebSocket.connectWith is inert without DOM globals" do
+    st <- onServer do
+      sock <- WebSocket.connectWith WebSocket.defaultReconnectOptions "ws://example.test/"
+      pure (sock.send "hello" *> (show <$> readT0 sock.state))
+    st `shouldEqual` "ConnectingAttempt 0"
