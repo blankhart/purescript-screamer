@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { cell, stateful, scope, effect, sample, map, stepper, eventSource, untracked, batch } from '../../src/Screamer/Runtime.ts';
+import { cell, stateful, scope, effect, sample, map, stepper, eventSource, untracked, batch, warnDevelopment, setDevHook, setStrict } from '../../src/Screamer/Runtime.ts';
 
 /** Run `f`, returning the messages it passed to `console.warn`. */
 function warnings(f: () => void): string[] {
@@ -16,6 +16,16 @@ function warnings(f: () => void): string[] {
 }
 
 describe('development warnings', () => {
+  test('add-on warnings reach the hook and strict mode', () => {
+    const seen = [];
+    setDevHook(event => { if (event.type === 'warning') seen.push(event.code); });
+    try {
+      assert.deepEqual(warnings(() => warnDevelopment('SCR004', 'focus', null)), ['screamer SCR004: focus']);
+      setStrict(true);
+      assert.throws(() => warnDevelopment('SCR004', 'focus', null), /SCR004/);
+      assert.deepEqual(seen, ['SCR004', 'SCR004']);
+    } finally { setStrict(false); setDevHook(null); }
+  });
   test('a read of a paused stateful node warns once, naming the operator', () => {
     const src = eventSource<number>();
     const last = stepper(0, src);
@@ -150,6 +160,7 @@ describe('development warnings', () => {
     try {
       const R = await import('../../src/Screamer/Runtime.ts?production');
       assert.equal(R.DEV, false);
+      assert.deepEqual(warnings(() => R.warnDevelopment('SCR004', 'focus', null)), []);
       const src = R.eventSource<number>();
       const last = R.stepper(0, src);
       const stop = R.scope(() => { R.effect(() => { last.read(); }); });
