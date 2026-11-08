@@ -1,4 +1,10 @@
 -- | Whether the page is visible and the browser is online, as signals.
+-- |
+-- | `Signal.subscribe` immediately calls back with the current value.
+-- | For transition-only effects, subscribe to `Event.changes` instead:
+-- | `Event.subscribe (Event.changes onlineSignal) \isOnline -> when isOnline retry`.
+-- | This skips the initial value; it does not combine separate online and
+-- | visibility transitions into one retry.
 module Screamer.Web.Page
   ( visible
   , online
@@ -23,11 +29,13 @@ foreign import onOnlineChange :: Effect Unit -> Effect (Effect Unit)
 
 -- | Whether the page is visible (`document.visibilityState`), updated on
 -- | `visibilitychange`. True when the backend is not interactive.
+-- | Subscribing delivers the initial value; use `Event.changes` to skip it.
 visible :: Owned (Signal Boolean)
 visible = follow visibleNow onVisibilityChange
 
 -- | Whether the browser is online (`navigator.onLine`), updated on
 -- | `online` and `offline`. True when the backend is not interactive.
+-- | Subscribing delivers the initial value; use `Event.changes` to skip it.
 online :: Owned (Signal Boolean)
 online = follow onlineNow onOnlineChange
 
