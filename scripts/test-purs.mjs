@@ -5,6 +5,8 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const setup = './packages/screamer-test/setup-dom.mjs';
+const bootstrap = spawnSync('node', ['--test', 'packages/screamer-test/test/setup.test.mjs'], { stdio: 'inherit' });
+if (bootstrap.status !== 0) process.exit(bootstrap.status ?? 1);
 const env = { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${setup}`.trim() };
 
 for (const dir of readdirSync('packages').sort()) {
