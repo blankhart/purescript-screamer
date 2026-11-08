@@ -76,6 +76,14 @@ const examples = {
     await page.fill('#draft', 'hello');
     await page.click('button');
     await page.waitForFunction(() => Array.from(document.querySelectorAll('#lines li')).map((l) => l.className + ':' + l.textContent).join() === 'mine:hello,theirs:hello');
+    await page.evaluate(() => { window.oldSocket = window.lastSocket; window.lastSocket.drop(); });
+    await expectText(page, '#status', 'Retrying connection (attempt 1)');
+    if (!await page.locator('button').isDisabled()) throw new Error('send enabled while disconnected');
+    await expectText(page, '#status', 'Connected to wss://echo.websocket.org');
+    if (!await page.evaluate(() => window.lastSocket !== window.oldSocket)) throw new Error('socket was not replaced');
+    await page.fill('#draft', 'again');
+    await page.click('button');
+    await page.waitForFunction(() => document.querySelectorAll('#lines li').length === 4);
     const closed = await page.evaluate(() => { window.screamerExample.unmount(); return window.lastSocket.closed; });
     if (!closed) throw new Error('socket still open after unmount');
   },

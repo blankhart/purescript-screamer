@@ -1,5 +1,5 @@
 -- | A chat box over a WebSocket. The socket opens with the component and
--- | closes when it is unmounted.
+-- | reconnects after abnormal closes, and closes when it is unmounted.
 module Screamer.Examples.WebSocket where
 
 import Prelude
@@ -17,7 +17,7 @@ import Screamer.Html.Attributes as A
 import Screamer.Html.Handlers as H
 import Screamer.Signal (readT0)
 import Screamer.Source (signalSource)
-import Screamer.Web.WebSocket (ConnectionState(..), connect)
+import Screamer.Web.WebSocket (ReconnectState(..), connectWith, defaultReconnectOptions)
 import Web.Event.Event (preventDefault, target)
 import Web.HTML.HTMLInputElement as Input
 
@@ -28,7 +28,7 @@ type Line = { index :: Int, text :: String, mine :: Boolean }
 
 chat :: String -> Element
 chat url = component do
-  socket <- connect url
+  socket <- connectWith defaultReconnectOptions url
   draft <- liftEffect $ signalSource ""
   lines <- liftEffect $ signalSource ([] :: Array Line)
   let
@@ -37,7 +37,8 @@ chat url = component do
     add text mine = lines.modifyT1 \ls -> ls <> [ { index: Array.length ls, text, mine } ]
     submit = do
       text <- readT0 draft.signal
-      when (text /= "") do
+      connected <- isConnected <$> readT0 socket.state
+      when (connected && text /= "") do
         socket.send text
         add text true
         draft.putT1 ""
@@ -59,12 +60,19 @@ chat url = component do
                 Nothing -> pure unit
             ]
             []
-        , E.button_ [ A.type_ InputSubmit, A.disabled_ (socket.state <#> (_ /= Open)) ] [ element "Send" ]
+        , E.button_ [ A.type_ InputSubmit, A.disabled_ (not <<< isConnected <$> socket.state) ] [ element "Send" ]
         ]
     ]
   where
+  isConnected :: ReconnectState -> Boolean
+  isConnected = case _ of
+    Connected -> true
+    _ -> false
+
+  status :: ReconnectState -> String
   status = case _ of
-    Connecting -> "Connecting to " <> url
-    Open -> "Connected to " <> url
-    Closing -> "Closing"
-    Closed -> "Disconnected"
+    ConnectingAttempt _ -> "Connecting to " <> url
+    Connected -> "Connected to " <> url
+    Reconnecting r -> "Retrying connection (attempt " <> show r.attempt <> ")"
+    Disconnected info -> "Disconnected: " <> show info.code <> " " <> info.reason
+    ConnectionFailed _ -> "Could not open the socket"
