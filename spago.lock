@@ -223,7 +223,10 @@
         },
         "test": {
           "dependencies": [
-            "console"
+            "console",
+            "exceptions",
+            "refs",
+            "screamer-test"
           ]
         }
       },

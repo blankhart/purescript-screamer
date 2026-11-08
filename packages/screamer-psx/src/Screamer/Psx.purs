@@ -7,6 +7,9 @@
 -- | constant or a `Signal` of its type, as Screamer's own attributes do, and
 -- | every handler is an effect: `onclick={count.modifyT1 (_ + 1)}`. `oninput`
 -- | is given the target's value and the keyboard events their event.
+-- | `onsubmit` prevents the default submission before running its effect.
+-- | `onclick` preserves the default action, including anchor navigation.
+-- | Use a trait hole with a raw handler to choose a different policy.
 module Screamer.Psx
   ( module Core
   , a
@@ -889,6 +892,7 @@ import Screamer.Element as S
 import Screamer.Attribute as S
 import Screamer.Psx.Core (class Content, Attr, Node, elementOf, onValueInput)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent)
+import Web.Event.Event (preventDefault)
 import Screamer.Psx.Core (class Children, class Content, class ToKey, Attr, Key, Markup, Node, attribute, children, element, keyed, none, root, text, toKey) as Core
 
 -- Elements --------------------------------------------------------------------
@@ -3460,7 +3464,7 @@ onStorage :: Effect Unit -> Attr (Effect Unit)
 onStorage = \effect -> S.on_ "storage" \_ -> effect
 
 onSubmit :: Effect Unit -> Attr (Effect Unit)
-onSubmit = \effect -> S.on_ "submit" \_ -> effect
+onSubmit = \effect -> S.on_ "submit" \e -> preventDefault e Prelude.*> effect
 
 onSuspend :: Effect Unit -> Attr (Effect Unit)
 onSuspend = \effect -> S.on_ "suspend" \_ -> effect

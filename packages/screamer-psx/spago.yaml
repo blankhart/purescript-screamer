@@ -17,3 +17,6 @@ package:
     main: Test.Screamer.Psx
     dependencies:
       - console
+      - exceptions
+      - refs
+      - screamer-test
